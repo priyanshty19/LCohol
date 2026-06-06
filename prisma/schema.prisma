@@ -1,0 +1,646 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// AUTH & USERS
+// ============================================================================
+
+model User {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authId    String   @unique @map("auth_id")
+  email     String   @unique
+  dob       DateTime @db.Date
+  isVerified Boolean @default(false) @map("is_verified")
+  isBanned  Boolean  @default(false) @map("is_banned")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  profile            Profile?
+  posts              Post[]
+  comments           Comment[]
+  votes              Vote[]
+  drinkReviews       DrinkReview[]
+  cocktailCreations  CocktailCreation[]
+  partyPlans         PartyPlan[]
+  hangoverLogs       HangoverLog[]
+  reports            Report[]         @relation("Reporter")
+  interactions       UserInteraction[]
+
+  @@map("users")
+}
+
+model Profile {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  username        String   @unique @db.VarChar(30)
+  displayName     String?  @map("display_name") @db.VarChar(50)
+  bio             String?  @db.VarChar(300)
+  avatarUrl       String?  @map("avatar_url")
+  karma           Int      @default(0)
+  drinkingStyle   DrinkingStyle? @map("drinking_style")
+  favoriteDrinkId String?  @map("favorite_drink_id") @db.Uuid
+  state           String?  @db.VarChar(50)
+  city            String?  @db.VarChar(50)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favoriteDrink Drink? @relation(fields: [favoriteDrinkId], references: [id])
+
+  @@index([username])
+  @@map("profiles")
+}
+
+enum DrinkingStyle {
+  SOCIAL
+  CONNOISSEUR
+  OCCASIONAL
+  EXPLORER
+  PARTY_ANIMAL
+  MIXOLOGIST
+  SOBER_CURIOUS
+
+  @@map("drinking_style")
+}
+
+// ============================================================================
+// POSTS & FEED
+// ============================================================================
+
+model Post {
+  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId  String     @map("author_id") @db.Uuid
+  title     String     @db.VarChar(300)
+  body      String?
+  imageUrl  String?    @map("image_url")
+  postType  PostType   @map("post_type")
+  score     Int        @default(0)
+  isDeleted Boolean    @default(false) @map("is_deleted")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments Comment[]
+  votes    Vote[]
+  tags     PostTag[]
+  drinks   PostDrink[]
+  reports  Report[]
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([score])
+  @@index([postType])
+  @@map("posts")
+}
+
+enum PostType {
+  STORY
+  QUESTION
+  REVIEW
+  RECOMMENDATION
+  MEME
+
+  @@map("post_type")
+}
+
+model Comment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  parentId  String?  @map("parent_id") @db.Uuid
+  body      String
+  score     Int      @default(0)
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  votes    Vote[]
+  reports  Report[]
+
+  @@index([postId])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model Vote {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  postId     String?  @map("post_id") @db.Uuid
+  commentId  String?  @map("comment_id") @db.Uuid
+  value      Int      // 1 = upvote, -1 = downvote
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@index([postId])
+  @@index([commentId])
+  @@map("votes")
+}
+
+// ============================================================================
+// TAGS
+// ============================================================================
+
+model Tag {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(50)
+  slug      String   @unique @db.VarChar(60)
+  tagType   TagType  @map("tag_type")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  posts PostTag[]
+
+  @@index([slug])
+  @@map("tags")
+}
+
+enum TagType {
+  OCCASION
+  MOOD
+  TOPIC
+  CUSTOM
+
+  @@map("tag_type")
+}
+
+model PostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+model PostDrink {
+  postId  String @map("post_id") @db.Uuid
+  drinkId String @map("drink_id") @db.Uuid
+
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@id([postId, drinkId])
+  @@map("post_drinks")
+}
+
+// ============================================================================
+// DRINKS
+// ============================================================================
+
+model DrinkCategory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(50)
+  slug        String   @unique @db.VarChar(60)
+  description String?
+  iconUrl     String?  @map("icon_url")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  subcategories DrinkSubcategory[]
+  drinks        Drink[]
+
+  @@map("drink_categories")
+}
+
+model DrinkSubcategory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String   @db.VarChar(50)
+  slug        String   @unique @db.VarChar(60)
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  category DrinkCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  drinks   Drink[]
+
+  @@unique([categoryId, name])
+  @@map("drink_subcategories")
+}
+
+model Drink {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId      String     @map("category_id") @db.Uuid
+  subcategoryId   String?    @map("subcategory_id") @db.Uuid
+  name            String     @db.VarChar(200)
+  slug            String     @unique @db.VarChar(220)
+  brand           String?    @db.VarChar(100)
+  variant         String?    @db.VarChar(100)
+  description     String?
+  country         String?    @db.VarChar(50)
+  abv             Decimal?   @db.Decimal(4, 1)
+  priceRange      PriceRange? @map("price_range")
+  basePriceInr    Int?       @map("base_price_inr") // Delhi MRP in INR as reference
+  imageUrl        String?    @map("image_url")
+  isVerified      Boolean    @default(false) @map("is_verified")
+  isUserSubmitted Boolean    @default(false) @map("is_user_submitted")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  category     DrinkCategory     @relation(fields: [categoryId], references: [id])
+  subcategory  DrinkSubcategory? @relation(fields: [subcategoryId], references: [id])
+  tasteProfile DrinkTasteProfile?
+  occasions    DrinkOccasion[]
+  moods        DrinkMood[]
+  foodPairings DrinkFoodPairing[]
+  posts        PostDrink[]
+  reviews      DrinkReview[]
+  communityScores CommunityScore[]
+  favoritedBy  Profile[]
+  cocktailIngredients CocktailIngredient[]
+  partyPlanDrinks PartyPlanDrink[]
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([name])
+  @@index([brand])
+  @@map("drinks")
+}
+
+enum PriceRange {
+  BUDGET
+  MID_RANGE
+  PREMIUM
+  LUXURY
+
+  @@map("price_range")
+}
+
+model DrinkTasteProfile {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId    String  @unique @map("drink_id") @db.Uuid
+  sweetness  Int     @default(0) @db.SmallInt // 0-10
+  bitterness Int     @default(0) @db.SmallInt
+  sourness   Int     @default(0) @db.SmallInt
+  smokiness  Int     @default(0) @db.SmallInt
+  spiciness  Int     @default(0) @db.SmallInt
+  fruitiness Int     @default(0) @db.SmallInt
+  floral     Int     @default(0) @db.SmallInt
+  body       Int     @default(0) @db.SmallInt // light=1 to full=10
+  finish     Int     @default(0) @db.SmallInt // short=1 to long=10
+
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@map("drink_taste_profiles")
+}
+
+model DrinkOccasion {
+  drinkId    String @map("drink_id") @db.Uuid
+  occasion   Occasion
+
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@id([drinkId, occasion])
+  @@map("drink_occasions")
+}
+
+enum Occasion {
+  DATE_NIGHT
+  HOUSE_PARTY
+  CLUB_NIGHT
+  CASUAL_HANGOUT
+  CELEBRATION
+  SOLO_RELAXATION
+  BUSINESS_DINNER
+  OUTDOOR_BBQ
+  FESTIVAL
+  WEEKEND_CHILL
+
+  @@map("occasion")
+}
+
+model DrinkMood {
+  drinkId String @map("drink_id") @db.Uuid
+  mood    Mood
+
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@id([drinkId, mood])
+  @@map("drink_moods")
+}
+
+enum Mood {
+  ADVENTUROUS
+  ROMANTIC
+  RELAXED
+  ENERGETIC
+  SOPHISTICATED
+  NOSTALGIC
+  CELEBRATORY
+  CONTEMPLATIVE
+
+  @@map("mood")
+}
+
+model DrinkFoodPairing {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId String @map("drink_id") @db.Uuid
+  food    String @db.VarChar(100)
+
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@unique([drinkId, food])
+  @@map("drink_food_pairings")
+}
+
+// ============================================================================
+// DRINK REVIEWS
+// ============================================================================
+
+model DrinkReview {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId   String   @map("drink_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  rating    Int      @db.SmallInt // 1-5
+  body      String?
+  occasion  Occasion?
+  mood      Mood?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  drink  Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([drinkId, authorId])
+  @@index([drinkId])
+  @@map("drink_reviews")
+}
+
+// ============================================================================
+// COCKTAILS
+// ============================================================================
+
+model Ingredient {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  slug      String   @unique @db.VarChar(110)
+  category  IngredientCategory
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cocktailIngredients CocktailIngredient[]
+
+  @@map("ingredients")
+}
+
+enum IngredientCategory {
+  SPIRIT
+  MIXER
+  JUICE
+  SYRUP
+  BITTERS
+  GARNISH
+  ICE
+  OTHER
+
+  @@map("ingredient_category")
+}
+
+model CocktailCreation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId    String   @map("author_id") @db.Uuid
+  name        String   @db.VarChar(200)
+  description String?
+  instructions String?
+  imageUrl    String?  @map("image_url")
+  score       Int      @default(0)
+  isPublic    Boolean  @default(true) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  author      User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  ingredients CocktailIngredient[]
+
+  @@index([authorId])
+  @@index([score])
+  @@map("cocktail_creations")
+}
+
+model CocktailIngredient {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cocktailId   String  @map("cocktail_id") @db.Uuid
+  ingredientId String? @map("ingredient_id") @db.Uuid
+  drinkId      String? @map("drink_id") @db.Uuid
+  quantity     String? @db.VarChar(50)
+  unit         String? @db.VarChar(20)
+  sortOrder    Int     @default(0) @map("sort_order")
+
+  cocktail   CocktailCreation @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+  ingredient Ingredient?      @relation(fields: [ingredientId], references: [id])
+  drink      Drink?           @relation(fields: [drinkId], references: [id])
+
+  @@map("cocktail_ingredients")
+}
+
+// ============================================================================
+// COMMUNITY SCORES (Phase 2 foundation — computed, not user-entered)
+// ============================================================================
+
+model CommunityScore {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId    String    @map("drink_id") @db.Uuid
+  scoreType  ScoreType @map("score_type")
+  value      Decimal   @db.Decimal(3, 1) // 0.0 - 10.0
+  sampleSize Int       @default(0) @map("sample_size")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@unique([drinkId, scoreType])
+  @@map("community_scores")
+}
+
+enum ScoreType {
+  FUN
+  PARTY
+  DATE
+  CHILL
+  HANGOVER
+  VALUE_FOR_MONEY
+
+  @@map("score_type")
+}
+
+// ============================================================================
+// PARTY PLANS (Phase 2 — schema ready)
+// ============================================================================
+
+model PartyPlan {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId    String    @map("author_id") @db.Uuid
+  title       String    @db.VarChar(200)
+  description String?
+  guestCount  Int?      @map("guest_count")
+  budget      BudgetRange?
+  occasion    Occasion?
+  eventDate   DateTime? @map("event_date") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  author User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  drinks PartyPlanDrink[]
+
+  @@index([authorId])
+  @@map("party_plans")
+}
+
+enum BudgetRange {
+  LOW
+  MEDIUM
+  HIGH
+  NO_LIMIT
+
+  @@map("budget_range")
+}
+
+model PartyPlanDrink {
+  partyPlanId String @map("party_plan_id") @db.Uuid
+  drinkId     String @map("drink_id") @db.Uuid
+  quantity    Int    @default(1)
+  notes       String?
+
+  partyPlan PartyPlan @relation(fields: [partyPlanId], references: [id], onDelete: Cascade)
+  drink     Drink     @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+
+  @@id([partyPlanId, drinkId])
+  @@map("party_plan_drinks")
+}
+
+// ============================================================================
+// HANGOVER LOGS (Phase 2 — schema ready)
+// ============================================================================
+
+model HangoverLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId      String   @map("author_id") @db.Uuid
+  severity      Int      @db.SmallInt // 1-10
+  drinksMixed   Boolean  @default(false) @map("drinks_mixed")
+  waterIntake   WaterIntake? @map("water_intake")
+  foodBefore    Boolean? @map("food_before")
+  hoursSlept    Decimal? @map("hours_slept") @db.Decimal(3, 1)
+  recoveryTip   String?  @map("recovery_tip")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@map("hangover_logs")
+}
+
+enum WaterIntake {
+  NONE
+  SOME
+  ADEQUATE
+  PLENTY
+
+  @@map("water_intake")
+}
+
+// ============================================================================
+// USER INTERACTIONS (AI training signal — Phase 3 foundation)
+// ============================================================================
+
+model UserInteraction {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  interactionType InteractionType @map("interaction_type")
+  targetType      TargetType      @map("target_type")
+  targetId        String          @map("target_id") @db.Uuid
+  context         Json?           // flexible context: search query, occasion, mood, etc.
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@index([interactionType])
+  @@map("user_interactions")
+}
+
+enum InteractionType {
+  VIEW
+  SEARCH
+  UPVOTE
+  DOWNVOTE
+  BOOKMARK
+  SHARE
+  CLICK_DRINK
+  CREATE_COCKTAIL
+  CREATE_POST
+
+  @@map("interaction_type")
+}
+
+enum TargetType {
+  POST
+  COMMENT
+  DRINK
+  COCKTAIL
+  PROFILE
+  SEARCH_QUERY
+
+  @@map("target_type")
+}
+
+// ============================================================================
+// MODERATION & REPORTS
+// ============================================================================
+
+model Report {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reporterId String       @map("reporter_id") @db.Uuid
+  postId     String?      @map("post_id") @db.Uuid
+  commentId  String?      @map("comment_id") @db.Uuid
+  reason     ReportReason
+  details    String?
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now()) @map("created_at")
+  resolvedAt DateTime?    @map("resolved_at")
+
+  reporter User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  post     Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  UNDERAGE_CONTENT
+  PROMOTES_EXCESSIVE_DRINKING
+  DRUNK_DRIVING
+  ILLEGAL_ACTIVITY
+  MISINFORMATION
+  OTHER
+
+  @@map("report_reason")
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
+
+  @@map("report_status")
+}

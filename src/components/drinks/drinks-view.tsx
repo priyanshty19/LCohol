@@ -1,0 +1,314 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { DrinkCard } from "./drink-card";
+import { StateSelector, useStateSelection } from "./state-selector";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+interface FilterData {
+  categories: {
+    id: string;
+    name: string;
+    slug: string;
+    subcategories: { id: string; name: string; slug: string }[];
+  }[];
+  brands: string[];
+}
+
+const SORT_OPTIONS = [
+  { value: "name", label: "A → Z" },
+  { value: "popular", label: "Most Popular" },
+  { value: "price_low", label: "Price: Low → High" },
+  { value: "price_high", label: "Price: High → Low" },
+  { value: "newest", label: "Newest" },
+];
+
+export function DrinksView() {
+  const [drinks, setDrinks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filtersLoading, setFiltersLoading] = useState(true);
+  const [filters, setFilters] = useState<FilterData | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [totalShown, setTotalShown] = useState(0);
+  const { stateCode, setStateCode, loaded } = useStateSelection();
+
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [brand, setBrand] = useState("all");
+  const [sort, setSort] = useState("name");
+  const [searchDebounced, setSearchDebounced] = useState("");
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchDebounced(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Load filter options
+  useEffect(() => {
+    fetch("/api/drinks/filters")
+      .then((r) => r.json())
+      .then(setFilters)
+      .catch(console.error)
+      .finally(() => setFiltersLoading(false));
+  }, []);
+
+  const fetchDrinks = useCallback(
+    async (loadMore = false) => {
+      setLoading(true);
+      const params = new URLSearchParams({ sort });
+      if (category !== "all") params.set("category", category);
+      if (brand !== "all") params.set("brand", brand);
+      if (searchDebounced) params.set("search", searchDebounced);
+      if (loadMore && cursor) params.set("cursor", cursor);
+
+      try {
+        const res = await fetch(`/api/drinks?${params}`);
+        const json = await res.json();
+        if (loadMore) {
+          setDrinks((prev) => [...prev, ...json.data]);
+          setTotalShown((prev) => prev + json.data.length);
+        } else {
+          setDrinks(json.data);
+          setTotalShown(json.data.length);
+        }
+        setHasMore(json.hasMore);
+        setCursor(json.nextCursor);
+      } catch (err) {
+        console.error("Failed to fetch drinks:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [sort, category, brand, searchDebounced, cursor]
+  );
+
+  // Re-fetch when filters change
+  useEffect(() => {
+    setCursor(undefined);
+    fetchDrinks(false);
+  }, [sort, category, brand, searchDebounced]);
+
+  function clearFilters() {
+    setSearch("");
+    setCategory("all");
+    setBrand("all");
+    setSort("name");
+  }
+
+  const hasActiveFilters =
+    search !== "" || category !== "all" || brand !== "all";
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold">Discover Drinks</h1>
+        <p className="text-sm text-muted-foreground">
+          Search across {filtersLoading ? "..." : "46"} spirits, beers & wines
+          in the Indian market
+        </p>
+      </div>
+
+      {/* Search bar */}
+      <div className="relative">
+        <svg
+          className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          viewBox="0 0 24 24"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search drinks, brands, or descriptions..."
+          className="h-11 border-border/30 bg-card/40 pl-10 text-sm backdrop-blur-sm placeholder:text-muted-foreground/50 focus:border-primary/40 focus:ring-primary/20"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Category */}
+        <Select value={category} onValueChange={(v) => setCategory(v ?? "all")}>
+          <SelectTrigger className="h-9 w-[140px] border-border/30 bg-card/40 text-xs">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {filters?.categories.map((cat) => (
+              <SelectItem key={cat.slug} value={cat.slug} className="text-xs">
+                {cat.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Brand */}
+        <Select value={brand} onValueChange={(v) => setBrand(v ?? "all")}>
+          <SelectTrigger className="h-9 w-[180px] border-border/30 bg-card/40 text-xs">
+            <SelectValue placeholder="All Brands" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px]">
+            <SelectItem value="all">All Brands</SelectItem>
+            {filters?.brands.map((b) => (
+              <SelectItem key={b} value={b} className="text-xs">
+                {b}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Sort */}
+        <Select value={sort} onValueChange={(v) => setSort(v ?? "name")}>
+          <SelectTrigger className="h-9 w-[160px] border-border/30 bg-card/40 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* State pricing */}
+        {loaded && (
+          <div className="ml-auto">
+            <StateSelector value={stateCode} onChange={setStateCode} />
+          </div>
+        )}
+      </div>
+
+      {/* Active filters */}
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Filters:</span>
+          {search && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              onClick={() => setSearch("")}
+            >
+              &quot;{search}&quot; ×
+            </Badge>
+          )}
+          {category !== "all" && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              onClick={() => setCategory("all")}
+            >
+              {filters?.categories.find((c) => c.slug === category)?.name ??
+                category}{" "}
+              ×
+            </Badge>
+          )}
+          {brand !== "all" && (
+            <Badge
+              variant="secondary"
+              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              onClick={() => setBrand("all")}
+            >
+              {brand} ×
+            </Badge>
+          )}
+          <button
+            onClick={clearFilters}
+            className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Results */}
+      {loading && drinks.length === 0 ? (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-64 animate-pulse rounded-xl bg-card/30"
+            />
+          ))}
+        </div>
+      ) : drinks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/30 py-20 text-center">
+          <span className="text-4xl">🔍</span>
+          <p className="mt-3 text-lg font-medium">No drinks found</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {hasActiveFilters
+              ? "Try adjusting your filters or search term"
+              : "The drink database is being built"}
+          </p>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={clearFilters}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Result count */}
+          <p className="text-xs text-muted-foreground">
+            Showing {totalShown} drink{totalShown !== 1 ? "s" : ""}
+            {hasMore ? "+" : ""}
+          </p>
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {drinks.map((drink) => (
+              <DrinkCard
+                key={drink.id}
+                drink={drink}
+                stateCode={stateCode}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => fetchDrinks(true)}
+                disabled={loading}
+              >
+                {loading ? "Loading..." : "Load More"}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
