@@ -1,30 +1,52 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { login } from "@/app/(auth)/actions";
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await login(formData);
-    if (result?.error) {
-      setError(result.error);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Login failed.");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
       setLoading(false);
     }
   }
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur">
-      <form action={handleSubmit}>
+      <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -44,6 +66,7 @@ export function LoginForm() {
               id="password"
               name="password"
               type="password"
+              placeholder="Enter password"
               required
               autoComplete="current-password"
             />
@@ -57,15 +80,16 @@ export function LoginForm() {
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={loading}
+          >
             {loading ? "Logging in..." : "Log In"}
           </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            New here?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              Create an account
-            </Link>
+          <p className="text-center text-xs text-muted-foreground">
+            Private beta — by invitation only
           </p>
         </CardFooter>
       </form>

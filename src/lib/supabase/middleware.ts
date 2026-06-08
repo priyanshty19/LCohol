@@ -1,63 +1,56 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+import { findAllowedUser } from "@/lib/allowed-users";
 
-const PUBLIC_ROUTES = ["/login", "/signup", "/verify-age", "/compliance"];
+const PUBLIC_ROUTES = ["/login", "/verify-age", "/compliance", "/denied"];
+const API_AUTH_ROUTES = ["/api/auth/login", "/api/auth/logout", "/api/auth/me"];
 
 export async function updateSession(request: NextRequest) {
-  const supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
 
-  // In dev mode without Supabase, skip all auth checks
-  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  if (isDevMode || !supabaseUrl || !supabaseUrl.startsWith("http")) {
-    return supabaseResponse;
+  // Always allow static assets
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    /\.(svg|png|jpg|jpeg|gif|webp|ico)$/.test(pathname)
+  ) {
+    return NextResponse.next({ request });
   }
 
-  let response = supabaseResponse;
+  // Always allow public routes and auth API endpoints
+  const isPublic =
+    PUBLIC_ROUTES.some((r) => pathname.startsWith(r)) ||
+    API_AUTH_ROUTES.some((r) => pathname.startsWith(r));
 
-  const supabase = createServerClient(
-    supabaseUrl,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  if (isPublic) {
+    return NextResponse.next({ request });
+  }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Validate session cookie
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const email = token ? await verifySessionToken(token) : null;
 
-  const pathname = request.nextUrl.pathname;
-  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
-    pathname.startsWith(route)
-  );
-  const isApiRoute = pathname.startsWith("/api");
-
-  if (!user && !isPublicRoute && !isApiRoute) {
+  if (!email) {
+    // Not logged in → redirect to login
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && (pathname === "/login" || pathname === "/signup")) {
+  // Verify the email is still in the allowlist
+  const allowed = findAllowedUser(email);
+  if (!allowed) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/denied";
+    return NextResponse.redirect(url);
+  }
+
+  // Already logged in, redirect away from login page
+  if (pathname === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
-  return response;
+  return NextResponse.next({ request });
 }

@@ -1,58 +1,25 @@
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { createClient } from "@/lib/supabase/server";
-
-const IS_DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-
-const DEV_USER = {
-  id: "dev-user-id",
-  email: "dev@sipstories.local",
-};
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+import { findAllowedUser } from "@/lib/allowed-users";
 
 /**
- * Get the current authenticated user's DB record.
- * In dev mode, auto-creates and returns a local test user.
+ * Get the current authenticated user's DB record from the session cookie.
+ * Returns null if not logged in or not in the allowlist.
  */
 export async function getCurrentUser() {
-  if (IS_DEV_MODE) {
-    // Find or create the dev user
-    let user = await prisma.user.findUnique({
-      where: { authId: DEV_USER.id },
-      include: { profile: true },
-    });
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          authId: DEV_USER.id,
-          email: DEV_USER.email,
-          dob: new Date("2000-01-01"),
-          isVerified: true,
-          profile: {
-            create: {
-              username: "devuser",
-              displayName: "Dev User",
-              bio: "Local development account",
-              karma: 42,
-            },
-          },
-        },
-        include: { profile: true },
-      });
-    }
+  const email = await verifySessionToken(token);
+  if (!email) return null;
 
-    return user;
-  }
+  const allowed = findAllowedUser(email);
+  if (!allowed) return null;
 
-  // Production: use Supabase auth
-  const supabase = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) return null;
-
-  return prisma.user.findUnique({
-    where: { authId: authUser.id },
+  return prisma.user.findFirst({
+    where: { email },
     include: { profile: true },
   });
 }
