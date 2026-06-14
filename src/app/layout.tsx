@@ -46,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${ebGaramond.variable} ${plusJakartaSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${ebGaramond.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <AgeGateOverlay />
