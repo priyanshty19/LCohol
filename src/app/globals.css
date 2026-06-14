@@ -111,67 +111,75 @@
   --color-sidebar: var(--sidebar);
 }
 
-/* ============================================================
-   DAY LOUNGE — Light Theme (primary theme)
-   Warm ivory base · Rich amber accent · Clean & airy
-   ============================================================ */
+/* Base / light fallback — the un-themed root palette. Paired with
+   [data-theme="light"] (Ivory Cream), which is the default theme; dark and
+   the vibe themes override these tokens via .dark + [data-theme] blocks. */
 :root {
-  --background: #FAF7F2;
-  --foreground: #1C1208;
-  --card: #FFFFFF;
-  --card-foreground: #1C1208;
-  --popover: #FFFFFF;
-  --popover-foreground: #1C1208;
-  --primary: #B5720A;
-  --primary-foreground: #FFF8EC;
-  --secondary: #F5EDD8;
-  --secondary-foreground: #4A3520;
-  --muted: #F0E8D6;
-  --muted-foreground: #7A6550;
-  --accent: #F5EDD8;
-  --accent-foreground: #3D2515;
-  --destructive: #B91C1C;
-  --border: #E5D5B5;
-  --input: #EDE3CF;
-  --ring: #B5720A;
+  --background: #f0e6d6;
+  --foreground: #1a1012;
+  --card: #d3c4b2;
+  --card-foreground: #1a1012;
+  --popover: #f0e6d6;
+  --popover-foreground: #1a1012;
+  --primary: #7d5800;
+  --primary-foreground: #ffdea9;
+  --secondary: #494851;
+  --secondary-foreground: #e4e1ec;
+  --muted: #d3c4b2;
+  --muted-foreground: #4f4537;
+  --accent: #ebe1cf;
+  --accent-foreground: #353023;
+  --destructive: #93000a;
+  --border: #9b8f7e;
+  --input: #9b8f7e;
+  --ring: #7d5800;
   --radius: 0.75rem;
-  --amber: #C8860A;
-  --amber-foreground: #422C00;
+  --amber: #a8243a;
+  --amber-foreground: #fbefe3;
 
-  /* Surface tokens */
-  --ml-surface: #FAF7F2;
-  --ml-surface-dim: #EDE3CF;
-  --ml-surface-bright: #FFFFFF;
-  --ml-surface-container-lowest: #FFFFFF;
-  --ml-surface-container-low: #F5EDD8;
-  --ml-surface-container: #F0E8D6;
-  --ml-surface-container-high: #EBE0C8;
-  --ml-surface-container-highest: #E5D5B5;
-  --ml-on-surface: #1C1208;
-  --ml-on-surface-variant: #5C4830;
-  --ml-primary-container: #FFDEA9;
-  --ml-on-primary: #FFFFFF;
-  --ml-on-primary-container: #2D1800;
-  --ml-surface-tint: #B5720A;
-  --ml-outline: #C4A882;
-  --ml-outline-variant: #E5D5B5;
-  --ml-error: #B91C1C;
-  --ml-on-error: #FFFFFF;
+  /* Midnight Speakeasy accents (light inversions) */
+  --ml-velvet: #7e1f2b;
+  --ml-velvet-bright: #b11226;
+  --ml-velvet-hover: #c8443b;
+  --ml-lapel: #1a1726;
+  --ml-brass: #9a7b2e;
+  --ml-sos: #c4302b;
+  --ml-sober: #3f7d63;
 
-  --chart-1: #B5720A;
-  --chart-2: #C8860A;
-  --chart-3: #7A6550;
-  --chart-4: #C4A882;
-  --chart-5: #4A3520;
+  /* Midnight Lounge surface tokens (light inversions) */
+  --ml-surface: #f0e6d6;
+  --ml-surface-dim: #f0e6d6;
+  --ml-surface-bright: #f5f5ff;
+  --ml-surface-container-lowest: #ffffff;
+  --ml-surface-container-low: #f0eff8;
+  --ml-surface-container: #eae9f4;
+  --ml-surface-container-high: #e4e3ef;
+  --ml-surface-container-highest: #dedde9;
+  --ml-on-surface: #1a1012;
+  --ml-on-surface-variant: #4f4537;
+  --ml-primary-container: #ffdea9;
+  --ml-on-primary: #ffdea9;
+  --ml-on-primary-container: #271900;
+  --ml-surface-tint: #7d5800;
+  --ml-outline: #9b8f7e;
+  --ml-outline-variant: #d3c4b2;
+  --ml-error: #93000a;
+  --ml-on-error: #ffdad6;
 
-  --sidebar: #F5EDD8;
-  --sidebar-foreground: #1C1208;
-  --sidebar-primary: #B5720A;
-  --sidebar-primary-foreground: #FFF8EC;
-  --sidebar-accent: #F0E8D6;
-  --sidebar-accent-foreground: #3D2515;
-  --sidebar-border: #E5D5B5;
-  --sidebar-ring: #B5720A;
+  --chart-1: #a8243a;
+  --chart-2: #b4ab9a;
+  --chart-3: #494851;
+  --chart-4: #9b8f7e;
+  --chart-5: #7d5800;
+
+  --sidebar: #f0eff8;
+  --sidebar-foreground: #1a1012;
+  --sidebar-primary: #7d5800;
+  --sidebar-primary-foreground: #ffdea9;
+  --sidebar-accent: #ebe1cf;
+  --sidebar-accent-foreground: #353023;
+  --sidebar-border: #9b8f7e;
+  --sidebar-ring: #7d5800;
 }
 
 /* Dark mode — the primary Midnight Lounge experience */
