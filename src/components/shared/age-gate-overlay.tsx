@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getCookie, setCookie } from "@/lib/client-cookies";
+
+export const AGE_COOKIE = "sip_age_ok";
+export const GEO_COOKIE = "sip_geo_ok";
 
 export function AgeGateOverlay() {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("age_verified");
+    // Persistent cookie (1yr) — survives tab close, unlike the old sessionStorage.
+    const verified = getCookie(AGE_COOKIE);
     if (!verified) {
       setVisible(true);
       // Prevent body scroll while overlay is visible
@@ -21,8 +26,10 @@ export function AgeGateOverlay() {
   function handleAccept() {
     setExiting(true);
     setTimeout(() => {
-      sessionStorage.setItem("age_verified", "true");
-      sessionStorage.setItem("geo_disclaimer_dismissed", "true");
+      // Only record age verification. The geo/prohibition-states disclaimer is a
+      // SEPARATE legal acknowledgement — it must still appear as its own banner
+      // and be dismissed on its own, so we do NOT touch GEO_COOKIE here.
+      setCookie(AGE_COOKIE, "1");
       document.body.style.overflow = "";
       setVisible(false);
     }, 400);
@@ -42,6 +49,8 @@ export function AgeGateOverlay() {
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-[#0c0d19]/95 backdrop-blur-xl" />
+      <div className="absolute inset-0 bg-ambient opacity-80" />
+      <div className="absolute inset-0 bg-grain opacity-70" />
 
       {/* Content */}
       <div
@@ -51,10 +60,7 @@ export function AgeGateOverlay() {
       >
         {/* Logo area */}
         <div className="mb-8 text-center">
-          <h1
-            className="text-3xl font-semibold tracking-wide text-[#f2bf64]"
-            style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-          >
+          <h1 className="font-display text-glow text-4xl font-semibold tracking-wide text-[#f2bf64]">
             SIPSTORIES
           </h1>
           <p className="mt-1 text-sm text-[#d3c4b2]/70">
@@ -63,21 +69,15 @@ export function AgeGateOverlay() {
         </div>
 
         {/* Glass card */}
-        <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-8 shadow-2xl backdrop-blur-md">
+        <div className="glass-panel-elevated rounded-2xl p-8">
           {/* 21+ badge */}
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#f2bf64]/40 bg-[#f2bf64]/10">
-            <span
-              className="text-3xl font-bold text-[#f2bf64]"
-              style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-            >
+            <span className="font-display text-3xl font-bold text-[#f2bf64]">
               21+
             </span>
           </div>
 
-          <h2
-            className="text-center text-xl font-medium text-[#e2e1f3]"
-            style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-          >
+          <h2 className="font-display text-center text-2xl font-medium text-[#e2e1f3]">
             Age Verification
           </h2>
 

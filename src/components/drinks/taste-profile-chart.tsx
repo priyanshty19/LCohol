@@ -34,13 +34,13 @@ export function TasteProfileChart({ profile }: TasteProfileChartProps) {
         return (
           <div key={key} className="flex items-center gap-3">
             <span className="w-16 text-xs text-muted-foreground">{label}</span>
-            <div className="flex-1 h-2 rounded-full bg-muted/50 overflow-hidden">
+            <div className="taste-bar-track flex-1">
               <div
-                className="h-full rounded-full bg-primary transition-all"
+                className="taste-bar-fill"
                 style={{ width: `${(value / 10) * 100}%` }}
               />
             </div>
-            <span className="w-6 text-xs text-muted-foreground text-right">
+            <span className="w-6 text-right font-mono text-xs text-muted-foreground">
               {value}
             </span>
           </div>

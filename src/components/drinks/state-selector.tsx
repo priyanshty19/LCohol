@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -9,8 +9,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { INDIAN_STATES, DEFAULT_STATE_CODE } from "@/lib/state-pricing";
+import { getCookie, setCookie } from "@/lib/client-cookies";
 
-const STORAGE_KEY = "sipstories_state";
+const STATE_COOKIE = "sip_state";
 
 interface StateSelectorProps {
   value: string;
@@ -39,22 +40,62 @@ export function StateSelector({ value, onChange }: StateSelectorProps) {
   );
 }
 
-/** Hook to manage state selection with localStorage persistence */
+/**
+ * State selection persisted to a 1-year cookie (survives sessions) and, for
+ * logged-in users, mirrored to Profile.state in the DB for cross-device sync.
+ * No localStorage — nothing silently disappears.
+ */
 export function useStateSelection() {
   const [stateCode, setStateCode] = useState(DEFAULT_STATE_CODE);
   const [loaded, setLoaded] = useState(false);
+  // Set once the user explicitly picks — the DB reconcile must never override it.
+  const userTouched = useRef(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    let alive = true;
+    // Cookie is the instant, offline-safe source.
+    const saved = getCookie(STATE_COOKIE);
     if (saved && INDIAN_STATES.some((s) => s.code === saved)) {
       setStateCode(saved);
     }
     setLoaded(true);
+
+    // If logged in and the DB has a state name, reconcile to its code — unless
+    // there's already a cookie OR the user has picked since mount.
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || userTouched.current) return;
+        const name: string | undefined = d?.user?.state;
+        if (!name) return;
+        const match = INDIAN_STATES.find(
+          (s) => s.name.toLowerCase() === name.toLowerCase()
+        );
+        if (match && !saved) {
+          setStateCode(match.code);
+          setCookie(STATE_COOKIE, match.code);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   function updateState(code: string) {
+    userTouched.current = true;
     setStateCode(code);
-    localStorage.setItem(STORAGE_KEY, code);
+    setCookie(STATE_COOKIE, code);
+    // Persist the human-readable state name to the profile (best-effort).
+    const name = INDIAN_STATES.find((s) => s.code === code)?.name;
+    if (name) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: name }),
+      }).catch(() => {});
+    }
   }
 
   return { stateCode, setStateCode: updateState, loaded };

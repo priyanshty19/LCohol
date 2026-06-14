@@ -8,6 +8,7 @@ import {
   type Severity,
 } from "@/lib/hangover-config";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export function HangoverView() {
   const [severity, setSeverity] = useState<Severity | null>(null);
@@ -32,7 +33,7 @@ export function HangoverView() {
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <span className="text-3xl">🆘</span>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "EB Garamond, serif" }}>
+          <h1 className="font-display text-2xl font-semibold text-primary">
             Hangover SOS
           </h1>
         </div>
@@ -42,8 +43,8 @@ export function HangoverView() {
       </div>
 
       {/* Severity scale */}
-      <div className="space-y-4 rounded-xl border border-border/20 bg-card/30 p-5 backdrop-blur">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="glass-panel space-y-4 rounded-xl p-5">
+        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           How bad is it?
         </h2>
         <div className="grid grid-cols-5 gap-2">
@@ -53,10 +54,10 @@ export function HangoverView() {
               <button
                 key={s}
                 onClick={() => setSeverity(s)}
-                className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-all duration-150 ${
+                className={`flex min-h-11 flex-col items-center gap-1.5 rounded-xl p-3 transition-all duration-150 ${
                   severity === s
-                    ? "border-primary/50 bg-primary/10 shadow-sm"
-                    : "border-border/20 bg-card/20 hover:border-border/40"
+                    ? "glass-panel-elevated border-primary/40 glow-primary"
+                    : "glass-panel"
                 }`}
               >
                 <span className="text-2xl">{m.emoji}</span>
@@ -75,8 +76,8 @@ export function HangoverView() {
       </div>
 
       {/* The Math section */}
-      <div className="space-y-4 rounded-xl border border-border/20 bg-card/30 p-5 backdrop-blur">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="glass-panel space-y-4 rounded-xl p-5">
+        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           🧮 The Sober Math
         </h2>
         <p className="text-xs text-muted-foreground">
@@ -94,7 +95,7 @@ export function HangoverView() {
               max={20}
               value={unitsConsumed}
               onChange={(e) => setUnitsConsumed(Number(e.target.value))}
-              className="w-full accent-[#f2bf64]"
+              className="w-full accent-[var(--primary)]"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground/50">
               <span>1</span><span>10</span><span>20</span>
@@ -111,7 +112,7 @@ export function HangoverView() {
               max={24}
               value={hoursSince}
               onChange={(e) => setHoursSince(Number(e.target.value))}
-              className="w-full accent-[#f2bf64]"
+              className="w-full accent-[var(--primary)]"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground/50">
               <span>1h</span><span>12h</span><span>24h</span>
@@ -123,16 +124,16 @@ export function HangoverView() {
         <div
           className={`rounded-lg border p-3 text-center ${
             isLikelyClear
-              ? "border-green-500/30 bg-green-500/10"
-              : "border-orange-500/30 bg-orange-500/10"
+              ? "border-[var(--ml-sober)]/30 bg-[var(--ml-sober)]/10"
+              : "border-[var(--ml-sos)]/30 bg-[var(--ml-sos)]/10 glow-danger"
           }`}
         >
           {isLikelyClear ? (
-            <p className="text-sm text-green-400 font-medium">
+            <p className="text-sm text-[var(--ml-sober)] font-medium">
               ✓ You're likely alcohol-free by now. You've got this.
             </p>
           ) : (
-            <p className="text-sm text-orange-400 font-medium">
+            <p className="text-sm text-[var(--ml-sos)] font-medium">
               ~{hoursRemaining} hour{hoursRemaining !== 1 ? "s" : ""} of processing remaining.{" "}
               <span className="text-muted-foreground font-normal">
                 Don't drive. Drink water.
@@ -145,19 +146,20 @@ export function HangoverView() {
       {/* Remedies */}
       {severity && activeRemedies.length > 0 && (
         <div className="space-y-4">
-          <h2 className="font-semibold">
+          <h2 className="font-display font-semibold">
             Recovery Plan — Level {severity} Protocol
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {activeRemedies.map((remedy) => (
               <Card
                 key={remedy.id}
-                className="border-border/20 bg-card/30 p-4 space-y-3"
+                variant="glass"
+                className="p-4 space-y-3"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{remedy.emoji}</span>
                   <div>
-                    <h3 className="font-semibold text-sm">{remedy.title}</h3>
+                    <h3 className="font-display font-semibold text-sm">{remedy.title}</h3>
                     <p className="text-[11px] text-muted-foreground">
                       {remedy.subtitle}
                     </p>
@@ -180,8 +182,8 @@ export function HangoverView() {
       )}
 
       {/* Never Again pledge */}
-      <div className="space-y-4 rounded-xl border border-border/20 bg-card/30 p-5 backdrop-blur">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="glass-panel space-y-4 rounded-xl p-5">
+        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           📝 The "Never Again" Pledge (we'll see)
         </h2>
         {!pledgeDone ? (
@@ -191,10 +193,8 @@ export function HangoverView() {
                 <button
                   key={p}
                   onClick={() => setPledge(p)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    pledge === p
-                      ? "border-primary/50 bg-primary/15 text-primary"
-                      : "border-border/30 bg-card/40 text-muted-foreground hover:text-foreground"
+                  className={`min-h-11 rounded-full px-3 text-xs ${
+                    pledge === p ? "pill-active" : "pill-inactive"
                   }`}
                 >
                   {p}
@@ -202,18 +202,20 @@ export function HangoverView() {
               ))}
             </div>
             {pledge && (
-              <button
+              <Button
+                variant="gold"
+                size="lg"
                 onClick={() => setPledgeDone(true)}
-                className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="mt-2"
               >
                 I solemnly pledge this 🤞
-              </button>
+              </Button>
             )}
           </>
         ) : (
           <div className="text-center py-4 space-y-2">
             <span className="text-4xl">🏅</span>
-            <p className="font-semibold text-sm">"{pledge}"</p>
+            <p className="font-display font-semibold text-sm">"{pledge}"</p>
             <p className="text-xs text-muted-foreground">
               Pledge accepted. We'll hold you to... absolutely nothing. Get some rest.
             </p>
@@ -229,7 +231,7 @@ export function HangoverView() {
 
       {/* Empty state */}
       {!severity && (
-        <div className="rounded-xl border border-dashed border-border/20 py-12 text-center">
+        <div className="glass-panel-subtle rounded-xl border-dashed py-12 text-center">
           <span className="text-5xl">☝️</span>
           <p className="mt-4 font-medium">Select your severity level above</p>
           <p className="mt-1 text-sm text-muted-foreground">

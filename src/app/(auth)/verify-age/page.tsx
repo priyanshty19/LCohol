@@ -9,14 +9,14 @@ export const metadata: Metadata = {
 
 export default function VerifyAgePage() {
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur">
+    <Card variant="glass">
       <CardContent className="space-y-6 pt-6 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-          <span className="text-2xl">21+</span>
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ml-sos)]/10 text-[var(--ml-sos)] glow-danger">
+          <span className="font-display text-2xl font-semibold">21+</span>
         </div>
 
         <div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             Age Verification Required
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -27,7 +27,7 @@ export default function VerifyAgePage() {
 
         <div className="space-y-3">
           <Link href="/signup" className="block">
-            <Button className="w-full">
+            <Button variant="gold" className="w-full">
               Create Account (21+ only)
             </Button>
           </Link>

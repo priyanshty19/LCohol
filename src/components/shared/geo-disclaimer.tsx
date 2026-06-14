@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { PROHIBITION_STATES, RESTRICTIVE_STATES } from "@/lib/constants";
+import { getCookie, setCookie } from "@/lib/client-cookies";
+import { GEO_COOKIE } from "./age-gate-overlay";
 
 export function GeoDisclaimer() {
   const [dismissed, setDismissed] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const wasDismissed = sessionStorage.getItem("geo_disclaimer_dismissed");
+    const wasDismissed = getCookie(GEO_COOKIE);
     if (wasDismissed) return;
 
     setDismissed(false);
@@ -35,7 +37,12 @@ export function GeoDisclaimer() {
           <button
             onClick={() => {
               setDismissed(true);
-              sessionStorage.setItem("geo_disclaimer_dismissed", "true");
+              setCookie(GEO_COOKIE, "1");
+              fetch("/api/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ geoDismissed: true }),
+              }).catch(() => {});
             }}
             className="shrink-0 rounded px-2 py-1 text-xs text-amber-300 hover:bg-amber-900/50"
           >

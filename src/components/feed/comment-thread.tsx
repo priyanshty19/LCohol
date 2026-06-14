@@ -87,7 +87,12 @@ function CommentInput({
             Cancel
           </Button>
         )}
-        <Button type="submit" size="sm" disabled={loading || !body.trim()}>
+        <Button
+          type="submit"
+          variant="gold"
+          size="sm"
+          disabled={loading || !body.trim()}
+        >
           {loading ? "Posting..." : parentId ? "Reply" : "Comment"}
         </Button>
       </div>
@@ -113,7 +118,7 @@ function CommentItem({
   });
 
   return (
-    <div className={cn("space-y-2", depth > 0 && "ml-6 border-l border-border/30 pl-4")}>
+    <div className={cn("space-y-2", depth > 0 && "indent-line ml-6 pl-4")}>
       <div className="flex items-start gap-3">
         <Avatar className="h-6 w-6">
           <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
@@ -125,17 +130,19 @@ function CommentItem({
             <span className="font-medium text-foreground">
               {comment.author?.profile?.displayName ?? username}
             </span>
-            <span>{timeAgo}</span>
+            <span className="text-muted-foreground/60">{timeAgo}</span>
           </div>
           <p className="mt-0.5 text-sm text-foreground/90 whitespace-pre-wrap">
             {comment.body}
           </p>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-            <span>{comment.score} points</span>
+            <span className="tabular-nums text-primary/70">
+              {comment.score} points
+            </span>
             {depth < 3 && (
               <button
                 onClick={() => setShowReply(!showReply)}
-                className="hover:text-foreground"
+                className="min-h-[44px] transition-colors hover:text-primary"
               >
                 Reply
               </button>

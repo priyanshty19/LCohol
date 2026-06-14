@@ -58,6 +58,32 @@
   --color-amber: var(--amber);
   --color-amber-foreground: var(--amber-foreground);
 
+  /* Midnight Speakeasy accents */
+  --color-velvet: var(--ml-velvet);
+  --color-velvet-bright: var(--ml-velvet-bright);
+  --color-velvet-hover: var(--ml-velvet-hover);
+  --color-lapel: var(--ml-lapel);
+  --color-brass: var(--ml-brass);
+  --color-sos: var(--ml-sos);
+  --color-sober: var(--ml-sober);
+
+  /* Motion */
+  --ease-lounge: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pour: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Fluid display type scale */
+  --text-display: clamp(2.5rem, 6vw, 4.5rem);
+  --text-h1: clamp(2rem, 4vw, 3rem);
+  --text-h2: clamp(1.5rem, 3vw, 2.125rem);
+
+  /* Elevation (dark-room depth) + gold bloom */
+  --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-e2: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-e3: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --shadow-glow-sm: 0 0 12px rgba(196, 48, 73, 0.25);
+  --shadow-glow-md: 0 0 24px rgba(196, 48, 73, 0.3);
+  --shadow-glow-lg: 0 0 48px rgba(196, 48, 73, 0.35);
+
   /* Radii */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -87,12 +113,12 @@
 
 /* Light mode (fallback — app is dark-first) */
 :root {
-  --background: #e2e1f3;
-  --foreground: #11121f;
+  --background: #f0e6d6;
+  --foreground: #1a1012;
   --card: #d3c4b2;
-  --card-foreground: #11121f;
-  --popover: #e2e1f3;
-  --popover-foreground: #11121f;
+  --card-foreground: #1a1012;
+  --popover: #f0e6d6;
+  --popover-foreground: #1a1012;
   --primary: #7d5800;
   --primary-foreground: #ffdea9;
   --secondary: #494851;
@@ -106,19 +132,28 @@
   --input: #9b8f7e;
   --ring: #7d5800;
   --radius: 0.75rem;
-  --amber: #d4a44c;
-  --amber-foreground: #422c00;
+  --amber: #a8243a;
+  --amber-foreground: #fbefe3;
+
+  /* Midnight Speakeasy accents (light inversions) */
+  --ml-velvet: #7e1f2b;
+  --ml-velvet-bright: #b11226;
+  --ml-velvet-hover: #c8443b;
+  --ml-lapel: #1a1726;
+  --ml-brass: #9a7b2e;
+  --ml-sos: #c4302b;
+  --ml-sober: #3f7d63;
 
   /* Midnight Lounge surface tokens (light inversions) */
-  --ml-surface: #e2e1f3;
-  --ml-surface-dim: #e2e1f3;
+  --ml-surface: #f0e6d6;
+  --ml-surface-dim: #f0e6d6;
   --ml-surface-bright: #f5f5ff;
   --ml-surface-container-lowest: #ffffff;
   --ml-surface-container-low: #f0eff8;
   --ml-surface-container: #eae9f4;
   --ml-surface-container-high: #e4e3ef;
   --ml-surface-container-highest: #dedde9;
-  --ml-on-surface: #11121f;
+  --ml-on-surface: #1a1012;
   --ml-on-surface-variant: #4f4537;
   --ml-primary-container: #ffdea9;
   --ml-on-primary: #ffdea9;
@@ -129,14 +164,14 @@
   --ml-error: #93000a;
   --ml-on-error: #ffdad6;
 
-  --chart-1: #d4a44c;
+  --chart-1: #a8243a;
   --chart-2: #b4ab9a;
   --chart-3: #494851;
   --chart-4: #9b8f7e;
   --chart-5: #7d5800;
 
   --sidebar: #f0eff8;
-  --sidebar-foreground: #11121f;
+  --sidebar-foreground: #1a1012;
   --sidebar-primary: #7d5800;
   --sidebar-primary-foreground: #ffdea9;
   --sidebar-accent: #ebe1cf;
@@ -147,62 +182,293 @@
 
 /* Dark mode — the primary Midnight Lounge experience */
 .dark {
-  --background: #11121f;
-  --foreground: #e2e1f3;
-  --card: #1e1f2c;
-  --card-foreground: #e2e1f3;
-  --popover: #1a1b27;
-  --popover-foreground: #e2e1f3;
-  --primary: #f2bf64;
-  --primary-foreground: #422c00;
+  --background: #1a1012;
+  --foreground: #f0e6d6;
+  --card: #241619;
+  --card-foreground: #f0e6d6;
+  --popover: #1f1316;
+  --popover-foreground: #f0e6d6;
+  --primary: #c43049;
+  --primary-foreground: #fbefe3;
   --secondary: #494851;
   --secondary-foreground: #c8c5cf;
-  --muted: #282936;
+  --muted: #2c1d20;
   --muted-foreground: #9b8f7e;
-  --accent: #333441;
+  --accent: #3a262a;
   --accent-foreground: #d3c4b2;
   --destructive: #ffb4ab;
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #f2bf64;
+  --ring: #c43049;
   --radius: 0.75rem;
-  --amber: #f2bf64;
-  --amber-foreground: #422c00;
+  --amber: #c43049;
+  --amber-foreground: #fbefe3;
+
+  /* Midnight Speakeasy accents — James (red tux), lapel, brass, safety, sober */
+  --ml-velvet: #7e1f2b;
+  --ml-velvet-bright: #b11226;
+  --ml-velvet-hover: #c8443b;
+  --ml-lapel: #0c0d12;
+  --ml-brass: #c9a24b;
+  --ml-sos: #e5484d;
+  --ml-sober: #7fb59b;
 
   /* Midnight Lounge surface tokens */
-  --ml-surface: #11121f;
-  --ml-surface-dim: #11121f;
+  --ml-surface: #1a1012;
+  --ml-surface-dim: #1a1012;
   --ml-surface-bright: #373846;
-  --ml-surface-container-lowest: #0c0d19;
-  --ml-surface-container-low: #1a1b27;
-  --ml-surface-container: #1e1f2c;
-  --ml-surface-container-high: #282936;
-  --ml-surface-container-highest: #333441;
-  --ml-on-surface: #e2e1f3;
+  --ml-surface-container-lowest: #120b0c;
+  --ml-surface-container-low: #1f1316;
+  --ml-surface-container: #241619;
+  --ml-surface-container-high: #2c1d20;
+  --ml-surface-container-highest: #3a262a;
+  --ml-on-surface: #f0e6d6;
   --ml-on-surface-variant: #d3c4b2;
-  --ml-primary-container: #d4a44c;
-  --ml-on-primary: #422c00;
+  --ml-primary-container: #a8243a;
+  --ml-on-primary: #fbefe3;
   --ml-on-primary-container: #563b00;
-  --ml-surface-tint: #f1be63;
+  --ml-surface-tint: #c43049;
   --ml-outline: #9b8f7e;
   --ml-outline-variant: #4f4537;
   --ml-error: #ffb4ab;
   --ml-on-error: #690005;
 
-  --chart-1: #f2bf64;
-  --chart-2: #d4a44c;
+  --chart-1: #c43049;
+  --chart-2: #a8243a;
   --chart-3: #b4ab9a;
   --chart-4: #9b8f7e;
   --chart-5: #cfc6b3;
 
-  --sidebar: #1a1b27;
-  --sidebar-foreground: #e2e1f3;
-  --sidebar-primary: #f2bf64;
-  --sidebar-primary-foreground: #422c00;
-  --sidebar-accent: #333441;
+  --sidebar: #1f1316;
+  --sidebar-foreground: #f0e6d6;
+  --sidebar-primary: #c43049;
+  --sidebar-primary-foreground: #fbefe3;
+  --sidebar-accent: #3a262a;
   --sidebar-accent-foreground: #d3c4b2;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #f2bf64;
+  --sidebar-ring: #c43049;
+
+  /* Atmosphere tokens — consumed by bg-ambient / bg-aurora / glass-* / shader.
+     Themes (below) override these to recolor the whole room from one attribute. */
+  --ambient-core: rgba(168, 36, 58, 0.08);
+  --ambient-edge: #1a1012;
+  --aurora-a: rgba(196, 48, 73, 0.16);
+  --aurora-b: rgba(126, 31, 43, 0.2);
+  --glass-bg: rgba(36, 22, 25, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-nav-bg: rgba(26, 16, 18, 0.8);
+  --glass-subtle-bg: rgba(36, 22, 25, 0.3);
+  --glass-elevated-bg: rgba(28, 18, 20, 0.55);
+  --glass-lapel-bg: rgba(18, 11, 12, 0.72);
+  /* WebGL shader triplet (ink → oxblood → wine) */
+  --shader-1: #160d0e;
+  --shader-2: #7e1f2b;
+  --shader-3: #c43049;
+}
+
+/* ============================================================
+   THEMES — [data-theme] overrides layered AFTER .dark.
+   html keeps the .dark class (so dark: variants + base palette
+   resolve); these blocks win by source order for the tokens they
+   redefine and inherit the rest. data-theme="dark" needs no block.
+   ============================================================ */
+
+/* Light — wine on whitish ivory cream, WCAG-AA body/icon contrast */
+[data-theme="light"] {
+  --background: #f8f4ec;
+  --foreground: #1f1417;
+  --card: #fffdf9;
+  --card-foreground: #1f1417;
+  --popover: #fffdf9;
+  --popover-foreground: #1f1417;
+  --primary: #b11226;
+  --primary-foreground: #fff6ef;
+  --secondary: #e9ddcd;
+  --secondary-foreground: #3a2c22;
+  --muted: #ece0d0;
+  --muted-foreground: #6b5a4a;
+  --accent: #f0e0d6;
+  --accent-foreground: #3a2226;
+  --destructive: #b3261e;
+  --border: rgba(26, 16, 18, 0.12);
+  --input: rgba(26, 16, 18, 0.14);
+  --ring: #b11226;
+  --amber: #b11226;
+  --amber-foreground: #fff6ef;
+  --ml-velvet: #7e1f2b;
+  --ml-velvet-bright: #b11226;
+  --ml-velvet-hover: #8e0f1f;
+  --ml-sos: #c4302b;
+  --ml-sober: #2f7d63;
+  --ambient-core: rgba(177, 18, 38, 0.06);
+  --ambient-edge: #f8f4ec;
+  --aurora-a: rgba(177, 18, 38, 0.08);
+  --aurora-b: rgba(201, 162, 75, 0.1);
+  --glass-bg: rgba(255, 253, 249, 0.66);
+  --glass-border: rgba(26, 16, 18, 0.08);
+  --glass-nav-bg: rgba(248, 244, 236, 0.85);
+  --glass-subtle-bg: rgba(255, 253, 249, 0.5);
+  --glass-elevated-bg: rgba(255, 254, 251, 0.8);
+  --glass-lapel-bg: rgba(252, 248, 241, 0.88);
+  --shader-1: #f8f4ec;
+  --shader-2: #e0a6ad;
+  --shader-3: #b11226;
+}
+
+/* Party — orange / amber */
+[data-theme="party"] {
+  --primary: #e8631f;
+  --primary-foreground: #1a0c02;
+  --ring: #e8631f;
+  --amber: #e8631f;
+  --ml-velvet-bright: #e8631f;
+  --ml-velvet-hover: #ff8a45;
+  --background: #170f0a;
+  --card: #221710;
+  --popover: #1d130c;
+  --muted: #241a10;
+  --accent: #3a2410;
+  --accent-foreground: #ffd9a8;
+  --foreground: #f8efe2;
+  --card-foreground: #f8efe2;
+  --muted-foreground: #c4a98c;
+  --ambient-core: rgba(232, 99, 31, 0.1);
+  --ambient-edge: #170f0a;
+  --aurora-a: rgba(232, 99, 31, 0.17);
+  --aurora-b: rgba(245, 185, 66, 0.15);
+  --shader-1: #160d06;
+  --shader-2: #b5471a;
+  --shader-3: #f5b942;
+}
+
+/* Chill — blue / indigo */
+[data-theme="chill"] {
+  --primary: #5286d6;
+  --primary-foreground: #04101f;
+  --ring: #5286d6;
+  --amber: #5286d6;
+  --ml-velvet-bright: #5286d6;
+  --ml-velvet-hover: #7da6e6;
+  --background: #0e1118;
+  --card: #161b27;
+  --popover: #121622;
+  --muted: #1a2030;
+  --accent: #1b2740;
+  --accent-foreground: #cfe0ff;
+  --foreground: #e9eefb;
+  --card-foreground: #e9eefb;
+  --muted-foreground: #9fb1d2;
+  --ambient-core: rgba(82, 134, 214, 0.1);
+  --ambient-edge: #0e1118;
+  --aurora-a: rgba(82, 134, 214, 0.16);
+  --aurora-b: rgba(99, 80, 214, 0.16);
+  --shader-1: #08101e;
+  --shader-2: #2d4a8a;
+  --shader-3: #6d8fd6;
+}
+
+/* Date night — rose / pink */
+[data-theme="date-night"] {
+  --primary: #e25b86;
+  --primary-foreground: #1c0810;
+  --ring: #e25b86;
+  --amber: #e25b86;
+  --ml-velvet-bright: #e25b86;
+  --ml-velvet-hover: #ef8aa9;
+  --background: #170d12;
+  --card: #22141b;
+  --popover: #1d1016;
+  --muted: #251720;
+  --accent: #3a1d2b;
+  --accent-foreground: #ffd6e3;
+  --foreground: #fbe9ef;
+  --card-foreground: #fbe9ef;
+  --muted-foreground: #d3a6b9;
+  --ambient-core: rgba(226, 91, 134, 0.1);
+  --ambient-edge: #170d12;
+  --aurora-a: rgba(226, 91, 134, 0.18);
+  --aurora-b: rgba(168, 58, 99, 0.16);
+  --shader-1: #160810;
+  --shader-2: #b03a63;
+  --shader-3: #e88fae;
+}
+
+/* Celebrate — amber / gold */
+[data-theme="celebrate"] {
+  --primary: #e0a83a;
+  --primary-foreground: #1d1400;
+  --ring: #e0a83a;
+  --amber: #e0a83a;
+  --ml-velvet-bright: #e0a83a;
+  --ml-velvet-hover: #f3c95f;
+  --background: #16110a;
+  --card: #211a0f;
+  --popover: #1c150c;
+  --muted: #241d10;
+  --accent: #38290f;
+  --accent-foreground: #ffe9b0;
+  --foreground: #f8f0db;
+  --card-foreground: #f8f0db;
+  --muted-foreground: #cbb488;
+  --ambient-core: rgba(224, 168, 58, 0.1);
+  --ambient-edge: #16110a;
+  --aurora-a: rgba(224, 168, 58, 0.16);
+  --aurora-b: rgba(201, 162, 75, 0.18);
+  --shader-1: #140f06;
+  --shader-2: #b5862a;
+  --shader-3: #f3d878;
+}
+
+/* Solo — violet / purple */
+[data-theme="solo"] {
+  --primary: #8b6fd6;
+  --primary-foreground: #0d061d;
+  --ring: #8b6fd6;
+  --amber: #8b6fd6;
+  --ml-velvet-bright: #8b6fd6;
+  --ml-velvet-hover: #a98fe6;
+  --background: #120f1a;
+  --card: #191425;
+  --popover: #14101e;
+  --muted: #1d1830;
+  --accent: #281f44;
+  --accent-foreground: #e0d6ff;
+  --foreground: #efeaff;
+  --card-foreground: #efeaff;
+  --muted-foreground: #b3a6d4;
+  --ambient-core: rgba(139, 111, 214, 0.1);
+  --ambient-edge: #120f1a;
+  --aurora-a: rgba(139, 111, 214, 0.17);
+  --aurora-b: rgba(90, 58, 154, 0.16);
+  --shader-1: #0c0818;
+  --shader-2: #5a3a9a;
+  --shader-3: #a98fe0;
+}
+
+/* Budget — emerald / green */
+[data-theme="budget"] {
+  --primary: #2fa86f;
+  --primary-foreground: #03130b;
+  --ring: #2fa86f;
+  --amber: #2fa86f;
+  --ml-velvet-bright: #2fa86f;
+  --ml-velvet-hover: #58c993;
+  --background: #0d140f;
+  --card: #131c16;
+  --popover: #0f1711;
+  --muted: #16201a;
+  --accent: #163024;
+  --accent-foreground: #c2f0d8;
+  --foreground: #e6f4ec;
+  --card-foreground: #e6f4ec;
+  --muted-foreground: #9ec7af;
+  --ambient-core: rgba(47, 168, 111, 0.1);
+  --ambient-edge: #0d140f;
+  --aurora-a: rgba(47, 168, 111, 0.16);
+  --aurora-b: rgba(31, 125, 82, 0.16);
+  --shader-1: #06120b;
+  --shader-2: #1f7d52;
+  --shader-3: #5fd69a;
 }
 
 @layer base {
@@ -224,46 +490,46 @@
    ============================================================ */
 
 @utility glass-panel {
-  background: rgba(30, 31, 44, 0.4);
+  background: var(--glass-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
 }
 
 @utility glass-nav {
-  background: rgba(17, 18, 31, 0.8);
+  background: var(--glass-nav-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 @utility glass-input {
-  background: rgba(17, 18, 31, 0.8);
+  background: var(--glass-nav-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(212, 164, 76, 0.2);
+  border: 1px solid var(--glass-border);
 }
 
 @utility glow-active {
-  box-shadow: 0 0 15px rgba(212, 164, 76, 0.2);
-  border-color: #d4a44c;
+  box-shadow: 0 0 15px rgba(168, 36, 58, 0.2);
+  border-color: #a8243a;
 }
 
 @utility glow-primary {
-  box-shadow: 0 0 20px rgba(242, 191, 100, 0.4);
+  box-shadow: 0 0 20px rgba(196, 48, 73, 0.4);
 }
 
 @utility glow-bloom {
-  box-shadow: inset 0 0 15px rgba(212, 164, 76, 0.1),
-    0 0 15px rgba(212, 164, 76, 0.2);
+  box-shadow: inset 0 0 15px rgba(168, 36, 58, 0.1),
+    0 0 15px rgba(168, 36, 58, 0.2);
 }
 
 @utility text-glow {
-  text-shadow: 0 0 12px rgba(242, 191, 100, 0.3);
+  text-shadow: 0 0 12px rgba(196, 48, 73, 0.3);
 }
 
 @utility taste-bar-track {
-  background-color: #333441;
+  background-color: var(--muted);
   height: 6px;
   border-radius: 3px;
   overflow: hidden;
@@ -274,20 +540,20 @@
   height: 100%;
   background: linear-gradient(
     90deg,
-    rgba(212, 164, 76, 0.2) 0%,
-    rgba(212, 164, 76, 1) 100%
+    rgba(168, 36, 58, 0.2) 0%,
+    rgba(168, 36, 58, 1) 100%
   );
   border-radius: 3px;
   position: relative;
 }
 
 @utility indent-line {
-  border-left: 2px solid rgba(212, 164, 76, 0.15);
+  border-left: 2px solid color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 @utility vote-line {
   width: 2px;
-  background-color: rgba(212, 164, 76, 0.15);
+  background-color: color-mix(in srgb, var(--primary) 15%, transparent);
   margin: 0 auto;
   flex-grow: 1;
 }
@@ -295,36 +561,63 @@
 @utility bg-ambient {
   background: radial-gradient(
     circle at 50% 0%,
-    rgba(212, 164, 76, 0.08) 0%,
-    rgba(17, 18, 31, 1) 60%
+    var(--ambient-core) 0%,
+    var(--ambient-edge) 60%
   );
 }
 
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(-3%, -2%, 0) scale(1.05);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate3d(3%, 3%, 0) scale(1.18);
+    opacity: 1;
+  }
+}
+
+/* Always-on, GPU-cheap wine aurora behind content (transform/opacity only). */
+@utility bg-aurora {
+  background:
+    radial-gradient(42% 38% at 22% 16%, var(--aurora-a), transparent 70%),
+    radial-gradient(36% 34% at 82% 10%, var(--aurora-b), transparent 70%);
+  animation: aurora-drift 20s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 @utility btn-gold {
-  background: #d4a44c;
-  box-shadow: 0 4px 15px rgba(212, 164, 76, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
+  background: linear-gradient(
+    180deg,
+    var(--primary) 0%,
+    color-mix(in srgb, var(--primary) 78%, #000) 100%
+  );
+  color: var(--primary-foreground);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.28);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @utility btn-ghost-gold {
-  border: 1px solid #f2bf64;
-  color: #f2bf64;
+  border: 1px solid #c43049;
+  color: #c43049;
   background: transparent;
 }
 
 @utility pill-active {
-  background: #d4a44c;
-  color: #0c0d19;
-  box-shadow: 0 0 15px rgba(212, 164, 76, 0.2);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 @utility pill-inactive {
-  background: rgba(30, 31, 44, 0.4);
+  background: var(--glass-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #e2e1f3;
+  border: 1px solid var(--glass-border);
+  color: var(--foreground);
 }
 
 @utility search-glow {
@@ -355,17 +648,17 @@
   height: 8px;
   background-color: #fff;
   border-radius: 50%;
-  box-shadow: 0 0 8px #f2bf64;
+  box-shadow: 0 0 8px #c43049;
 }
 
 .btn-gold:hover {
-  box-shadow: 0 6px 20px rgba(212, 164, 76, 0.5),
+  box-shadow: 0 6px 20px rgba(168, 36, 58, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
 }
 
 .btn-ghost-gold:hover {
-  background: rgba(242, 191, 100, 0.1);
+  background: rgba(196, 48, 73, 0.1);
 }
 
 .pill-inactive:hover {
@@ -373,14 +666,14 @@
 }
 
 .search-glow:focus-within {
-  box-shadow: 0 0 20px rgba(242, 191, 100, 0.15);
-  border-color: #f2bf64;
+  box-shadow: 0 0 20px rgba(196, 48, 73, 0.15);
+  border-color: #c43049;
 }
 
 .drink-card-hover:hover {
   transform: translateY(-4px);
-  border-color: #f2bf64;
-  box-shadow: 0 0 20px rgba(212, 164, 76, 0.15);
+  border-color: #c43049;
+  box-shadow: 0 0 20px rgba(168, 36, 58, 0.15);
 }
 
 .hide-scrollbar::-webkit-scrollbar {
@@ -401,4 +694,146 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================
+   MIDNIGHT SPEAKEASY — overhaul additions (utilities)
+   Velvet (James), lapel glass, grain, mobile-blur, reduced-motion
+   ============================================================ */
+
+@utility font-display {
+  font-family: var(--font-playfair), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+}
+
+@utility glass-panel-elevated {
+  background: var(--glass-elevated-bg);
+  backdrop-filter: blur(32px) saturate(1.2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.2);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@utility glass-panel-subtle {
+  background: var(--glass-subtle-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+@utility glass-lapel {
+  background: var(--glass-lapel-bg);
+  backdrop-filter: blur(28px) saturate(1.1);
+  -webkit-backdrop-filter: blur(28px) saturate(1.1);
+  border: 1px solid rgba(201, 162, 75, 0.18);
+}
+
+@utility glow-velvet {
+  box-shadow: 0 0 20px rgba(177, 18, 38, 0.45);
+}
+
+@utility glow-danger {
+  box-shadow: 0 0 18px rgba(229, 72, 77, 0.4);
+}
+
+@utility btn-velvet {
+  background: linear-gradient(
+    180deg,
+    var(--ml-velvet-bright) 0%,
+    color-mix(in srgb, var(--ml-velvet-bright) 68%, #000) 100%
+  );
+  color: var(--primary-foreground);
+  box-shadow: 0 4px 15px color-mix(in srgb, var(--ml-velvet-bright) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@utility bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   LANDING FX — orbs, glare sweep, sparkles (polish layer)
+   Pure CSS so they need no JS; reduced-motion kills them globally.
+   ============================================================ */
+@keyframes orb-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(3%, -4%, 0) scale(1.08); }
+}
+@keyframes glare-sweep {
+  0% { transform: translateX(-160%) skewX(-20deg); opacity: 0; }
+  12% { opacity: 0.5; }
+  38% { transform: translateX(280%) skewX(-20deg); opacity: 0; }
+  100% { transform: translateX(280%) skewX(-20deg); opacity: 0; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.1; transform: scale(0.6); }
+  50% { opacity: 0.85; transform: scale(1); }
+}
+
+@utility fx-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  will-change: transform;
+  pointer-events: none;
+  animation: orb-float 16s ease-in-out infinite;
+}
+
+@utility fx-sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--primary);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--primary) 55%, transparent);
+  pointer-events: none;
+  will-change: opacity, transform;
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+@utility fx-glare {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 38%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  filter: blur(6px);
+  pointer-events: none;
+  animation: glare-sweep 7s ease-in-out infinite;
+}
+
+.btn-velvet:hover {
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--ml-velvet-bright) 55%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Mobile GPU budget — reduce heavy blur on small screens */
+@media (max-width: 768px) {
+  .glass-panel,
+  .glass-nav,
+  .glass-panel-elevated,
+  .glass-lapel {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* Accessibility + graphics fallback — honor reduced motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

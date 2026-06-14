@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { COCKTAIL_RECIPES, findMatchingRecipes } from "@/lib/cocktail-recipes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,13 +35,58 @@ const BOTTLE_OPTIONS = [
 
 const CATEGORIES = ["All", "Rum", "Gin", "Vodka", "Whisky", "Tequila", "Wine", "Beer"];
 
+// Spirit-pref id (onboarding) → Mix Lab category label.
+const PREF_TO_CATEGORY: Record<string, string> = {
+  whisky: "Whisky",
+  rum: "Rum",
+  vodka: "Vodka",
+  gin: "Gin",
+  beer: "Beer",
+  wine: "Wine",
+  tequila: "Tequila",
+};
+
 export function MixLabView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [activeRecipe, setActiveRecipe] = useState<string | null>(null);
   const [luckyRecipe, setLuckyRecipe] = useState<string | null>(null);
+  const [seededFromPrefs, setSeededFromPrefs] = useState(false);
+  // True once the user touches a bottle — the prefs seed must not run after that.
+  const touchedRef = useRef(false);
+
+  // Pre-fill the cabinet from the user's onboarding spirit prefs — one
+  // representative bottle per liked category — so recipes show immediately.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        // Bail if unmounted or the user already started picking — keeps the
+        // "pre-filled" label honest (only shown when the seed truly applied).
+        if (!alive || touchedRef.current) return;
+        const prefs: string[] = d?.user?.preferredSpirits ?? [];
+        if (!prefs.length) return;
+        const cats = new Set(
+          prefs.map((p) => PREF_TO_CATEGORY[p]).filter(Boolean)
+        );
+        const seed = new Set<string>();
+        cats.forEach((cat) => {
+          const first = BOTTLE_OPTIONS.find((b) => b.category === cat);
+          if (first) seed.add(first.slug);
+        });
+        if (!seed.size) return;
+        setSelected(seed);
+        setSeededFromPrefs(true);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function toggleBottle(slug: string) {
+    touchedRef.current = true;
     setSelected((prev) => {
       const next = new Set(prev);
       next.has(slug) ? next.delete(slug) : next.add(slug);
@@ -79,7 +124,7 @@ export function MixLabView() {
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <span className="text-3xl">🧪</span>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "EB Garamond, serif" }}>
+          <h1 className="font-display text-2xl font-semibold text-primary">
             Mix Lab
           </h1>
         </div>
@@ -89,9 +134,9 @@ export function MixLabView() {
       </div>
 
       {/* Bottle Selector */}
-      <div className="space-y-4 rounded-xl border border-border/20 bg-card/30 p-5 backdrop-blur">
+      <div className="glass-panel space-y-4 rounded-xl p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="font-display text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             What do you have?
           </h2>
           {selected.size > 0 && (
@@ -110,10 +155,8 @@ export function MixLabView() {
             <button
               key={cat}
               onClick={() => setCategoryFilter(cat)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                categoryFilter === cat
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card/60 text-muted-foreground hover:text-foreground border border-border/30"
+              className={`min-h-11 rounded-full px-3 text-xs ${
+                categoryFilter === cat ? "pill-active" : "pill-inactive"
               }`}
             >
               {cat}
@@ -129,15 +172,13 @@ export function MixLabView() {
               <button
                 key={bottle.slug}
                 onClick={() => toggleBottle(bottle.slug)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                  isSelected
-                    ? "border-primary bg-primary/15 text-primary shadow-sm shadow-primary/10"
-                    : "border-border/30 bg-card/40 text-muted-foreground hover:border-border/60 hover:text-foreground"
+                className={`flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs ${
+                  isSelected ? "pill-active" : "pill-inactive"
                 }`}
               >
                 <span>{bottle.emoji}</span>
                 {bottle.name}
-                {isSelected && <span className="ml-0.5 text-primary">✓</span>}
+                {isSelected && <span className="ml-0.5">✓</span>}
               </button>
             );
           })}
@@ -146,6 +187,11 @@ export function MixLabView() {
         {selected.size > 0 && (
           <p className="text-xs text-muted-foreground">
             {selected.size} bottle{selected.size !== 1 ? "s" : ""} selected
+            {seededFromPrefs && (
+              <span className="text-[var(--ml-velvet-hover)]">
+                {" "}· pre-filled from your taste profile 🍸
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -153,9 +199,10 @@ export function MixLabView() {
       {/* Action row */}
       <div className="flex items-center gap-3">
         <Button
-          variant="outline"
+          variant="glass"
+          size="lg"
           onClick={handleLucky}
-          className="gap-2 border-primary/30 text-primary hover:bg-primary/10"
+          className="gap-2"
         >
           <span>🎲</span> Feeling Lucky
         </Button>
@@ -170,7 +217,7 @@ export function MixLabView() {
       {selected.size === 0 && !luckyRecipe ? (
         /* Browse all recipes */
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          <h2 className="font-display text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             All Recipes ({COCKTAIL_RECIPES.length})
           </h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -192,8 +239,8 @@ export function MixLabView() {
           {perfectMatches.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <h2 className="font-semibold">✅ You can make these right now</h2>
-                <Badge className="bg-green-500/20 text-green-400 text-xs border-green-500/30">
+                <h2 className="font-display font-semibold">✅ You can make these right now</h2>
+                <Badge variant="recommendation">
                   {perfectMatches.length}
                 </Badge>
               </div>
@@ -216,7 +263,7 @@ export function MixLabView() {
           {/* Partial matches */}
           {partialMatches.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-semibold text-muted-foreground">
+              <h2 className="font-display font-semibold text-muted-foreground">
                 🛒 Missing a few things
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -238,14 +285,14 @@ export function MixLabView() {
           )}
 
           {matches.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/30 py-16 text-center">
+            <div className="glass-panel-subtle flex flex-col items-center justify-center rounded-xl border-dashed py-16 text-center">
               <span className="text-4xl">🤔</span>
               <p className="mt-3 font-medium">No recipes match those bottles yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Try adding more spirits or check out all recipes below
               </p>
               <Button
-                variant="outline"
+                variant="glass"
                 size="sm"
                 className="mt-4"
                 onClick={() => setSelected(new Set())}

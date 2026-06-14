@@ -7,14 +7,14 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div className="prose prose-invert mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold text-foreground">Privacy Policy</h1>
+      <h1 className="font-display text-2xl font-bold text-primary">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground">
         Last updated: June 2026
       </p>
 
       <div className="mt-8 space-y-6 text-sm text-foreground/80">
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             1. Introduction
           </h2>
           <p>
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             2. Data We Collect
           </h2>
           <p>We collect the following data:</p>
@@ -56,7 +56,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             3. Purpose of Data Collection
           </h2>
           <ul className="list-disc pl-6 space-y-1">
@@ -77,7 +77,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             4. Data Storage and Security
           </h2>
           <p>
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             5. Data Sharing
           </h2>
           <p>
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             6. Your Rights (DPDP Act, 2023)
           </h2>
           <p>Under the DPDP Act, you have the right to:</p>
@@ -142,7 +142,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             7. Data Retention
           </h2>
           <p>
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             8. Children and Minors
           </h2>
           <p>
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             9. Cookies
           </h2>
           <p>
@@ -177,7 +177,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             10. Contact & Grievance Officer
           </h2>
           <p>

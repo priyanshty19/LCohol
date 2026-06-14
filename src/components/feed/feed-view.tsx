@@ -3,28 +3,50 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { PostList } from "./post-list";
 import type { FeedSortOption } from "@/types/database";
+
+const SORT_OPTIONS: { value: FeedSortOption; label: string }[] = [
+  { value: "hot", label: "Hot" },
+  { value: "new", label: "New" },
+  { value: "top", label: "Top" },
+];
 
 export function FeedView() {
   const [sort, setSort] = useState<FeedSortOption>("hot");
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Tabs
-          value={sort}
-          onValueChange={(v) => setSort(v as FeedSortOption)}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div
+          role="tablist"
+          aria-label="Sort feed"
+          className="flex items-center gap-1.5"
         >
-          <TabsList>
-            <TabsTrigger value="hot">Hot</TabsTrigger>
-            <TabsTrigger value="new">New</TabsTrigger>
-            <TabsTrigger value="top">Top</TabsTrigger>
-          </TabsList>
-        </Tabs>
+          {SORT_OPTIONS.map((option) => {
+            const active = sort === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setSort(option.value)}
+                className={cn(
+                  "inline-flex h-9 items-center rounded-full px-4 text-sm font-medium transition-all",
+                  active ? "pill-active" : "pill-inactive hover:text-primary"
+                )}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
         <Link href="/create">
-          <Button size="sm">Share a Story</Button>
+          <Button variant="gold" size="lg" className="font-display">
+            Share a Story
+          </Button>
         </Link>
       </div>
 

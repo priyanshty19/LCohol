@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { PostCard } from "./post-card";
+import { Reveal } from "@/components/fx/motion";
 import { Button } from "@/components/ui/button";
 import type { PostWithRelations, FeedSortOption } from "@/types/database";
 
@@ -49,11 +50,11 @@ export function PostList({ sort, postType }: PostListProps) {
 
   if (loading && posts.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
-            className="h-32 animate-pulse rounded-lg bg-card/50"
+            className="glass-panel-subtle h-32 animate-pulse rounded-xl bg-muted/40"
           />
         ))}
       </div>
@@ -66,13 +67,16 @@ export function PostList({ sort, postType }: PostListProps) {
 
   return (
     <div className="space-y-3">
-      {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+      {posts.map((post, i) => (
+        <Reveal key={post.id} delay={Math.min(i, 6) * 0.05}>
+          <PostCard post={post} />
+        </Reveal>
       ))}
       {hasMore && (
         <div className="flex justify-center pt-4">
           <Button
-            variant="outline"
+            variant="glass"
+            size="lg"
             onClick={() => fetchPosts(true)}
             disabled={loading}
           >

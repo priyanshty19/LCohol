@@ -65,16 +65,17 @@ export function DrinkTagSelector({ selected, onChange }: DrinkTagSelectorProps) 
           {selected.map((drink) => (
             <Badge
               key={drink.id}
-              variant="secondary"
+              variant="drink"
               className="gap-1 pr-1"
             >
               {drink.name}
               <button
                 type="button"
                 onClick={() => removeDrink(drink.id)}
-                className="ml-1 rounded-full p-0.5 hover:bg-background/50"
+                className="ml-1 flex h-4 w-4 items-center justify-center rounded-full p-0.5 hover:bg-background/50"
+                aria-label={`Remove ${drink.name}`}
               >
-                x
+                ×
               </button>
             </Badge>
           ))}
@@ -83,6 +84,7 @@ export function DrinkTagSelector({ selected, onChange }: DrinkTagSelectorProps) 
 
       <div className="relative">
         <Input
+          variant="search"
           placeholder="Search drinks to tag..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -91,16 +93,16 @@ export function DrinkTagSelector({ selected, onChange }: DrinkTagSelectorProps) 
         />
 
         {open && results.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+          <div className="glass-panel-elevated absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto rounded-lg hide-scrollbar">
             {results.map((drink) => (
               <button
                 key={drink.id}
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => addDrink(drink)}
               >
-                <span className="font-medium">{drink.name}</span>
+                <span className="font-display font-medium">{drink.name}</span>
                 {drink.brand && (
                   <span className="text-xs text-muted-foreground">
                     {drink.brand}

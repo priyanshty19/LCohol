@@ -14,9 +14,9 @@ interface RecipeCardProps {
 }
 
 const DIFFICULTY_COLOR = {
-  Easy:   "text-green-400 border-green-400/30 bg-green-400/10",
-  Medium: "text-yellow-400 border-yellow-400/30 bg-yellow-400/10",
-  Hard:   "text-red-400 border-red-400/30 bg-red-400/10",
+  Easy:   "text-[var(--ml-sober)] border-[var(--ml-sober)]/30 bg-[var(--ml-sober)]/10",
+  Medium: "text-primary border-primary/30 bg-primary/10",
+  Hard:   "text-[var(--ml-sos)] border-[var(--ml-sos)]/30 bg-[var(--ml-sos)]/10",
 };
 
 export function RecipeCard({
@@ -31,10 +31,9 @@ export function RecipeCard({
 
   return (
     <Card
-      className={`overflow-hidden border transition-all duration-200 cursor-pointer ${
-        isExpanded
-          ? "border-primary/40 bg-card/70 shadow-lg shadow-primary/5"
-          : "border-border/20 bg-card/30 hover:border-border/40 hover:bg-card/50"
+      variant="glass"
+      className={`drink-card-hover cursor-pointer py-0 transition-all duration-200 ${
+        isExpanded ? "border-primary/40 glow-primary" : ""
       }`}
       onClick={onToggle}
     >
@@ -44,7 +43,7 @@ export function RecipeCard({
           <div className="flex items-center gap-2">
             <span className="text-2xl">{recipe.emoji}</span>
             <div>
-              <h3 className="font-semibold text-sm leading-tight">{recipe.name}</h3>
+              <h3 className="font-display font-semibold text-sm leading-tight">{recipe.name}</h3>
               <p className="text-[11px] text-muted-foreground/70 mt-0.5">
                 {recipe.glass} · {recipe.prepTime}
               </p>
@@ -58,10 +57,10 @@ export function RecipeCard({
               {recipe.difficulty}
             </Badge>
             {highlight === "perfect" && (
-              <span className="text-[10px] text-green-400 font-medium">✓ Ready</span>
+              <span className="text-[10px] text-[var(--ml-sober)] font-medium">✓ Ready</span>
             )}
             {highlight === "partial" && matchInfo && (
-              <span className="text-[10px] text-yellow-400">{matchInfo}</span>
+              <span className="text-[10px] text-primary">{matchInfo}</span>
             )}
           </div>
         </div>
@@ -74,12 +73,9 @@ export function RecipeCard({
         <div className="flex items-center justify-between pt-1">
           <div className="flex gap-1 flex-wrap">
             {recipe.vibes.slice(0, 2).map((v) => (
-              <span
-                key={v}
-                className="text-[10px] text-muted-foreground/60 bg-muted/20 rounded-full px-2 py-0.5"
-              >
+              <Badge key={v} variant="topic" className="text-[10px]">
                 {v}
-              </span>
+              </Badge>
             ))}
           </div>
           <span className="text-xs text-muted-foreground/50">
@@ -96,7 +92,7 @@ export function RecipeCard({
         >
           {/* Ingredients */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <h4 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Ingredients
             </h4>
             <ul className="space-y-1.5">
@@ -115,10 +111,10 @@ export function RecipeCard({
                       }`}
                     >
                       {isAvailable === true && (
-                        <span className="text-green-400 text-[10px]">✓</span>
+                        <span className="text-[var(--ml-sober)] text-[10px]">✓</span>
                       )}
                       {isAvailable === false && (
-                        <span className="text-red-400/60 text-[10px]">✗</span>
+                        <span className="text-[var(--ml-sos)]/60 text-[10px]">✗</span>
                       )}
                       {ing.name}
                       {ing.isOptional && (
@@ -136,7 +132,7 @@ export function RecipeCard({
 
           {/* Steps */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <h4 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Method
             </h4>
             <ol className="space-y-2">

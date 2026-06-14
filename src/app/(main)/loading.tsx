@@ -4,7 +4,7 @@ export default function Loading() {
       {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
-          className="h-32 animate-pulse rounded-lg bg-card/50"
+          className="glass-panel-subtle h-32 animate-pulse rounded-xl bg-muted/50"
         />
       ))}
     </div>

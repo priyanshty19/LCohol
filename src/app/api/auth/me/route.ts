@@ -1,22 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
-import { findAllowedUser } from "@/lib/allowed-users";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
-export async function GET(request: NextRequest) {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return NextResponse.json({ user: null });
-
-  const email = await verifySessionToken(token);
-  if (!email) return NextResponse.json({ user: null });
-
-  const allowedUser = findAllowedUser(email);
-  if (!allowedUser) return NextResponse.json({ user: null });
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ user: null });
 
   return NextResponse.json({
     user: {
-      email: allowedUser.email,
-      username: allowedUser.username,
-      displayName: allowedUser.displayName,
+      email: user.email,
+      username: user.profile?.username ?? null,
+      displayName: user.profile?.displayName ?? user.profile?.username ?? null,
+      role: user.role,
+      isBanned: user.isBanned,
+      emergencyPhone: user.profile?.emergencyPhone ?? null,
+      theme: user.profile?.theme ?? "light",
+      state: user.profile?.state ?? null,
+      preferredSpirits: user.profile?.preferredSpirits ?? [],
     },
   });
 }

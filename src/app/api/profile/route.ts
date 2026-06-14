@@ -39,7 +39,33 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { displayName, bio, drinkingStyle, city, state } = body;
+  const {
+    displayName,
+    bio,
+    drinkingStyle,
+    city,
+    state,
+    emergencyPhone,
+    preferredSpirits,
+    preferredFlavours,
+    intensity,
+    intent,
+    theme,
+    onboarded,
+    geoDismissed,
+  } = body;
+
+  // Whitelist the theme value so a client can't write arbitrary data-theme.
+  const ALLOWED_THEMES = new Set([
+    "dark",
+    "light",
+    "party",
+    "chill",
+    "date-night",
+    "celebrate",
+    "solo",
+    "budget",
+  ]);
 
   const updated = await prisma.profile.update({
     where: { id: dbUser.profile.id },
@@ -49,6 +75,18 @@ export async function PATCH(request: Request) {
       ...(drinkingStyle !== undefined ? { drinkingStyle } : {}),
       ...(city !== undefined ? { city } : {}),
       ...(state !== undefined ? { state } : {}),
+      ...(emergencyPhone !== undefined ? { emergencyPhone } : {}),
+      ...(Array.isArray(preferredSpirits)
+        ? { preferredSpirits: preferredSpirits.slice(0, 12).map(String) }
+        : {}),
+      ...(Array.isArray(preferredFlavours)
+        ? { preferredFlavours: preferredFlavours.slice(0, 16).map(String) }
+        : {}),
+      ...(typeof intensity === "string" ? { intensity: intensity.slice(0, 20) } : {}),
+      ...(typeof intent === "string" ? { intent: intent.slice(0, 20) } : {}),
+      ...(typeof theme === "string" && ALLOWED_THEMES.has(theme) ? { theme } : {}),
+      ...(onboarded ? { onboardedAt: new Date() } : {}),
+      ...(geoDismissed ? { geoDismissedAt: new Date() } : {}),
     },
   });
 

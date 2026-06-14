@@ -6,7 +6,10 @@ import { DRINKS } from "../scripts/seed-drinks";
 
 const dbUrl = process.env.DATABASE_URL!;
 console.log(`Connecting to: ${dbUrl.replace(/\/\/.*@/, "//***@")}`);
-const adapter = new PrismaPg(dbUrl);
+const adapter = new PrismaPg({
+  connectionString: dbUrl,
+  ssl: { rejectUnauthorized: false },
+});
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
