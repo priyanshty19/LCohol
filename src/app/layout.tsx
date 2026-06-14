@@ -65,9 +65,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-theme="light"
-      suppressHydrationWarning
-      className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} light h-full antialiased`}
+      className={`${ebGaramond.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
