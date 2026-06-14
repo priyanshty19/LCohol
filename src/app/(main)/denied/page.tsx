@@ -1,9 +1,9 @@
 export default function DeniedPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
-      <div className="space-y-6 max-w-sm">
+    <div className="bg-ambient flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
+      <div className="glass-panel-elevated max-w-sm space-y-6 rounded-2xl p-8">
         <div className="text-6xl">🚫</div>
-        <h1 className="text-3xl font-bold text-primary" style={{ fontFamily: "EB Garamond, serif" }}>
+        <h1 className="font-display text-3xl font-bold text-primary text-glow">
           Access Denied
         </h1>
         <p className="text-muted-foreground leading-relaxed">
@@ -13,11 +13,11 @@ export default function DeniedPage() {
         </p>
         <a
           href="/login"
-          className="inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="btn-gold inline-flex min-h-[44px] items-center justify-center rounded-lg px-6 py-2.5 text-sm font-medium transition-colors"
         >
           Back to Login
         </a>
-        <p className="text-xs text-muted-foreground/50">
+        <p className="font-display text-xs text-muted-foreground/50">
           SIPSTORIES · Private Beta
         </p>
       </div>

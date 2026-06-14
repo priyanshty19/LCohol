@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,9 +12,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import { SipStoriesLogo } from "@/components/brand/logo";
+
+const NAV = [
+  { href: "/", label: "Feed" },
+  { href: "/drinks", label: "Drinks" },
+  { href: "/bars", label: "🍻 Bars" },
+  { href: "/mix", label: "Mix Lab" },
+  { href: "/vibe", label: "Vibe" },
+  { href: "/search", label: "Search" },
+];
 
 export function Header() {
   const { user } = useAuth();
+  const pathname = usePathname();
   const router = useRouter();
 
   async function handleLogout() {
@@ -23,50 +35,73 @@ export function Header() {
     router.refresh();
   }
 
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+    <header className="glass-nav sticky top-0 z-50">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="text-xl font-bold text-primary">
-            SIPSTORIES
+        <div className="flex items-center gap-5">
+          <Link href="/" aria-label="Sip Stories home">
+            <SipStoriesLogo />
           </Link>
-          <nav className="hidden items-center gap-1 md:flex">
-            <Link href="/">
-              <Button variant="ghost" size="sm">Feed</Button>
-            </Link>
-            <Link href="/drinks">
-              <Button variant="ghost" size="sm">Drinks</Button>
-            </Link>
-            <Link href="/mix">
-              <Button variant="ghost" size="sm">🧪 Mix Lab</Button>
-            </Link>
-            <Link href="/vibe">
-              <Button variant="ghost" size="sm">🌙 Vibe</Button>
-            </Link>
+          <nav className="hidden items-center gap-0.5 md:flex">
+            {NAV.map((n) => (
+              <Link key={n.href} href={n.href}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(isActive(n.href) && "text-primary")}
+                >
+                  {n.label}
+                </Button>
+              </Link>
+            ))}
             <Link href="/hangover">
-              <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">🆘 SOS</Button>
-            </Link>
-            <Link href="/search">
-              <Button variant="ghost" size="sm">Search</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[var(--ml-sos)] hover:text-[var(--ml-sos)]"
+              >
+                🆘 SOS
+              </Button>
             </Link>
           </nav>
         </div>
 
         <div className="flex items-center gap-3">
           <Link href="/create">
-            <Button size="sm">Post</Button>
+            <Button variant="gold" size="sm">
+              Post
+            </Button>
           </Link>
 
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-accent">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/20 text-primary text-xs">
-                    {user.email?.[0]?.toUpperCase() ?? "?"}
+                  <AvatarFallback className="bg-primary/20 text-xs text-primary">
+                    {user.username?.[0]?.toUpperCase() ??
+                      user.email?.[0]?.toUpperCase() ??
+                      "?"}
                   </AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem>
+                  <Link
+                    href="/help"
+                    className="w-full font-medium text-[var(--ml-sos)]"
+                  >
+                    🆘 Help &amp; Safety
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Link href={`/profile/${user.username ?? ""}`} className="w-full">
+                    My profile
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Link href="/settings" className="w-full">
                     Settings
@@ -83,11 +118,25 @@ export function Header() {
                     Privacy
                   </Link>
                 </DropdownMenuItem>
+                {(user.role === "ADMIN" || user.role === "MODERATOR") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Link href="/moderation" className="w-full">
+                        Moderation
+                      </Link>
+                    </DropdownMenuItem>
+                    {user.role === "ADMIN" && (
+                      <DropdownMenuItem>
+                        <Link href="/admin" className="w-full">
+                          Admin
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                  </>
+                )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  variant="destructive"
-                >
+                <DropdownMenuItem onClick={handleLogout} variant="destructive">
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>

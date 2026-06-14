@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 export default function GrievancePage() {
   return (
     <div className="prose prose-invert mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold text-foreground">
+      <h1 className="font-display text-2xl font-bold text-primary">
         Grievance Redressal
       </h1>
       <p className="text-sm text-muted-foreground">
@@ -17,8 +17,8 @@ export default function GrievancePage() {
       </p>
 
       <div className="mt-8 space-y-6 text-sm text-foreground/80">
-        <section className="rounded-lg border border-border/30 bg-card/50 p-6">
-          <h2 className="text-lg font-semibold text-foreground">
+        <section className="glass-panel-elevated glow-primary rounded-xl p-6">
+          <h2 className="font-display text-lg font-semibold text-primary">
             Grievance Officer
           </h2>
           <div className="mt-4 space-y-2">
@@ -39,7 +39,7 @@ export default function GrievancePage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             How to File a Complaint
           </h2>
           <p>If you have a grievance related to:</p>
@@ -61,7 +61,7 @@ export default function GrievancePage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             Response Timeline
           </h2>
           <ul className="list-disc pl-6 space-y-1">
@@ -80,7 +80,7 @@ export default function GrievancePage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             Reporting Content
           </h2>
           <p>
@@ -91,7 +91,7 @@ export default function GrievancePage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             Escalation
           </h2>
           <p>

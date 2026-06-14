@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 const DRINKING_STYLES = [
   { value: "SOCIAL", label: "Social Drinker" },
@@ -37,18 +38,11 @@ export function SettingsView() {
   const [drinkingStyle, setDrinkingStyle] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
 
   useEffect(() => {
-    async function load() {
-      if (!user?.email) return;
-      // Fetch current user's profile via a simple lookup
-      const res = await fetch(`/api/profile?username=_current`, {
-        method: "GET",
-      });
-      // If _current doesn't work, we rely on the settings being loaded empty
-      setLoading(false);
-    }
-    load();
+    if (user?.emergencyPhone) setEmergencyPhone(user.emergencyPhone);
+    setLoading(false);
   }, [user]);
 
   async function handleSave() {
@@ -65,6 +59,7 @@ export function SettingsView() {
           drinkingStyle: drinkingStyle || undefined,
           city: city || undefined,
           state: state || undefined,
+          emergencyPhone: emergencyPhone || undefined,
         }),
       });
 
@@ -79,11 +74,11 @@ export function SettingsView() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="font-display text-2xl font-bold text-primary">Settings</h1>
 
-      <Card className="border-border/30 bg-card/50">
+      <Card variant="glass">
         <CardContent className="space-y-4 pt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Profile
           </h2>
 
@@ -149,20 +144,47 @@ export function SettingsView() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="emergencyPhone">Emergency contact</Label>
+            <Input
+              id="emergencyPhone"
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+              placeholder="+91 98765 43210"
+              maxLength={20}
+            />
+            <p className="text-xs text-muted-foreground">
+              Used by the Help page to call someone you trust. Kept private.
+            </p>
+          </div>
+
           <div className="flex items-center gap-3 pt-2">
-            <Button onClick={handleSave} disabled={saving}>
+            <Button variant="gold" onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
             </Button>
             {saved && (
-              <span className="text-sm text-green-500">Changes saved!</span>
+              <span className="text-sm text-[var(--ml-sober)]">Changes saved!</span>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <Card className="border-border/30 bg-card/50">
+      <Card variant="glass">
         <CardContent className="space-y-4 pt-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Appearance
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Pick a mood. It follows you across devices.
+          </p>
+          <ThemeSwitcher />
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardContent className="space-y-4 pt-6">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Account
           </h2>
           <p className="text-sm text-muted-foreground">

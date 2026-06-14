@@ -7,14 +7,14 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <div className="prose prose-invert mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold text-foreground">Terms of Service</h1>
+      <h1 className="font-display text-2xl font-bold text-primary">Terms of Service</h1>
       <p className="text-sm text-muted-foreground">
         Last updated: June 2026
       </p>
 
       <div className="mt-8 space-y-6 text-sm text-foreground/80">
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             1. Acceptance of Terms
           </h2>
           <p>
@@ -25,7 +25,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             2. Eligibility
           </h2>
           <p>
@@ -37,7 +37,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             3. Nature of the Platform
           </h2>
           <p>
@@ -57,7 +57,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             4. User-Generated Content
           </h2>
           <p>
@@ -77,7 +77,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             5. Content Moderation
           </h2>
           <p>
@@ -89,7 +89,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             6. Intellectual Property
           </h2>
           <p>
@@ -100,7 +100,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             7. Disclaimer
           </h2>
           <p>
@@ -120,7 +120,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             8. Account Termination
           </h2>
           <p>
@@ -131,7 +131,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             9. Governing Law
           </h2>
           <p>
@@ -142,7 +142,7 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-display text-lg font-semibold text-foreground">
             10. Contact
           </h2>
           <p>

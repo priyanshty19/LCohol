@@ -18,6 +18,12 @@ model User {
   dob       DateTime @db.Date
   isVerified Boolean @default(false) @map("is_verified")
   isBanned  Boolean  @default(false) @map("is_banned")
+  role         Role      @default(USER)
+  passwordHash String?   @map("password_hash")
+  referralCode String?   @unique @map("referral_code")
+  invitedById  String?   @map("invited_by_id") @db.Uuid
+  consentedAt  DateTime? @map("consented_at")
+  ageVerifiedAt DateTime? @map("age_verified_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -31,6 +37,11 @@ model User {
   hangoverLogs       HangoverLog[]
   reports            Report[]         @relation("Reporter")
   interactions       UserInteraction[]
+  invitedBy          User?    @relation("Referrals", fields: [invitedById], references: [id])
+  invitees           User[]   @relation("Referrals")
+  moderationActions  ModerationAction[] @relation("ModActor")
+  resolvedReports    Report[]           @relation("ReportResolver")
+  barReviews         BarReview[]
 
   @@map("users")
 }
@@ -42,11 +53,19 @@ model Profile {
   displayName     String?  @map("display_name") @db.VarChar(50)
   bio             String?  @db.VarChar(300)
   avatarUrl       String?  @map("avatar_url")
-  karma           Int      @default(0)
+  shots           Int      @default(0) @map("karma")
   drinkingStyle   DrinkingStyle? @map("drinking_style")
   favoriteDrinkId String?  @map("favorite_drink_id") @db.Uuid
   state           String?  @db.VarChar(50)
   city            String?  @db.VarChar(50)
+  emergencyPhone  String?  @map("emergency_phone") @db.VarChar(20)
+  preferredSpirits  String[] @default([]) @map("preferred_spirits")
+  preferredFlavours String[] @default([]) @map("preferred_flavours")
+  intensity       String?  @db.VarChar(20)
+  intent          String?  @db.VarChar(20)
+  onboardedAt     DateTime? @map("onboarded_at")
+  theme           String?  @default("light") @db.VarChar(24)
+  geoDismissedAt  DateTime? @map("geo_dismissed_at")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -613,10 +632,12 @@ model Report {
   status     ReportStatus @default(PENDING)
   createdAt  DateTime     @default(now()) @map("created_at")
   resolvedAt DateTime?    @map("resolved_at")
+  resolvedById String?    @map("resolved_by_id") @db.Uuid
 
   reporter User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
   post     Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  resolvedBy User?  @relation("ReportResolver", fields: [resolvedById], references: [id])
 
   @@index([status])
   @@index([createdAt])
@@ -643,4 +664,100 @@ enum ReportStatus {
   DISMISSED
 
   @@map("report_status")
+}
+
+// ============================================================================
+// IAM / RBAC
+// ============================================================================
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+
+  @@map("role")
+}
+
+enum ModActionType {
+  DELETE_POST
+  DELETE_COMMENT
+  BAN_USER
+  UNBAN_USER
+  PROMOTE_MOD
+  DEMOTE_MOD
+
+  @@map("mod_action_type")
+}
+
+model ModerationAction {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String        @map("actor_id") @db.Uuid
+  action     ModActionType
+  targetType TargetType    @map("target_type")
+  targetId   String        @map("target_id") @db.Uuid
+  reason     String?
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  actor User @relation("ModActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("moderation_actions")
+}
+
+// ============================================================================
+// BARS (Explore Bars — pgvector embedding added in P7)
+// ============================================================================
+
+enum BarType {
+  PUB
+  BAR
+  BYOB
+  BREWERY
+  LOUNGE
+  CLUB
+
+  @@map("bar_type")
+}
+
+model Bar {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String      @db.VarChar(200)
+  slug        String      @unique @db.VarChar(220)
+  type        BarType
+  city        String      @db.VarChar(60)
+  state       String      @db.VarChar(60)
+  address     String?
+  lat         Float
+  lng         Float
+  priceRange  PriceRange? @map("price_range")
+  rating      Decimal?    @db.Decimal(2, 1)
+  bestsellers String[]
+  description String?
+  sourceUrl   String?     @map("source_url")
+  isVerified  Boolean     @default(false) @map("is_verified")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  reviews BarReview[]
+
+  @@index([city])
+  @@index([type])
+  @@map("bars")
+}
+
+model BarReview {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  barId     String   @map("bar_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  rating    Int      @db.SmallInt // 1-5
+  body      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bar    Bar  @relation(fields: [barId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([barId, authorId])
+  @@index([barId])
+  @@map("bar_reviews")
 }

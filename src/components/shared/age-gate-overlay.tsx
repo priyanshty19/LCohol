@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { getCookie, setCookie } from "@/lib/client-cookies";
+
+export const AGE_COOKIE = "sip_age_ok";
+export const GEO_COOKIE = "sip_geo_ok";
 
 export function AgeGateOverlay() {
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    const verified = sessionStorage.getItem("age_verified");
+    // Persistent cookie (1yr) — survives tab close, unlike the old sessionStorage.
+    const verified = getCookie(AGE_COOKIE);
     if (!verified) {
       setVisible(true);
       document.body.style.overflow = "hidden";
@@ -20,8 +25,10 @@ export function AgeGateOverlay() {
   function handleAccept() {
     setExiting(true);
     setTimeout(() => {
-      sessionStorage.setItem("age_verified", "true");
-      sessionStorage.setItem("geo_disclaimer_dismissed", "true");
+      // Only record age verification. The geo/prohibition-states disclaimer is a
+      // SEPARATE legal acknowledgement — it must still appear as its own banner
+      // and be dismissed on its own, so we do NOT touch GEO_COOKIE here.
+      setCookie(AGE_COOKIE, "1");
       document.body.style.overflow = "";
       setVisible(false);
     }, 400);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { VIBES } from "@/lib/vibe-config";
 import { COCKTAIL_RECIPES } from "@/lib/cocktail-recipes";
@@ -22,28 +23,31 @@ export function HomeSidebar() {
   return (
     <div className="space-y-5 sticky top-20">
       {/* Tonight's Random Pick */}
-      <Card className="border-border/20 bg-card/30 p-4 space-y-3 backdrop-blur">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      <Card variant="glass" className="p-4 space-y-3">
+        <h3 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           🎲 Tonight's Random Pick
         </h3>
         <div className="flex items-center gap-2">
           <span className="text-2xl">{randomRecipe.emoji}</span>
           <div>
-            <p className="font-semibold text-sm">{randomRecipe.name}</p>
+            <p className="font-display font-semibold text-sm">{randomRecipe.name}</p>
             <p className="text-[11px] text-muted-foreground">{randomRecipe.tagline}</p>
           </div>
         </div>
-        <Link
-          href="/mix"
-          className="block w-full rounded-lg border border-primary/30 bg-primary/10 py-1.5 text-center text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+        <Button
+          variant="gold"
+          size="sm"
+          className="w-full"
+          nativeButton={false}
+          render={<Link href="/mix" />}
         >
           Get the Recipe →
-        </Link>
+        </Button>
       </Card>
 
       {/* Vibe Quick Jump */}
-      <Card className="border-border/20 bg-card/30 p-4 space-y-3 backdrop-blur">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      <Card variant="glass" className="p-4 space-y-3">
+        <h3 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           🌙 What's your vibe?
         </h3>
         <div className="grid grid-cols-2 gap-2">
@@ -51,7 +55,7 @@ export function HomeSidebar() {
             <Link
               key={vibe.id}
               href={`/vibe`}
-              className="flex items-center gap-1.5 rounded-lg border border-border/20 bg-card/40 px-2.5 py-2 text-xs hover:border-border/50 hover:bg-card/60 transition-colors"
+              className="glass-panel-subtle flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs transition-colors hover:border-primary/30 hover:text-primary"
             >
               <span>{vibe.emoji}</span>
               <span className="text-muted-foreground">{vibe.label}</span>
@@ -68,8 +72,8 @@ export function HomeSidebar() {
 
       {/* Trending Drinks */}
       {trendingDrinks.length > 0 && (
-        <Card className="border-border/20 bg-card/30 p-4 space-y-3 backdrop-blur">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <Card variant="glass" className="p-4 space-y-3">
+          <h3 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             🔥 Trending Drinks
           </h3>
           <ul className="space-y-2.5">
@@ -77,7 +81,7 @@ export function HomeSidebar() {
               <li key={drink.id}>
                 <Link
                   href={`/drinks/${drink.slug}`}
-                  className="flex items-center gap-2.5 group"
+                  className="drink-card-hover -mx-2 flex min-h-11 items-center gap-2.5 rounded-lg px-2 group"
                 >
                   <span className="text-xs text-muted-foreground/40 w-4 font-mono">
                     {i + 1}
@@ -106,10 +110,13 @@ export function HomeSidebar() {
 
       {/* Hangover SOS CTA */}
       <Link href="/hangover">
-        <Card className="border-red-500/20 bg-red-500/5 p-4 space-y-1.5 cursor-pointer hover:border-red-500/40 hover:bg-red-500/10 transition-all">
+        <Card
+          variant="glass"
+          className="p-4 space-y-1.5 cursor-pointer border-[var(--ml-sos)]/20 transition-all hover:border-[var(--ml-sos)]/40 hover:glow-danger"
+        >
           <div className="flex items-center gap-2">
             <span className="text-xl">🆘</span>
-            <p className="font-semibold text-sm text-red-400">Hangover SOS</p>
+            <p className="font-display font-semibold text-sm text-[var(--ml-sos)]">Hangover SOS</p>
           </div>
           <p className="text-[11px] text-muted-foreground">
             Recovery protocols, the math on when you're sober, and India-specific remedies

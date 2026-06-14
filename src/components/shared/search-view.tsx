@@ -2,13 +2,19 @@
 
 import { useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PostCard } from "@/components/feed/post-card";
 import { DrinkCard } from "@/components/drinks/drink-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 
 type SearchType = "all" | "posts" | "drinks" | "users";
+
+const SEARCH_TABS: { value: SearchType; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "posts", label: "Stories" },
+  { value: "drinks", label: "Drinks" },
+  { value: "users", label: "People" },
+];
 
 export function SearchView() {
   const [query, setQuery] = useState("");
@@ -68,21 +74,26 @@ export function SearchView() {
     <div className="space-y-6">
       <div className="space-y-4">
         <Input
+          variant="search"
           placeholder="Search stories, drinks, people..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="h-12 text-base"
+          className="h-12 text-base search-glow"
           autoFocus
         />
-        <Tabs value={type} onValueChange={handleTypeChange}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="posts">Stories</TabsTrigger>
-            <TabsTrigger value="drinks">Drinks</TabsTrigger>
-            <TabsTrigger value="users">People</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap gap-2">
+          {SEARCH_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => handleTypeChange(tab.value)}
+              className={type === tab.value ? "pill-active" : "pill-inactive"}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading && (
@@ -90,7 +101,7 @@ export function SearchView() {
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="h-24 animate-pulse rounded-lg bg-card/50"
+              className="h-24 animate-pulse rounded-xl bg-muted"
             />
           ))}
         </div>
@@ -98,7 +109,7 @@ export function SearchView() {
 
       {!loading && searched && !hasAnyResults && (
         <div className="py-16 text-center">
-          <p className="text-lg font-medium text-foreground">No results found</p>
+          <p className="font-display text-lg font-medium text-foreground">No results found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Try a different search term
           </p>
@@ -107,7 +118,7 @@ export function SearchView() {
 
       {!loading && hasPosts && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Stories ({results.posts!.length})
           </h2>
           {results.posts!.map((post: any) => (
@@ -118,7 +129,7 @@ export function SearchView() {
 
       {!loading && hasDrinks && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Drinks ({results.drinks!.length})
           </h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -131,7 +142,7 @@ export function SearchView() {
 
       {!loading && hasProfiles && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             People ({results.profiles!.length})
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
@@ -139,7 +150,7 @@ export function SearchView() {
               <Link
                 key={profile.username}
                 href={`/profile/${profile.username}`}
-                className="flex items-center gap-3 rounded-lg border border-border/30 bg-card/50 p-4 transition-colors hover:bg-card/80"
+                className="glass-panel flex min-h-11 items-center gap-3 rounded-xl p-4 transition-all hover:border-primary/40 hover:glow-primary"
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="bg-primary/20 text-primary">
@@ -151,7 +162,7 @@ export function SearchView() {
                     {profile.displayName ?? profile.username}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    @{profile.username} · {profile.karma} karma
+                    @{profile.username} · {profile.shots ?? 0} Shots 🥃
                   </p>
                   {profile.bio && (
                     <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">

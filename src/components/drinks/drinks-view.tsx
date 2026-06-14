@@ -114,7 +114,9 @@ export function DrinksView() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">Discover Drinks</h1>
+        <h1 className="font-display text-2xl font-bold text-primary text-glow sm:text-3xl">
+          Discover Drinks
+        </h1>
         <p className="text-sm text-muted-foreground">
           Search across {filtersLoading ? "..." : "46"} spirits, beers & wines
           in the Indian market
@@ -134,10 +136,11 @@ export function DrinksView() {
           <path d="m21 21-4.35-4.35" />
         </svg>
         <Input
+          variant="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search drinks, brands, or descriptions..."
-          className="h-11 border-border/30 bg-card/40 pl-10 text-sm backdrop-blur-sm placeholder:text-muted-foreground/50 focus:border-primary/40 focus:ring-primary/20"
+          className="h-11 pl-10 text-sm placeholder:text-muted-foreground/50"
         />
         {search && (
           <button
@@ -156,7 +159,7 @@ export function DrinksView() {
       <div className="flex flex-wrap items-center gap-3">
         {/* Category */}
         <Select value={category} onValueChange={(v) => setCategory(v ?? "all")}>
-          <SelectTrigger className="h-9 w-[140px] border-border/30 bg-card/40 text-xs">
+          <SelectTrigger className="glass-panel-subtle h-9 w-[140px] text-xs">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
@@ -171,7 +174,7 @@ export function DrinksView() {
 
         {/* Brand */}
         <Select value={brand} onValueChange={(v) => setBrand(v ?? "all")}>
-          <SelectTrigger className="h-9 w-[180px] border-border/30 bg-card/40 text-xs">
+          <SelectTrigger className="glass-panel-subtle h-9 w-[180px] text-xs">
             <SelectValue placeholder="All Brands" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
@@ -186,7 +189,7 @@ export function DrinksView() {
 
         {/* Sort */}
         <Select value={sort} onValueChange={(v) => setSort(v ?? "name")}>
-          <SelectTrigger className="h-9 w-[160px] border-border/30 bg-card/40 text-xs">
+          <SelectTrigger className="glass-panel-subtle h-9 w-[160px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -212,8 +215,8 @@ export function DrinksView() {
           <span className="text-xs text-muted-foreground">Filters:</span>
           {search && (
             <Badge
-              variant="secondary"
-              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              variant="drink"
+              className="cursor-pointer gap-1 text-xs"
               onClick={() => setSearch("")}
             >
               &quot;{search}&quot; ×
@@ -221,8 +224,8 @@ export function DrinksView() {
           )}
           {category !== "all" && (
             <Badge
-              variant="secondary"
-              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              variant="drink"
+              className="cursor-pointer gap-1 text-xs"
               onClick={() => setCategory("all")}
             >
               {filters?.categories.find((c) => c.slug === category)?.name ??
@@ -232,8 +235,8 @@ export function DrinksView() {
           )}
           {brand !== "all" && (
             <Badge
-              variant="secondary"
-              className="cursor-pointer gap-1 bg-primary/10 text-xs text-primary hover:bg-primary/20"
+              variant="drink"
+              className="cursor-pointer gap-1 text-xs"
               onClick={() => setBrand("all")}
             >
               {brand} ×
@@ -254,14 +257,14 @@ export function DrinksView() {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="h-64 animate-pulse rounded-xl bg-card/30"
+              className="h-64 animate-pulse rounded-xl bg-muted"
             />
           ))}
         </div>
       ) : drinks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/30 py-20 text-center">
+        <div className="glass-panel flex flex-col items-center justify-center rounded-xl py-20 text-center">
           <span className="text-4xl">🔍</span>
-          <p className="mt-3 text-lg font-medium">No drinks found</p>
+          <p className="mt-3 font-display text-lg font-medium">No drinks found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasActiveFilters
               ? "Try adjusting your filters or search term"
@@ -269,7 +272,7 @@ export function DrinksView() {
           </p>
           {hasActiveFilters && (
             <Button
-              variant="outline"
+              variant="glass"
               size="sm"
               className="mt-4"
               onClick={clearFilters}
@@ -299,7 +302,7 @@ export function DrinksView() {
           {hasMore && (
             <div className="flex justify-center pt-4">
               <Button
-                variant="outline"
+                variant="glass"
                 onClick={() => fetchDrinks(true)}
                 disabled={loading}
               >

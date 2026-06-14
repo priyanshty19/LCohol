@@ -45,7 +45,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur">
+    <Card variant="glass">
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
@@ -82,7 +82,9 @@ export function LoginForm() {
         <CardFooter className="flex flex-col gap-4">
           <Button
             type="submit"
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            variant="gold"
+            size="lg"
+            className="w-full"
             disabled={loading}
           >
             {loading ? "Logging in..." : "Log In"}

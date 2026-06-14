@@ -40,7 +40,7 @@ export function ProfileView({ username }: ProfileViewProps) {
   if (loading) {
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="h-48 animate-pulse rounded-lg bg-card/50" />
+        <div className="h-48 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -48,7 +48,7 @@ export function ProfileView({ username }: ProfileViewProps) {
   if (!profile) {
     return (
       <div className="mx-auto max-w-2xl py-16 text-center">
-        <p className="text-lg font-medium">User not found</p>
+        <p className="font-display text-lg font-medium">User not found</p>
         <Link href="/" className="mt-2 text-sm text-primary hover:underline">
           Back to feed
         </Link>
@@ -58,7 +58,7 @@ export function ProfileView({ username }: ProfileViewProps) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Card className="border-border/30 bg-card/50">
+      <Card variant="glass">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             <Avatar className="h-16 w-16">
@@ -67,7 +67,7 @@ export function ProfileView({ username }: ProfileViewProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">
+              <h1 className="font-display text-2xl font-bold text-primary">
                 {profile.displayName ?? profile.username}
               </h1>
               <p className="text-sm text-muted-foreground">
@@ -79,15 +79,15 @@ export function ProfileView({ username }: ProfileViewProps) {
                 </p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant="secondary">{profile.karma} karma</Badge>
+                <Badge variant="recommendation">{profile.shots ?? 0} Shots 🥃</Badge>
                 {profile.drinkingStyle && (
-                  <Badge variant="outline">
+                  <Badge variant="topic">
                     {DRINKING_STYLE_LABELS[profile.drinkingStyle] ??
                       profile.drinkingStyle}
                   </Badge>
                 )}
                 {profile.city && (
-                  <Badge variant="outline">
+                  <Badge variant="topic">
                     {profile.city}
                     {profile.state ? `, ${profile.state}` : ""}
                   </Badge>
@@ -100,22 +100,22 @@ export function ProfileView({ username }: ProfileViewProps) {
 
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-foreground">
+              <p className="font-mono text-2xl font-bold text-foreground">
                 {profile.user?._count?.posts ?? 0}
               </p>
               <p className="text-xs text-muted-foreground">Posts</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">
+              <p className="font-mono text-2xl font-bold text-foreground">
                 {profile.user?._count?.comments ?? 0}
               </p>
               <p className="text-xs text-muted-foreground">Comments</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-foreground">
-                {profile.karma}
+              <p className="font-mono text-2xl font-bold text-primary">
+                {profile.shots ?? 0}
               </p>
-              <p className="text-xs text-muted-foreground">Karma</p>
+              <p className="text-xs text-muted-foreground">Shots</p>
             </div>
           </div>
 
@@ -123,7 +123,7 @@ export function ProfileView({ username }: ProfileViewProps) {
             <>
               <Separator className="my-4 border-border/30" />
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                <p className="font-display text-xs text-muted-foreground uppercase tracking-wider">
                   Favorite Drink
                 </p>
                 <Link

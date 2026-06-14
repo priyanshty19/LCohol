@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 
 export type SipUser = {
   email: string;
-  username: string;
-  displayName: string;
+  username: string | null;
+  displayName: string | null;
+  role: "USER" | "MODERATOR" | "ADMIN";
+  isBanned: boolean;
+  emergencyPhone: string | null;
 };
 
 export function useAuth() {

@@ -62,7 +62,9 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
   if (loading) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
-        <div className="h-64 animate-pulse rounded-lg bg-card/50" />
+        <div className="h-8 w-1/2 animate-pulse rounded-lg bg-muted" />
+        <div className="h-64 animate-pulse rounded-xl bg-muted" />
+        <div className="h-40 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -70,7 +72,7 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
   if (!drink) {
     return (
       <div className="mx-auto max-w-2xl py-16 text-center">
-        <p className="text-lg font-medium">Drink not found</p>
+        <p className="font-display text-lg font-medium">Drink not found</p>
         <Link href="/drinks" className="mt-2 text-sm text-primary hover:underline">
           Browse all drinks
         </Link>
@@ -89,7 +91,9 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
           {drink.category.name}
           {drink.subcategory && ` / ${drink.subcategory.name}`}
         </p>
-        <h1 className="mt-2 text-2xl font-bold">{drink.name}</h1>
+        <h1 className="mt-2 font-display text-2xl font-bold text-primary text-glow sm:text-3xl">
+          {drink.name}
+        </h1>
         {drink.brand && (
           <p className="text-muted-foreground">{drink.brand}</p>
         )}
@@ -97,15 +101,17 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
 
       <div className="flex flex-wrap gap-2">
         {drink.abv && (
-          <Badge variant="outline">{String(drink.abv)}% ABV</Badge>
+          <Badge variant="drink" className="font-mono">
+            {String(drink.abv)}% ABV
+          </Badge>
         )}
         {drink.priceRange && (
-          <Badge variant="secondary">
+          <Badge variant="recommendation">
             {PRICE_LABELS[drink.priceRange] ?? drink.priceRange}
           </Badge>
         )}
         {drink.country && (
-          <Badge variant="outline">{drink.country}</Badge>
+          <Badge variant="topic">{drink.country}</Badge>
         )}
       </div>
 
@@ -116,9 +122,9 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
       )}
 
       {drink.tasteProfile && (
-        <Card className="border-border/30 bg-card/50">
+        <Card variant="glass">
           <CardContent className="pt-6">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Taste Profile
             </h2>
             <TasteProfileChart profile={drink.tasteProfile} />
@@ -128,12 +134,12 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
 
       {drink.occasions.length > 0 && (
         <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Best For
           </h2>
           <div className="flex flex-wrap gap-2">
             {drink.occasions.map(({ occasion }) => (
-              <Badge key={occasion} variant="secondary">
+              <Badge key={occasion} variant="recommendation">
                 {OCCASION_LABELS[occasion] ?? occasion}
               </Badge>
             ))}
@@ -143,12 +149,12 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
 
       {drink.moods.length > 0 && (
         <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Mood
           </h2>
           <div className="flex flex-wrap gap-2">
             {drink.moods.map(({ mood }) => (
-              <Badge key={mood} variant="outline">
+              <Badge key={mood} variant="topic">
                 {MOOD_LABELS[mood] ?? mood}
               </Badge>
             ))}
@@ -158,12 +164,12 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
 
       {drink.foodPairings.length > 0 && (
         <div>
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <h2 className="mb-2 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Food Pairings
           </h2>
           <div className="flex flex-wrap gap-2">
             {drink.foodPairings.map(({ food }) => (
-              <Badge key={food} variant="outline">
+              <Badge key={food} variant="topic">
                 {food}
               </Badge>
             ))}
@@ -175,16 +181,17 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
         <>
           <Separator className="border-border/30" />
           <div>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2 className="mb-3 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Community Scores
             </h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {drink.communityScores.map((score) => (
                 <Card
                   key={score.id}
-                  className="border-border/30 bg-card/50 p-3 text-center"
+                  variant="glass"
+                  className="p-3 text-center"
                 >
-                  <p className="text-2xl font-bold text-primary">
+                  <p className="font-display text-2xl font-bold text-primary text-glow">
                     {String(score.value)}
                   </p>
                   <p className="text-xs text-muted-foreground">

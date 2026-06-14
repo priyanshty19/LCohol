@@ -30,8 +30,8 @@ export const MAX_COMMENT_LENGTH = 5000;
 export const MAX_BIO_LENGTH = 300;
 export const MAX_USERNAME_LENGTH = 30;
 
-export const KARMA_UPVOTE = 1;
-export const KARMA_DOWNVOTE = -1;
+export const SHOTS_UPVOTE = 1;
+export const SHOTS_DOWNVOTE = -1;
 
 export const POST_TYPES = [
   { value: "STORY", label: "Story", emoji: "story" },

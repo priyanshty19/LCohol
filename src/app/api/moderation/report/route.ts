@@ -1,11 +1,23 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   const dbUser = await getCurrentUser();
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  // Match sibling mutation routes: banned users cannot act, and cap report
+  // volume so the moderation queue can't be flooded.
+  if (dbUser.isBanned) {
+    return NextResponse.json({ error: "Account suspended." }, { status: 403 });
+  }
+  if (!rateLimit(`report:${dbUser.id}`, 15, 60_000)) {
+    return NextResponse.json(
+      { error: "You're reporting too fast — give it a moment." },
+      { status: 429 }
+    );
   }
 
   const body = await request.json();
@@ -15,9 +27,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Reason is required" }, { status: 400 });
   }
 
-  if (!postId && !commentId) {
+  // Exactly one target — not both, not neither.
+  if (!postId === !commentId) {
     return NextResponse.json(
-      { error: "Must report a post or comment" },
+      { error: "Report exactly one post or comment" },
       { status: 400 }
     );
   }

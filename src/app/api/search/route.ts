@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         username: true,
         displayName: true,
         avatarUrl: true,
-        karma: true,
+        shots: true,
         bio: true,
       },
     });

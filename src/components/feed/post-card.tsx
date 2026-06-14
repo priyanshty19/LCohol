@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { VoteButtons } from "./vote-buttons";
+import { ReportButton } from "./report-button";
 import type { PostWithRelations } from "@/types/database";
 import { formatDistanceToNow } from "date-fns";
 
@@ -10,12 +11,19 @@ interface PostCardProps {
   post: PostWithRelations;
 }
 
-const POST_TYPE_STYLES: Record<string, string> = {
-  STORY: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  QUESTION: "bg-green-500/10 text-green-400 border-green-500/20",
-  REVIEW: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  RECOMMENDATION: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  MEME: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+type PostTypeBadgeVariant =
+  | "story"
+  | "question"
+  | "review"
+  | "recommendation"
+  | "meme";
+
+const POST_TYPE_VARIANTS: Record<string, PostTypeBadgeVariant> = {
+  STORY: "story",
+  QUESTION: "question",
+  REVIEW: "review",
+  RECOMMENDATION: "recommendation",
+  MEME: "meme",
 };
 
 const POST_TYPE_LABELS: Record<string, string> = {
@@ -35,7 +43,10 @@ export function PostCard({ post }: PostCardProps) {
   const initial = (displayName[0] ?? "?").toUpperCase();
 
   return (
-    <Card className="group overflow-hidden border-border/20 bg-card/40 backdrop-blur-sm transition-all duration-200 hover:border-primary/20 hover:bg-card/60 hover:shadow-lg hover:shadow-primary/5">
+    <Card
+      variant="glass"
+      className="drink-card-hover group overflow-hidden py-0 hover:border-primary/30"
+    >
       <div className="flex gap-3 p-4">
         {/* Vote buttons */}
         <VoteButtons
@@ -49,8 +60,8 @@ export function PostCard({ post }: PostCardProps) {
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge
-              variant="outline"
-              className={`px-2 py-0 text-[10px] font-semibold uppercase tracking-wider ${POST_TYPE_STYLES[post.postType] ?? ""}`}
+              variant={POST_TYPE_VARIANTS[post.postType] ?? "topic"}
+              className="text-[10px] font-semibold uppercase tracking-wider"
             >
               {POST_TYPE_LABELS[post.postType] ?? post.postType.toLowerCase()}
             </Badge>
@@ -70,7 +81,7 @@ export function PostCard({ post }: PostCardProps) {
 
           {/* Title + body */}
           <Link href={`/post/${post.id}`} className="mt-2 block">
-            <h2 className="text-[15px] font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
+            <h2 className="font-display text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
               {post.title}
             </h2>
             {post.body && (
@@ -103,8 +114,8 @@ export function PostCard({ post }: PostCardProps) {
               {post.drinks.map(({ drink }) => (
                 <Link key={drink.id} href={`/drinks/${drink.slug}`}>
                   <Badge
-                    variant="outline"
-                    className="border-primary/30 bg-primary/5 text-xs text-primary transition-colors hover:bg-primary/10"
+                    variant="drink"
+                    className="transition-colors hover:bg-primary/20"
                   >
                     🥃 {drink.name}
                   </Badge>
@@ -117,11 +128,7 @@ export function PostCard({ post }: PostCardProps) {
           {post.tags.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {post.tags.map(({ tag }) => (
-                <Badge
-                  key={tag.id}
-                  variant="outline"
-                  className="border-border/30 bg-muted/30 text-[11px] text-muted-foreground/70"
-                >
+                <Badge key={tag.id} variant="topic" className="text-[11px]">
                   #{tag.name}
                 </Badge>
               ))}
@@ -129,10 +136,10 @@ export function PostCard({ post }: PostCardProps) {
           )}
 
           {/* Footer */}
-          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground/60">
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground/60">
             <Link
               href={`/post/${post.id}`}
-              className="flex items-center gap-1.5 transition-colors hover:text-foreground"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 transition-colors hover:text-primary"
             >
               <svg
                 width="14"
@@ -149,7 +156,7 @@ export function PostCard({ post }: PostCardProps) {
               {post._count.comments}{" "}
               {post._count.comments === 1 ? "comment" : "comments"}
             </Link>
-            <button className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+            <button className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 transition-colors hover:text-primary">
               <svg
                 width="14"
                 height="14"
@@ -166,6 +173,7 @@ export function PostCard({ post }: PostCardProps) {
               </svg>
               Share
             </button>
+            <ReportButton postId={post.id} className="ml-auto" />
           </div>
         </div>
       </div>

@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local-only backups & reference material (not part of the app)
+.backup_pregraphics/
+references/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

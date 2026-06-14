@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
-import { findAllowedUser } from "@/lib/allowed-users";
 
 /**
  * Get the current authenticated user's DB record from the session cookie.
- * Returns null if not logged in or not in the allowlist.
+ * Returns null if not logged in. Includes `role` (scalar) and profile.
+ * Ban handling is done by callers (page guards / mutation APIs), not here.
  */
 export async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -14,9 +14,6 @@ export async function getCurrentUser() {
 
   const email = await verifySessionToken(token);
   if (!email) return null;
-
-  const allowed = findAllowedUser(email);
-  if (!allowed) return null;
 
   return prisma.user.findFirst({
     where: { email },

@@ -42,7 +42,10 @@ export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
 
   return (
     <Link href={`/drinks/${drink.slug}`}>
-      <Card className="group flex flex-col overflow-hidden border-border/20 bg-card/40 backdrop-blur-sm transition-all duration-200 hover:border-primary/20 hover:bg-card/60 hover:shadow-lg hover:shadow-primary/5">
+      <Card
+        variant="glass"
+        className="drink-card-hover group flex flex-col overflow-hidden py-0"
+      >
         {/* Image area */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/20">
           {drink.imageUrl ? (
@@ -64,14 +67,17 @@ export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
           )}
           {/* Category pill overlay */}
           <div className="absolute left-2 top-2">
-            <Badge className="border-none bg-black/50 text-[10px] font-semibold uppercase tracking-wider text-white/90 backdrop-blur-sm">
+            <Badge
+              variant="drink"
+              className="font-display text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm"
+            >
               {drink.subcategory?.name ?? drink.category.name}
             </Badge>
           </div>
           {/* Price tag overlay */}
           {statePrice != null && (
             <div className="absolute bottom-2 right-2">
-              <span className="rounded-md bg-black/60 px-2 py-1 text-sm font-bold text-[#f2bf64] backdrop-blur-sm">
+              <span className="rounded-md bg-black/60 px-2 py-1 font-mono text-sm font-bold text-primary backdrop-blur-sm">
                 {formatPriceINR(statePrice)}
               </span>
             </div>
@@ -80,7 +86,7 @@ export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
 
         {/* Content */}
         <div className="flex flex-1 flex-col p-3.5">
-          <h3 className="text-sm font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
+          <h3 className="font-display text-sm font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
             {drink.name}
           </h3>
           {drink.brand && (
@@ -92,10 +98,7 @@ export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
           <div className="mt-auto flex items-center justify-between pt-3">
             <div className="flex gap-1.5">
               {drink.abv && (
-                <Badge
-                  variant="outline"
-                  className="border-primary/20 bg-primary/5 px-1.5 text-[10px] text-primary"
-                >
+                <Badge variant="drink" className="px-1.5 font-mono text-[10px]">
                   {String(drink.abv)}%
                 </Badge>
               )}
