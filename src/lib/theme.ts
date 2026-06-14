@@ -1,6 +1,6 @@
 // Theme system — one [data-theme] attribute drives the whole palette + shader.
-// `dark` is the default Sip Stories wine look; `light` is its cream inverse;
-// the six vibe themes mirror src/lib/vibe-config.ts hues.
+// `light` (Ivory Cream) is the default; `dark` is the Midnight Wine look; the
+// six vibe themes mirror src/lib/vibe-config.ts hues.
 
 export type ThemeId =
   | "dark"
