@@ -65,7 +65,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${ebGaramond.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
