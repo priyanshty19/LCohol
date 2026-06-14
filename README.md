@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🍸 SIPSTORIES
+
+An India-focused drinks & social community — share stories, discover drinks and bars, mix cocktails, and get a hand from **James**, the in-app AI bartender. Built with Next.js (App Router), React, Prisma, Supabase, Base UI, and Tailwind.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# 1. Install dependencies
+npm install
+
+# 2. Configure environment (Supabase + DB URL, etc.)
+cp .env.example .env.local   # then fill in values
+
+# 3. Generate the Prisma client and run migrations
+npx prisma generate
+npx prisma migrate dev
+
+# 4. (Optional) seed data
+npx prisma db seed            # core seed
+npx tsx prisma/seed-bars.ts   # bars
+npx tsx prisma/seed-posts.ts  # feed posts
+npx tsx prisma/seed-admins.ts # admin/moderator accounts
+
+# 5. Run the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app. Production build: `npm run build`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Framework:** Next.js (App Router) + React, TypeScript
+- **Data:** Prisma ORM, Supabase (Postgres + auth helpers)
+- **UI:** Base UI primitives, Tailwind CSS, custom glass/gold/velvet design system
+- **AI:** James AI bartender (chat API + retriever)
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Updates
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+A running list of everything shipped in the recent overhaul, grouped by area.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 🎨 Design system & theming
+- New **glass / gold / velvet** button and card variants with display fonts and shared theme tokens (including `--ml-sos`) across `globals.css`, `button`, `card`, `badge`, and `input`.
+- **Theme provider, theme switcher, and first-run vibe selection** so the look adapts to the user's chosen vibe.
+- **Light "Day Lounge" theme** option.
+- **Liquid-glass FX backdrop** (shader-based) plus the vendored `public/vendor/liquid-glass-js` library.
+- Full visual restyle of every surface: feed, drinks, mix, hangover, vibe, profile, search, settings, auth, header, and mobile nav.
 
-## Deploy on Vercel
+### ✨ New features
+- **Mix Lab** — cocktail recipes and mixing surface.
+- **Tonight's Vibe** — vibe-driven discovery, wired into the home sidebar.
+- **Hangover SOS** — recovery protocols, a "when are you sober" calculation, and India-specific remedies.
+- **Bars directory** — browse, map, and detail views with a bar reviews API.
+- **James AI bartender** — in-app chat assistant with its own persona, knowledge retriever, and mini-games.
+- **Onboarding quiz** and a **Help center**.
+- **Moderation & Admin** — moderation queue, content report button, and an admin panel for users, moderators, and audit logs.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 🔐 Platform & infrastructure
+- **Auth rework** — signup API, password hashing, role-based access control (RBAC), API route guards, and rate limiting.
+- **Image upload** with client-side compression.
+- Utility layer — **referral** codes, **funky-name** generation, a **geolocation** hook, and client-cookie helpers.
+- **Prisma schema** updates and seed scripts for admins, bars, and posts.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### ♿ Accessibility
+- Fixed a Base UI `nativeButton` console warning: the home-sidebar "Get the Recipe" button renders a Next.js `Link` (an `<a>`), so it now sets `nativeButton={false}` to restore native button semantics (role + keyboard handling) for assistive tech, while keeping link navigation intact.
+
+### 🧹 Housekeeping
+- Added local-only `.backup_pregraphics/` and `references/` directories to `.gitignore`.
+
+---
+
+## Deployment
+
+Deploys on [Vercel](https://vercel.com). See the [Next.js deployment docs](https://nextjs.org/docs/app/building-your-application/deploying) for details.
