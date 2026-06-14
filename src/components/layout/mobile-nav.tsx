@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Feed" },
-  { href: "/drinks", label: "Drinks" },
-  { href: "/create", label: "+" },
-  { href: "/search", label: "Search" },
-  { href: "/settings", label: "Profile" },
+  { href: "/",        label: "Feed",  emoji: "🏠" },
+  { href: "/drinks",  label: "Drinks",emoji: "🥃" },
+  { href: "/create",  label: "+",     emoji: "+" },
+  { href: "/mix",     label: "Mix",   emoji: "🧪" },
+  { href: "/vibe",    label: "Vibe",  emoji: "🌙" },
+  { href: "/hangover",label: "SOS",   emoji: "🆘" },
 ] as const;
 
 export function MobileNav() {
@@ -30,15 +31,16 @@ export function MobileNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors",
+                "flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] transition-colors",
                 isCreate
-                  ? "rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+                  ? "rounded-full bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground"
                   : isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {item.label}
+              <span className="text-base">{item.emoji}</span>
+              {!isCreate && item.label}
             </Link>
           );
         })}

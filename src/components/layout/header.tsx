@@ -32,19 +32,22 @@ export function Header() {
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
             <Link href="/">
-              <Button variant="ghost" size="sm">
-                Feed
-              </Button>
+              <Button variant="ghost" size="sm">Feed</Button>
             </Link>
             <Link href="/drinks">
-              <Button variant="ghost" size="sm">
-                Drinks
-              </Button>
+              <Button variant="ghost" size="sm">Drinks</Button>
+            </Link>
+            <Link href="/mix">
+              <Button variant="ghost" size="sm">🧪 Mix Lab</Button>
+            </Link>
+            <Link href="/vibe">
+              <Button variant="ghost" size="sm">🌙 Vibe</Button>
+            </Link>
+            <Link href="/hangover">
+              <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">🆘 SOS</Button>
             </Link>
             <Link href="/search">
-              <Button variant="ghost" size="sm">
-                Search
-              </Button>
+              <Button variant="ghost" size="sm">Search</Button>
             </Link>
           </nav>
         </div>
