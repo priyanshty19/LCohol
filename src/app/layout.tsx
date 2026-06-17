@@ -5,6 +5,7 @@ import {
   Plus_Jakarta_Sans,
   Geist_Mono,
 } from "next/font/google";
+import Script from "next/script";
 import { AgeGateOverlay } from "@/components/shared/age-gate-overlay";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import "./globals.css";
@@ -68,10 +69,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-      </head>
       <body className="min-h-full flex flex-col">
+        <Script id="theme-bootstrap" strategy="beforeInteractive">
+          {THEME_BOOTSTRAP}
+        </Script>
         <ThemeProvider />
         <AgeGateOverlay />
         {children}
