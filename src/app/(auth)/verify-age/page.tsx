@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SipStoriesMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -9,6 +10,17 @@ export const metadata: Metadata = {
 
 export default function VerifyAgePage() {
   return (
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex flex-col items-center text-center">
+          <SipStoriesMark className="h-14 w-auto text-foreground" />
+          <div className="relative mt-3 overflow-hidden px-1">
+            <h1 className="font-display text-4xl font-semibold tracking-tight">
+              <span className="text-glow italic text-primary">Sip</span>{" "}
+              <span className="text-foreground">Stories</span>
+            </h1>
+          </div>
+        </div>
     <Card variant="glass">
       <CardContent className="space-y-6 pt-6 text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--ml-sos)]/10 text-[var(--ml-sos)] glow-danger">
@@ -45,5 +57,7 @@ export default function VerifyAgePage() {
         </p>
       </CardContent>
     </Card>
+      </div>
+    </div>
   );
 }
