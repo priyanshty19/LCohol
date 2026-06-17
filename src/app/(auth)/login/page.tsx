@@ -1,6 +1,6 @@
 import { SipStoriesMark } from "@/components/brand/logo";
 import { AuthPanel } from "@/components/landing/auth-panel";
-import { JamesSpotlight } from "@/components/landing/james-spotlight";
+import { JamesTalking } from "@/components/landing/james-talking";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Welcome" };
@@ -82,7 +82,7 @@ export default function LoginPage() {
           {/* Zone C — quiet proof: a glimpse of James */}
           <div className="space-y-6">
             <div className="h-px bg-border/20" />
-            <JamesSpotlight />
+            <JamesTalking />
           </div>
 
           {/* Compliance footer */}
