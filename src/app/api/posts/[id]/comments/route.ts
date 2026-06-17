@@ -54,6 +54,11 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const post = await prisma.post.findUnique({ where: { id: postId, isDeleted: false }, select: { id: true } });
+  if (!post) {
+    return NextResponse.json({ error: "Post not found" }, { status: 404 });
+  }
+
   const { body, parentId } = await request.json();
 
   if (!body || body.trim().length === 0) {

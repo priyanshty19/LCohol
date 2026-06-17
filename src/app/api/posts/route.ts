@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { PostType } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { FEED_PAGE_SIZE } from "@/lib/constants";
@@ -141,11 +142,17 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { title, body: postBody, postType, tagIds, drinkIds, imageUrl } = body;
 
+  const VALID_POST_TYPES = new Set(["STORY", "QUESTION", "REVIEW", "RECOMMENDATION", "MEME"]);
+
   if (!title || !postType) {
     return NextResponse.json(
       { error: "Title and post type are required" },
       { status: 400 }
     );
+  }
+
+  if (!VALID_POST_TYPES.has(postType)) {
+    return NextResponse.json({ error: "Invalid post type" }, { status: 400 });
   }
 
   // Only accept image URLs we host on OUR Supabase Storage public bucket.
@@ -159,7 +166,7 @@ export async function POST(request: Request) {
       authorId: dbUser.id,
       title,
       body: postBody || null,
-      postType,
+      postType: postType as PostType,
       imageUrl: safeImageUrl,
       tags: tagIds?.length
         ? { create: tagIds.map((id: string) => ({ tagId: id })) }
