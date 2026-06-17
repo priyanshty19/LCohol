@@ -1,7 +1,12 @@
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { FeedView } from "@/components/feed/feed-view";
 import { HomeSidebar } from "@/components/shared/home-sidebar";
 
-export default function FeedPage() {
+export default async function FeedPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
   return (
     <div className="flex gap-8">
       <div className="min-w-0 flex-1">
