@@ -12,12 +12,14 @@ const SECURITY_HEADERS = [
       "default-src 'self'",
       // Next.js requires unsafe-inline for styles; nonces would be the stricter alternative
       "style-src 'self' 'unsafe-inline'",
-      // Next.js hydration bundles + Supabase realtime WS
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-      "img-src 'self' blob: data: https://images.unsplash.com https://eihjedfbnlubihyuphlh.supabase.co",
-      "connect-src 'self' https://eihjedfbnlubihyuphlh.supabase.co wss://eihjedfbnlubihyuphlh.supabase.co https://clerk.accounts.dev https://*.clerk.accounts.dev",
-      "font-src 'self'",
-      "frame-src 'none'",
+      // Next.js hydration + dev HMR need eval/inline. Clerk loads its JS from clerk.accounts.dev
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev",
+      "img-src 'self' blob: data: https://images.unsplash.com https://eihjedfbnlubihyuphlh.supabase.co https://*.clerk.accounts.dev",
+      "connect-src 'self' ws: wss: https://eihjedfbnlubihyuphlh.supabase.co wss://eihjedfbnlubihyuphlh.supabase.co https://clerk.accounts.dev https://*.clerk.accounts.dev",
+      "font-src 'self' data:",
+      // Clerk renders its CAPTCHA / OAuth UI in iframes from its own domain
+      "frame-src 'self' https://*.clerk.accounts.dev",
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
