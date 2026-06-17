@@ -44,12 +44,21 @@ export function JamesTalking() {
   // text appearing in place isn't the viewport motion prefers-reduced-motion
   // guards against. What reduced motion DOES suppress: the pulsing ring, the
   // bouncing thinking dots, the blinking caret, and the slide on swap.
-  const prefersReduced = useReducedMotion();
+  const prefersReducedRaw = useReducedMotion();
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState<Phase>("user");
   const [typed, setTyped] = useState("");
   const [visible, setVisible] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const exitInnerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // useReducedMotion() can't read the media query during SSR (it returns false),
+  // but resolves true on a reduced-motion client — so the first client render
+  // must match the server's non-reduced output, then upgrade after mount.
+  // Without this gate the style object diverges and React throws a hydration
+  // mismatch on the transform/transition props below.
+  useEffect(() => setMounted(true), []);
+  const prefersReduced = mounted ? !!prefersReducedRaw : false;
 
   const conv = CONVERSATIONS[idx];
 
