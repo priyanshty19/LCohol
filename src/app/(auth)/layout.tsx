@@ -1,12 +1,16 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import { ShaderBackdropLazy } from "@/components/fx/shader-backdrop.lazy";
 import { SipStoriesMark } from "@/components/brand/logo";
 
+// Clerk is scoped to the auth route group only — it powers the email-OTP
+// forms here, but the rest of the app runs on our own ss_auth session.
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
+    <ClerkProvider>
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
       {/* Ambient backdrop (CSS fallback + optional WebGL shader) */}
       <div className="pointer-events-none absolute inset-0 bg-ambient" />
@@ -85,5 +89,6 @@ export default function AuthLayout({
         </p>
       </div>
     </div>
+    </ClerkProvider>
   );
 }
