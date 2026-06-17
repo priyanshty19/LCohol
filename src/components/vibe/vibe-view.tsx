@@ -85,9 +85,24 @@ export function VibeView() {
 
       {/* Vibe selector */}
       <div className="space-y-3">
-        <h2 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          What's the vibe?
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            What's the vibe?
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedVibe(null);
+              setSelectedBudget(null);
+              setActiveRecipe(null);
+              // Back to the default Ivory Cream look.
+              applyTheme("light", { persist: true });
+            }}
+            className="pill-inactive shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-all hover:text-primary"
+          >
+            ↺ Reset the Vibe
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {VIBES.map((vibe) => (
             <button

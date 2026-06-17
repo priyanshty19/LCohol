@@ -492,25 +492,25 @@
    ============================================================ */
 
 @utility glass-panel {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(181, 114, 10, 0.12);
-  box-shadow: 0 1px 4px rgba(28, 18, 8, 0.06);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 @utility glass-nav {
-  background: rgba(250, 247, 242, 0.92);
+  background: var(--glass-nav-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(229, 213, 181, 0.8);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 @utility glass-input {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--glass-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(181, 114, 10, 0.2);
+  border: 1px solid var(--input);
 }
 
 @utility glow-active {
@@ -564,8 +564,8 @@
 @utility bg-ambient {
   background: radial-gradient(
     circle at 50% 0%,
-    rgba(181, 114, 10, 0.07) 0%,
-    rgba(250, 247, 242, 1) 65%
+    var(--ambient-core) 0%,
+    var(--ambient-edge) 65%
   );
 }
 
@@ -605,15 +605,15 @@
 }
 
 @utility pill-active {
-  background: #B5720A;
-  color: #FFF8EC;
-  box-shadow: 0 2px 8px rgba(181, 114, 10, 0.2);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 
 @utility pill-inactive {
-  background: rgba(240, 232, 214, 0.7);
-  border: 1px solid rgba(181, 114, 10, 0.15);
-  color: #5C4830;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
 }
 
 @utility search-glow {
@@ -659,13 +659,13 @@
 }
 
 .pill-inactive:hover {
-  background: rgba(181, 114, 10, 0.08);
-  border-color: rgba(181, 114, 10, 0.3);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .search-glow:focus-within {
-  box-shadow: 0 0 0 3px rgba(181, 114, 10, 0.12);
-  border-color: #B5720A;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--primary);
 }
 
 .drink-card-hover:hover {

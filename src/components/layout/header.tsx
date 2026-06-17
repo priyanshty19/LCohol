@@ -51,7 +51,12 @@ export function Header() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn(isActive(n.href) && "text-primary")}
+                  className={cn(
+                    // Theme-aware hover (primary is vivid in every vibe, so the
+                    // highlight stays visible on both light and dark nav bars).
+                    "hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15",
+                    isActive(n.href) && "text-primary",
+                  )}
                 >
                   {n.label}
                 </Button>

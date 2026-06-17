@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { PostCard } from "@/components/feed/post-card";
 import { DrinkCard } from "@/components/drinks/drink-card";
@@ -52,6 +52,13 @@ export function SearchView() {
     []
   );
 
+  // Live search: debounce keystrokes so we hit the API once the user pauses,
+  // not on every character. Enter still triggers an immediate search.
+  useEffect(() => {
+    const t = setTimeout(() => search(query, type), 300);
+    return () => clearTimeout(t);
+  }, [query, type, search]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       search(query, type);
@@ -59,10 +66,8 @@ export function SearchView() {
   }
 
   function handleTypeChange(newType: string) {
+    // The debounced effect re-runs on `type` change and refreshes results.
     setType(newType as SearchType);
-    if (query.length >= 2) {
-      search(query, newType as SearchType);
-    }
   }
 
   const hasPosts = (results.posts?.length ?? 0) > 0;
@@ -88,7 +93,9 @@ export function SearchView() {
               key={tab.value}
               type="button"
               onClick={() => handleTypeChange(tab.value)}
-              className={type === tab.value ? "pill-active" : "pill-inactive"}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-all ${
+                type === tab.value ? "pill-active" : "pill-inactive hover:text-primary"
+              }`}
             >
               {tab.label}
             </button>
