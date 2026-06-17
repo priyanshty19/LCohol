@@ -8,30 +8,34 @@ const CONVERSATIONS = [
   {
     user: "Rainy Mumbai night. What's the move?",
     james:
-      "Old Monk and Thumbs Up, boss. 🥃 Splash of lime, handful of ice, something slow on the speakers. The rain does the rest.",
+      "Old Monk and Thumbs Up, boss. 🥃 Splash of lime, ice, something slow on the speakers.",
   },
   {
-    user: "Solo night in. What's easy to make at home?",
+    user: "Solo night in. Easy to make at home?",
     james:
-      "Whisky soda, lemon peel. Honest drink, never wrong. Use your good ice — that part matters more than the whisky, trust me. 🧊",
+      "Whisky soda, lemon peel. Honest drink, never wrong. Mind the ice more than the whisky. 🧊",
   },
   {
     user: "5 of us want a drinking game. Go.",
     james:
-      "Roxanne. Put on The Police, sip every time Sting sings her name. Short song, serious consequences. You'll thank me. 🎵",
+      "Roxanne. Cue The Police, sip every time Sting says her name. Short song, big regrets. 🎵",
   },
   {
     user: "First time at a whisky bar. Help.",
     james:
-      "Ask the barman what's open and interesting. Say you're new to malts — good bartenders live for that question. Try it neat first, ice later. ✨",
+      "Tell the barman you're new to malts, they live for it. Neat first, ice later. ✨",
   },
 ] as const;
 
-const TYPING_SPEED_MS = 27;
-const USER_VISIBLE_MS = 480;
-const THINKING_MS = 820;
-const HOLD_MS = 2800;
-const EXIT_MS = 310;
+// One conversation occupies a fixed 4s slot. Typing duration scales with the
+// reply length; the hold is whatever's left in the slot, so the swap cadence
+// stays a steady 4s no matter how long the line is.
+const CYCLE_MS = 4000;
+const TYPING_SPEED_MS = 24;
+const USER_VISIBLE_MS = 300;
+const THINKING_MS = 450;
+const EXIT_MS = 280;
+const MIN_HOLD_MS = 600;
 
 type Phase = "user" | "thinking" | "typing" | "hold";
 
@@ -45,13 +49,20 @@ export function JamesTalking() {
 
   const conv = CONVERSATIONS[idx];
 
-  // Kick off phase sequence when conversation changes
+  // Kick off phase sequence when conversation changes.
+  // Reduced motion: skip the user→thinking→typing build-up — drop straight to
+  // the full reply and let the hold effect still rotate conversations on the
+  // 4s beat (a gentle crossfade, no per-char typing or pulsing indicator).
   useEffect(() => {
+    setVisible(true);
+    if (prefersReduced) {
+      setTyped(conv.james);
+      setPhase("hold");
+      return;
+    }
+
     setTyped("");
     setPhase("user");
-    setVisible(true);
-    if (prefersReduced) return;
-
     const t1 = setTimeout(() => setPhase("thinking"), USER_VISIBLE_MS);
     const t2 = setTimeout(
       () => setPhase("typing"),
@@ -61,7 +72,7 @@ export function JamesTalking() {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [idx, prefersReduced]);
+  }, [idx, prefersReduced, conv.james]);
 
   // Typewriter — fires once per (phase==="typing") entry
   useEffect(() => {
@@ -79,20 +90,31 @@ export function JamesTalking() {
     return () => clearInterval(interval);
   }, [phase, conv.james]);
 
-  // Hold → fade out → advance
+  // Hold → fade out → advance. Hold length = whatever's left of the 4s slot
+  // after the user message, thinking, typing, and exit fade have been spent,
+  // so every conversation swaps on a steady 4s beat.
   useEffect(() => {
     if (phase !== "hold") return;
+    // Reduced motion shows the reply instantly, so the whole slot minus the
+    // fade is hold. Normal motion subtracts the build-up + typing time spent.
+    const typingMs = conv.james.length * TYPING_SPEED_MS;
+    const holdMs = prefersReduced
+      ? CYCLE_MS - EXIT_MS
+      : Math.max(
+          MIN_HOLD_MS,
+          CYCLE_MS - USER_VISIBLE_MS - THINKING_MS - typingMs - EXIT_MS
+        );
     const t = setTimeout(() => {
       setVisible(false);
       exitInnerRef.current = setTimeout(() => {
         setIdx((i) => (i + 1) % CONVERSATIONS.length);
       }, EXIT_MS);
-    }, HOLD_MS);
+    }, holdMs);
     return () => {
       clearTimeout(t);
       if (exitInnerRef.current) clearTimeout(exitInnerRef.current);
     };
-  }, [phase]);
+  }, [phase, conv.james, prefersReduced]);
 
   const pulsing =
     !prefersReduced && (phase === "thinking" || phase === "typing");
