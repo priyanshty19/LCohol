@@ -10,6 +10,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed:admins": "npx tsx prisma/seed-admins.ts",
     "db:reset": "prisma migrate reset"
   },
   "prisma": {

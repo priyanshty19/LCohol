@@ -46,8 +46,10 @@ export function AgeGateOverlay() {
         exiting ? "opacity-0" : "opacity-100"
       }`}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-[#FAF7F2]/95 backdrop-blur-xl" />
+      {/* Backdrop — matches the landing's ivory base + wine aurora */}
+      <div className="absolute inset-0 bg-background/95 backdrop-blur-xl" />
+      <div className="pointer-events-none absolute inset-0 bg-aurora opacity-60" />
+      <div className="pointer-events-none absolute inset-0 bg-grain opacity-20" />
 
       {/* Content */}
       <div
@@ -57,38 +59,30 @@ export function AgeGateOverlay() {
       >
         {/* Logo area */}
         <div className="mb-8 text-center">
-          <h1
-            className="text-3xl font-semibold tracking-wide text-[#B5720A]"
-            style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-          >
-            SIPSTORIES
+          <h1 className="font-display text-3xl font-semibold tracking-wide">
+            <span className="italic text-primary">Sip</span>{" "}
+            <span className="text-foreground">Stories</span>
           </h1>
-          <p className="mt-1 text-sm text-[#7A6550]">
+          <p className="mt-1 text-sm text-muted-foreground">
             Stories worth sipping on
           </p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl border border-[#E5D5B5] bg-white p-8 shadow-xl shadow-[#B5720A]/8">
+        <div className="glass-panel-elevated rounded-2xl border border-border/60 p-8">
           {/* 21+ badge */}
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#B5720A]/40 bg-[#B5720A]/10">
-            <span
-              className="text-3xl font-bold text-[#B5720A]"
-              style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-            >
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 border-primary/35 bg-primary/10">
+            <span className="font-display text-3xl font-bold text-primary">
               21+
             </span>
           </div>
 
-          <h2
-            className="text-center text-xl font-medium text-[#1C1208]"
-            style={{ fontFamily: "EB Garamond, Georgia, serif" }}
-          >
+          <h2 className="text-center font-display text-xl font-medium text-foreground">
             Age Verification
           </h2>
 
-          <p className="mt-3 text-center text-sm leading-relaxed text-[#7A6550]">
-            You must be 21 years or older to access SIPSTORIES. This platform
+          <p className="mt-3 text-center text-sm leading-relaxed text-muted-foreground">
+            You must be 21 years or older to access SipStories. This platform
             contains alcohol-related content intended for adults of legal
             drinking age in India.
           </p>
@@ -97,13 +91,13 @@ export function AgeGateOverlay() {
           <div className="mt-8 space-y-3">
             <button
               onClick={handleAccept}
-              className="w-full rounded-full bg-[#B5720A] px-6 py-3.5 text-sm font-semibold uppercase tracking-wider text-[#FFF8EC] transition-all duration-200 hover:bg-[#9A5F08] hover:shadow-lg hover:shadow-[#B5720A]/20 active:scale-[0.98]"
+              className="w-full rounded-full bg-primary px-6 py-3.5 text-sm font-semibold uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/20 transition-all duration-200 hover:bg-primary/90 active:scale-[0.98]"
             >
               I am 21+ — Enter
             </button>
             <button
               onClick={handleDecline}
-              className="w-full rounded-full border border-[#E5D5B5] px-6 py-3 text-sm font-medium text-[#7A6550] transition-colors hover:border-[#C4A882] hover:text-[#5C4830]"
+              className="w-full rounded-full border border-border px-6 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
             >
               I am under 21
             </button>
@@ -111,9 +105,9 @@ export function AgeGateOverlay() {
         </div>
 
         {/* Prohibition states disclaimer */}
-        <div className="mt-6 rounded-xl border border-[#E5D5B5] bg-[#F5EDD8] px-5 py-4">
-          <p className="text-center text-xs leading-relaxed text-[#7A6550]">
-            <span className="font-semibold text-[#5C4830]">
+        <div className="mt-6 rounded-xl border border-border/60 bg-muted/40 px-5 py-4">
+          <p className="text-center text-xs leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">
               Alcohol is prohibited
             </span>{" "}
             in Gujarat, Bihar, Mizoram, Nagaland & Lakshadweep. This platform
@@ -123,7 +117,7 @@ export function AgeGateOverlay() {
         </div>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-[11px] uppercase tracking-widest text-[#C4A882]">
+        <p className="mt-6 text-center text-[11px] uppercase tracking-widest text-muted-foreground/70">
           Drink Responsibly
         </p>
       </div>
