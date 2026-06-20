@@ -9,7 +9,7 @@ const ADMINS = [
   { email: "priyansht1999@gmail.com", username: "priyansh", displayName: "Priyansh" },
   { email: "shauryashivam38@gmail.com", username: "shivam", displayName: "Shivam" },
   { email: "piyushdtu23@gmail.com", username: "piyush", displayName: "Piyush" },
-  { email: "hemangsinhasocial@gmail.com", username: "hemang", displayName: "Hemang" },
+  { email: "hemangsinha.social@gmail.com", username: "hemang", displayName: "Hemang" },
 ];
 
 const adapter = new PrismaPg({

@@ -25,6 +25,26 @@ const CONVERSATIONS = [
     james:
       "Tell the barman you're new to malts, they live for it. Neat first, ice later. ✨",
   },
+  {
+    user: "Date night. Want to impress.",
+    james:
+      "Gin and tonic, fresh lime, a sprig of mint. Simple, classy, hard to mess up. 🍸",
+  },
+  {
+    user: "Hosting Friday. What do I stock?",
+    james:
+      "Old Monk, a decent gin, soda, limes, and lots of ice. Covers 90% of requests. 🧊",
+  },
+  {
+    user: "Beer's boring tonight. Shake it up.",
+    james:
+      "Michelada, boss. Beer, lime, a little masala on the rim. Tastes like a Sunday. 🍺",
+  },
+  {
+    user: "Rough morning. Save me.",
+    james:
+      "Water first. Then nimbu paani, salt and sugar. Greasy breakfast. Skip the hair of the dog. 💧",
+  },
 ] as const;
 
 // One conversation occupies a fixed 4s slot. Typing duration scales with the
@@ -39,7 +59,7 @@ const MIN_HOLD_MS = 600;
 
 type Phase = "user" | "thinking" | "typing" | "hold";
 
-export function JamesTalking() {
+export function JamesTalking({ compact = false }: { compact?: boolean }) {
   // The typewriter is the whole point of this widget, so it always plays —
   // text appearing in place isn't the viewport motion prefers-reduced-motion
   // guards against. What reduced motion DOES suppress: the pulsing ring, the
@@ -121,11 +141,11 @@ export function JamesTalking() {
   const showJames = phase === "typing" || phase === "hold";
 
   return (
-    <div className="glass-panel rounded-2xl p-5">
+    <div className={`glass-panel rounded-2xl ${compact ? "p-3.5" : "p-6"}`}>
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center ${compact ? "gap-3" : "gap-3.5"}`}>
         <div className="relative shrink-0">
-          <JamesAvatar className="h-11 w-11" />
+          <JamesAvatar className={compact ? "h-9 w-9" : "h-14 w-14"} />
           {active && (
             <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background bg-emerald-500">
               {!prefersReduced && (
@@ -135,16 +155,26 @@ export function JamesTalking() {
           )}
         </div>
         <div>
-          <p className="font-display text-base font-semibold text-foreground">
+          <p
+            className={`font-display font-semibold text-foreground ${
+              compact ? "text-base" : "text-lg"
+            }`}
+          >
             James
           </p>
-          <p className="text-xs text-muted-foreground">AI bartender, on call</p>
+          <p
+            className={`text-muted-foreground ${
+              compact ? "text-xs" : "text-sm"
+            }`}
+          >
+            AI bartender, on call
+          </p>
         </div>
       </div>
 
       {/* Conversation — fades out between topics */}
       <div
-        className="mt-4 space-y-2.5"
+        className={compact ? "mt-3 space-y-2" : "mt-4 space-y-2.5"}
         style={{
           opacity: visible ? 1 : 0,
           transform: prefersReduced
@@ -158,7 +188,11 @@ export function JamesTalking() {
         }}
       >
         {/* User bubble */}
-        <div className="ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-primary/15 px-3.5 py-2 text-xs leading-relaxed text-foreground/90">
+        <div
+          className={`ml-auto max-w-[82%] rounded-2xl rounded-br-sm bg-primary/15 leading-relaxed text-foreground/90 ${
+            compact ? "px-3.5 py-2 text-xs" : "px-4 py-2.5 text-sm"
+          }`}
+        >
           {conv.user}
         </div>
 
@@ -167,7 +201,11 @@ export function JamesTalking() {
 
         {/* James reply — typed out character by character */}
         {showJames && (
-          <div className="mr-auto max-w-[88%] rounded-2xl rounded-bl-sm border border-border/40 bg-card/60 px-3.5 py-2 text-xs leading-relaxed text-foreground/90">
+          <div
+            className={`mr-auto max-w-[88%] rounded-2xl rounded-bl-sm border border-border/40 bg-card/60 leading-relaxed text-foreground/90 ${
+              compact ? "px-3.5 py-2 text-xs" : "px-4 py-2.5 text-sm"
+            }`}
+          >
             {typed}
             {phase === "typing" && (
               <span
@@ -181,8 +219,8 @@ export function JamesTalking() {
       </div>
 
       {/* Footer + progress pips */}
-      <div className="mt-4 flex items-center justify-between">
-        <p className="text-[11px] text-muted-foreground">
+      <div className={`flex items-center justify-between ${compact ? "mt-3" : "mt-5"}`}>
+        <p className={`text-muted-foreground ${compact ? "text-[11px]" : "text-xs"}`}>
           James is behind the bar the moment you&apos;re in.
         </p>
         <div className="flex items-center gap-1">
