@@ -8,12 +8,17 @@ import { VIBES } from "@/lib/vibe-config";
 import { COCKTAIL_RECIPES } from "@/lib/cocktail-recipes";
 
 export function HomeSidebar() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [trendingDrinks, setTrendingDrinks] = useState<any[]>([]);
-  const [randomRecipe] = useState(
-    () => COCKTAIL_RECIPES[Math.floor(Math.random() * COCKTAIL_RECIPES.length)]
-  );
+  // Start with a deterministic item so server and first client render match,
+  // then randomize after mount (client-only) to avoid a hydration mismatch.
+  const [randomRecipe, setRandomRecipe] = useState(COCKTAIL_RECIPES[0]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRandomRecipe(
+      COCKTAIL_RECIPES[Math.floor(Math.random() * COCKTAIL_RECIPES.length)]
+    );
     fetch("/api/drinks?sort=popular&limit=5")
       .then((r) => r.json())
       .then((d) => setTrendingDrinks(d.data?.slice(0, 5) ?? []))
@@ -25,7 +30,7 @@ export function HomeSidebar() {
       {/* Tonight's Random Pick */}
       <Card variant="glass" className="p-4 space-y-3">
         <h3 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          🎲 Tonight's Random Pick
+          🎲 Tonight&apos;s Random Pick
         </h3>
         <div className="flex items-center gap-2">
           <span className="text-2xl">{randomRecipe.emoji}</span>
@@ -48,7 +53,7 @@ export function HomeSidebar() {
       {/* Vibe Quick Jump */}
       <Card variant="glass" className="p-4 space-y-3">
         <h3 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          🌙 What's your vibe?
+          🌙 What&apos;s your vibe?
         </h3>
         <div className="grid grid-cols-2 gap-2">
           {VIBES.slice(0, 4).map((vibe) => (
@@ -66,7 +71,7 @@ export function HomeSidebar() {
           href="/vibe"
           className="block text-center text-xs text-primary underline-offset-2 hover:underline"
         >
-          Pick tonight's vibe →
+          Pick tonight&apos;s vibe →
         </Link>
       </Card>
 
@@ -119,7 +124,7 @@ export function HomeSidebar() {
             <p className="font-display font-semibold text-sm text-[var(--ml-sos)]">Hangover SOS</p>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Recovery protocols, the math on when you're sober, and India-specific remedies
+            Recovery protocols, the math on when you&apos;re sober, and India-specific remedies
           </p>
         </Card>
       </Link>
