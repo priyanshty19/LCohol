@@ -3,12 +3,24 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
+function isLocalDb(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 function createPrismaClient() {
-  // Supabase pooler presents a cert that node-postgres (verify-full) rejects as
-  // self-signed; require encryption but skip CA verification.
+  const url = process.env.DATABASE_URL;
+  // Local Postgres typically has no TLS; remote (Supabase pooler) presents a
+  // cert that node-postgres (verify-full) rejects as self-signed, so require
+  // encryption there but skip CA verification.
   const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    connectionString: url,
+    ssl: isLocalDb(url) ? false : { rejectUnauthorized: false },
   });
   return new PrismaClient({ adapter });
 }

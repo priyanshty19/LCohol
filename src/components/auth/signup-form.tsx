@@ -19,6 +19,17 @@ function clerkError(e: unknown, fallback: string): string {
   return er?.errors?.[0]?.longMessage ?? er?.errors?.[0]?.message ?? fallback;
 }
 
+// Full age in years from a YYYY-MM-DD string (month/day aware). NaN if unparseable.
+function ageFromDob(dobStr: string): number {
+  const dob = new Date(dobStr);
+  if (Number.isNaN(dob.getTime())) return NaN;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+  return age;
+}
+
 export function SignupForm() {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
@@ -31,6 +42,10 @@ export function SignupForm() {
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
+  // DOB as separate parts so year is a single dropdown (no calendar paging).
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
 
   // Details captured in step 1, sent to our backend after the OTP is verified.
   const [details, setDetails] = useState({
@@ -43,6 +58,8 @@ export function SignupForm() {
 
   // Suggest a funky pseudonym on first paint (effect → no hydration mismatch).
   useEffect(() => {
+    // Random pseudonym is client-only to avoid an SSR/client hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUsername(generateFunkyName());
   }, []);
 
@@ -78,6 +95,19 @@ export function SignupForm() {
     }
     if (!consent) {
       setError("Please confirm you are 21 or older.");
+      setLoading(false);
+      return;
+    }
+    // Catch under-21 up front (the server re-checks at otp/complete) so an
+    // underage DOB never gets as far as an emailed verification code.
+    const age = ageFromDob(dob);
+    if (Number.isNaN(age)) {
+      setError("Please enter a valid date of birth.");
+      setLoading(false);
+      return;
+    }
+    if (age < 21) {
+      setError("You must be 21 or older to join SipStories.");
       setLoading(false);
       return;
     }
@@ -253,6 +283,25 @@ export function SignupForm() {
     );
   }
 
+  // DOB dropdown options. Years run from 21 to 100 years ago (newest first) so
+  // the picker only offers ages that pass the 21+ gate; the precise check still
+  // happens in handleDetails. Day count tracks the selected month/year.
+  const currentYear = new Date().getFullYear();
+  const dobYears = Array.from({ length: 80 }, (_, i) => currentYear - 21 - i);
+  const dobMonths = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const daysInMonth =
+    dobMonth && dobYear
+      ? new Date(Number(dobYear), Number(dobMonth), 0).getDate()
+      : 31;
+  const dobDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const dobValue =
+    dobDay && dobMonth && dobYear ? `${dobYear}-${dobMonth}-${dobDay}` : "";
+  const dobSelectClass =
+    "h-9 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+
   return (
     <Card variant="glass">
       <form onSubmit={handleDetails}>
@@ -303,8 +352,51 @@ export function SignupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dob">Date of birth</Label>
-            <Input id="dob" name="dob" type="date" required />
+            <Label htmlFor="dobDay">Date of birth</Label>
+            <div className="grid grid-cols-[1fr_1.3fr_1.2fr] gap-2">
+              <select
+                id="dobDay"
+                aria-label="Day"
+                className={dobSelectClass}
+                value={dobDay}
+                onChange={(e) => setDobDay(e.target.value)}
+              >
+                <option value="">Day</option>
+                {dobDays.map((d) => (
+                  <option key={d} value={String(d).padStart(2, "0")}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Month"
+                className={dobSelectClass}
+                value={dobMonth}
+                onChange={(e) => setDobMonth(e.target.value)}
+              >
+                <option value="">Month</option>
+                {dobMonths.map((m, i) => (
+                  <option key={m} value={String(i + 1).padStart(2, "0")}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Year"
+                className={dobSelectClass}
+                value={dobYear}
+                onChange={(e) => setDobYear(e.target.value)}
+              >
+                <option value="">Year</option>
+                {dobYears.map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* handleDetails reads this via FormData, unchanged. */}
+            <input type="hidden" name="dob" value={dobValue} />
           </div>
 
           <div className="space-y-2">
@@ -330,7 +422,7 @@ export function SignupForm() {
               className="h-9 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               defaultValue=""
             >
-              <option value="">— what's your poison? —</option>
+              <option value="">— what&apos;s your poison? —</option>
               {drinks.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -365,6 +457,12 @@ export function SignupForm() {
             🥜 Teetotaler? Pull up a chair — you&apos;re welcome too. Just don&apos;t
             finish the <em>Chakna</em>.
           </p>
+
+          {/* Clerk mounts its bot-protection (Smart CAPTCHA / Turnstile) widget
+              here. Without this node, Clerk falls back to an invisible CAPTCHA
+              that gets blocked in private windows / by content blockers, which
+              surfaces as "The CAPTCHA failed to load." */}
+          <div id="clerk-captcha" className="flex justify-center empty:hidden" />
 
           {error && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

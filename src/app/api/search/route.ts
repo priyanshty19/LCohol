@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { getConnectionUserIds } from "@/lib/connections";
 import { SEARCH_PAGE_SIZE } from "@/lib/constants";
 
 export async function GET(request: Request) {
@@ -14,12 +17,31 @@ export async function GET(request: Request) {
   const results: { posts?: any[]; drinks?: any[]; profiles?: any[] } = {};
 
   if (type === "all" || type === "posts") {
+    // Only surface posts the searcher is allowed to see (PUBLIC + own/circle).
+    const me = await getCurrentUser();
+    const audience: Prisma.PostWhereInput = me
+      ? {
+          OR: [
+            { visibility: "PUBLIC" },
+            {
+              visibility: "CIRCLE",
+              authorId: { in: [me.id, ...(await getConnectionUserIds(me.id))] },
+            },
+          ],
+        }
+      : { visibility: "PUBLIC" };
+
     results.posts = await prisma.post.findMany({
       where: {
         isDeleted: false,
-        OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { body: { contains: q, mode: "insensitive" } },
+        AND: [
+          {
+            OR: [
+              { title: { contains: q, mode: "insensitive" } },
+              { body: { contains: q, mode: "insensitive" } },
+            ],
+          },
+          audience,
         ],
       },
       take: SEARCH_PAGE_SIZE,

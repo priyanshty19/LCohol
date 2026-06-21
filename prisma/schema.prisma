@@ -42,8 +42,97 @@ model User {
   moderationActions  ModerationAction[] @relation("ModActor")
   resolvedReports    Report[]           @relation("ReportResolver")
   barReviews         BarReview[]
+  referralsSent      Referral[]   @relation("ReferralInviter")
+  referralAccepted   Referral?    @relation("ReferralAccepted")
+  connectionsA       Connection[] @relation("ConnectionA")
+  connectionsB       Connection[] @relation("ConnectionB")
+  requestsSent       ConnectionRequest[] @relation("RequestsSent")
+  requestsReceived   ConnectionRequest[] @relation("RequestsReceived")
 
   @@map("users")
+}
+
+// ============================================================================
+// SOCIAL — per-invite referrals & the connection graph (the "circle")
+// ============================================================================
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+
+  @@map("referral_status")
+}
+
+// One row per invite a user generates. Capped at 5 active (PENDING, unexpired)
+// per inviter in app logic; each expires 3 days after creation.
+model Referral {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String         @unique
+  inviterId    String         @map("inviter_id") @db.Uuid
+  label        String?        @db.VarChar(50)
+  status       ReferralStatus @default(PENDING)
+  expiresAt    DateTime       @map("expires_at")
+  acceptedById String?        @unique @map("accepted_by_id") @db.Uuid
+  acceptedAt   DateTime?      @map("accepted_at")
+  revokedAt    DateTime?      @map("revoked_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  inviter    User  @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  acceptedBy User? @relation("ReferralAccepted", fields: [acceptedById], references: [id])
+  connection Connection?
+
+  @@index([inviterId])
+  @@map("referrals")
+}
+
+// A mutual connection between two users (the closed-knit circle). Stored once
+// per pair with userAId < userBId (canonical order) so the unique pair index
+// blocks duplicates regardless of who invited whom.
+model Connection {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userAId    String    @map("user_a_id") @db.Uuid
+  userBId    String    @map("user_b_id") @db.Uuid
+  referralId String?   @unique @map("referral_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  userA    User      @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB    User      @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
+  referral Referral? @relation(fields: [referralId], references: [id])
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@map("connections")
+}
+
+enum ConnectionRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+
+  @@map("connection_request_status")
+}
+
+// A request to connect with someone already on the app (found by username).
+// Accepting it creates a Connection. App logic blocks duplicates while one is
+// PENDING or the two are already connected.
+model ConnectionRequest {
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fromUserId  String                  @map("from_user_id") @db.Uuid
+  toUserId    String                  @map("to_user_id") @db.Uuid
+  status      ConnectionRequestStatus @default(PENDING)
+  createdAt   DateTime                @default(now()) @map("created_at")
+  respondedAt DateTime?               @map("responded_at")
+
+  from User @relation("RequestsSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to   User @relation("RequestsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
+  @@map("connection_requests")
 }
 
 model Profile {
@@ -99,6 +188,7 @@ model Post {
   body      String?
   imageUrl  String?    @map("image_url")
   postType  PostType   @map("post_type")
+  visibility PostVisibility @default(PUBLIC) @map("visibility")
   score     Int        @default(0)
   isDeleted Boolean    @default(false) @map("is_deleted")
   createdAt DateTime   @default(now()) @map("created_at")
@@ -115,6 +205,7 @@ model Post {
   @@index([createdAt])
   @@index([score])
   @@index([postType])
+  @@index([visibility])
   @@map("posts")
 }
 
@@ -126,6 +217,13 @@ enum PostType {
   MEME
 
   @@map("post_type")
+}
+
+enum PostVisibility {
+  PUBLIC
+  CIRCLE
+
+  @@map("post_visibility")
 }
 
 model Comment {

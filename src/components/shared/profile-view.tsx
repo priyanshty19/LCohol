@@ -3,9 +3,14 @@
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
+import { CircleView } from "@/components/circle/circle-view";
+
+type Relationship = "self" | "connected" | "incoming" | "outgoing" | "none";
 
 const DRINKING_STYLE_LABELS: Record<string, string> = {
   SOCIAL: "Social Drinker",
@@ -22,20 +27,66 @@ interface ProfileViewProps {
 }
 
 export function ProfileView({ username }: ProfileViewProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const { user: me } = useAuth();
+  // The circle (invites + connections) is private — only on your own profile.
+  const isOwnProfile = Boolean(me?.username && me.username === username);
+  const [rel, setRel] = useState<Relationship>("none");
+  const [reqId, setReqId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let alive = true;
     async function load() {
       const res = await fetch(`/api/profile?username=${username}`);
-      if (res.ok) {
+      if (alive && res.ok) {
         const json = await res.json();
         setProfile(json.data);
+        setRel(json.data.viewer?.relationship ?? "none");
+        setReqId(json.data.viewer?.requestId ?? null);
       }
-      setLoading(false);
+      if (alive) setLoading(false);
     }
     load();
+
+    // Quietly re-sync the relationship so the circle button reflects the other
+    // person accepting/declining without a full reload.
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 12000);
+    const onFocus = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [username]);
+
+  async function addToCircle() {
+    setBusy(true);
+    const r = await fetch("/api/connections/requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username }),
+    });
+    if (r.ok) setRel("outgoing");
+    setBusy(false);
+  }
+
+  async function acceptRequest() {
+    if (!reqId) return;
+    setBusy(true);
+    const r = await fetch(`/api/connections/requests/${reqId}/accept`, {
+      method: "POST",
+    });
+    if (r.ok) setRel("connected");
+    setBusy(false);
+  }
 
   if (loading) {
     return (
@@ -94,6 +145,37 @@ export function ProfileView({ username }: ProfileViewProps) {
                 )}
               </div>
             </div>
+
+            {/* Circle action — only when viewing someone else's profile. */}
+            {me && rel !== "self" && (
+              <div className="shrink-0">
+                {rel === "connected" ? (
+                  <Badge variant="recommendation">In your circle ✓</Badge>
+                ) : rel === "outgoing" ? (
+                  <Button variant="outline" size="sm" disabled>
+                    Request sent
+                  </Button>
+                ) : rel === "incoming" ? (
+                  <Button
+                    variant="gold"
+                    size="sm"
+                    disabled={busy}
+                    onClick={acceptRequest}
+                  >
+                    Accept request
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    disabled={busy}
+                    onClick={addToCircle}
+                  >
+                    + Add to circle
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           <Separator className="my-4 border-border/30" />
@@ -145,6 +227,13 @@ export function ProfileView({ username }: ProfileViewProps) {
           </p>
         </CardContent>
       </Card>
+
+      {isOwnProfile && (
+        <>
+          <Separator className="border-border/30" />
+          <CircleView embedded />
+        </>
+      )}
     </div>
   );
 }

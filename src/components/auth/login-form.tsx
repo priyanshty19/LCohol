@@ -236,6 +236,10 @@ export function LoginForm() {
             />
           </div>
 
+          {/* Clerk mounts its bot-protection CAPTCHA here for the signUp
+              fallback used when Clerk doesn't yet know this email. */}
+          <div id="clerk-captcha" className="flex justify-center empty:hidden" />
+
           {error && (
             <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
               {error}

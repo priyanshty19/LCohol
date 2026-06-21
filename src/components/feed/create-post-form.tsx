@@ -26,6 +26,7 @@ export function CreatePostForm() {
   const [error, setError] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<"PUBLIC" | "CIRCLE">("PUBLIC");
 
   // Revoke the active object URL on unmount (e.g. after submit navigates away)
   // so the blob isn't leaked for the document's lifetime.
@@ -87,7 +88,7 @@ export function CreatePostForm() {
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, body, postType, imageUrl }),
+        body: JSON.stringify({ title, body, postType, imageUrl, visibility }),
       });
 
       const json = await res.json();
@@ -123,6 +124,41 @@ export function CreatePostForm() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Audience</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { value: "PUBLIC", emoji: "🌍", label: "Public" },
+                  { value: "CIRCLE", emoji: "🤝", label: "Circle" },
+                ] as const
+              ).map((opt) => {
+                const active = visibility === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setVisibility(opt.value)}
+                    aria-pressed={active}
+                    className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border/60 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="mr-1">{opt.emoji}</span>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {visibility === "PUBLIC"
+                ? "Everyone on SipStories can see this."
+                : "Only people in your circle can see this."}
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
-import { PostType } from "@/generated/prisma/client";
+import { PostType, PostVisibility, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { getConnectionUserIds } from "@/lib/connections";
 import { FEED_PAGE_SIZE } from "@/lib/constants";
+
+/**
+ * The audience filter for a viewer: every PUBLIC post, plus CIRCLE posts
+ * authored by the viewer or someone in their circle. Logged-out viewers see
+ * only PUBLIC posts.
+ */
+async function visibilityWhere(): Promise<Prisma.PostWhereInput> {
+  const me = await getCurrentUser();
+  if (!me) return { visibility: "PUBLIC" };
+  const circleAuthorIds = [me.id, ...(await getConnectionUserIds(me.id))];
+  return {
+    OR: [
+      { visibility: "PUBLIC" },
+      { visibility: "CIRCLE", authorId: { in: circleAuthorIds } },
+    ],
+  };
+}
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
  *  under the public storage path. Structural checks — no substring matching. */
@@ -33,9 +51,10 @@ export async function GET(request: Request) {
   const cursor = searchParams.get("cursor");
   const postType = searchParams.get("type");
 
-  const where = {
+  const where: Prisma.PostWhereInput = {
     isDeleted: false,
-    ...(postType ? { postType: postType as any } : {}),
+    ...(postType ? { postType: postType as PostType } : {}),
+    ...(await visibilityWhere()),
   };
 
   const include = {
@@ -140,7 +159,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { title, body: postBody, postType, tagIds, drinkIds, imageUrl } = body;
+  const { title, body: postBody, postType, tagIds, drinkIds, imageUrl, visibility } = body;
 
   const VALID_POST_TYPES = new Set(["STORY", "QUESTION", "REVIEW", "RECOMMENDATION", "MEME"]);
 
@@ -155,6 +174,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid post type" }, { status: 400 });
   }
 
+  // Audience: PUBLIC (default, global feed) or CIRCLE (only the author + their
+  // connections). Anything else falls back to PUBLIC.
+  const postVisibility: PostVisibility =
+    visibility === "CIRCLE" ? "CIRCLE" : "PUBLIC";
+
   // Only accept image URLs we host on OUR Supabase Storage public bucket.
   // Parse structurally (host + path) — never a substring regex, which would
   // accept https://evil.com/?x=.supabase.co/storage/ and turn every viewer's
@@ -167,6 +191,7 @@ export async function POST(request: Request) {
       title,
       body: postBody || null,
       postType: postType as PostType,
+      visibility: postVisibility,
       imageUrl: safeImageUrl,
       tags: tagIds?.length
         ? { create: tagIds.map((id: string) => ({ tagId: id })) }
