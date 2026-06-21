@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateReferralCode, isTestReferralCode } from "@/lib/referral";
+import { isTestReferralCode } from "@/lib/referral";
+import {
+  acceptReferralTx,
+  generateUniqueReferralCode,
+} from "@/lib/referrals";
+import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { verifiedEmailFromClerkToken, clerkBackend } from "@/lib/clerk";
@@ -17,6 +22,10 @@ function ageFromDob(dob: Date): number {
   if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
   return age;
 }
+
+// Thrown inside the signup transaction when a per-invite code can't be claimed
+// (invalid / already used / expired), so the whole user.create rolls back.
+class ReferralUnavailableError extends Error {}
 
 /**
  * Final step of the email-OTP flow. The client has already verified the email
@@ -141,21 +150,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Test codes (e.g. IEEE23) are accepted with no inviter; real codes must
-    // belong to an existing member.
-    let invitedById: string | undefined;
-    if (!isTestReferralCode(referralCode)) {
-      const inviter = await prisma.user.findFirst({
-        where: { referralCode },
+    // Resolve the invite category up front (read-only). Test codes (e.g. IEEE23)
+    // create an account with no inviter; a legacy admin code is a root invite.
+    const isTest = isTestReferralCode(referralCode);
+    let adminInviterId: string | null = null;
+    if (!isTest) {
+      const adminInviter = await prisma.user.findFirst({
+        where: { referralCode, role: "ADMIN" },
         select: { id: true },
       });
-      if (!inviter) {
-        return NextResponse.json(
-          { error: "That referral code isn't valid." },
-          { status: 403 },
-        );
-      }
-      invitedById = inviter.id;
+      adminInviterId = adminInviter?.id ?? null;
     }
 
     if (
@@ -176,33 +180,61 @@ export async function POST(request: NextRequest) {
       favDrinkId = d?.id;
     }
 
-    let code = generateReferralCode();
-    if (
-      await prisma.user.findFirst({ where: { referralCode: code }, select: { id: true } })
-    ) {
-      code = generateReferralCode();
-    }
+    const code = await generateUniqueReferralCode();
 
-    await prisma.user.create({
-      data: {
-        authId: email,
-        email,
-        dob,
-        isVerified: true, // email proven via OTP
-        consentedAt: new Date(),
-        referralCode: code,
-        invitedById,
-        role: isAdminEmail(email) ? "ADMIN" : "USER",
-        profile: {
-          create: {
-            username,
-            displayName: username,
-            favoriteDrinkId: favDrinkId,
-            theme: "light",
+    // Create the member, claim the per-invite referral, and form the mutual
+    // connection atomically — so a code that loses the race (or expired between
+    // the pre-check and now) rolls the whole signup back.
+    try {
+      await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            authId: email,
+            email,
+            dob,
+            isVerified: true, // email proven via OTP
+            consentedAt: new Date(),
+            referralCode: code,
+            role: isAdminEmail(email) ? "ADMIN" : "USER",
+            profile: {
+              create: {
+                username,
+                displayName: username,
+                favoriteDrinkId: favDrinkId,
+                theme: "light",
+              },
+            },
           },
-        },
-      },
-    });
+          select: { id: true },
+        });
+
+        if (isTest) return; // open invite — no inviter, no connection
+
+        if (adminInviterId) {
+          await tx.user.update({
+            where: { id: newUser.id },
+            data: { invitedById: adminInviterId },
+          });
+          await createConnectionTx(tx, adminInviterId, newUser.id);
+          return;
+        }
+
+        const inviterId = await acceptReferralTx(tx, referralCode, newUser.id);
+        if (!inviterId) throw new ReferralUnavailableError();
+        await tx.user.update({
+          where: { id: newUser.id },
+          data: { invitedById: inviterId },
+        });
+      });
+    } catch (e) {
+      if (e instanceof ReferralUnavailableError) {
+        return NextResponse.json(
+          { error: "That referral code isn't valid or has expired." },
+          { status: 403 },
+        );
+      }
+      throw e;
+    }
 
     return mintFor(username, 201);
   } catch (err) {

@@ -104,7 +104,7 @@ export function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Link href={`/profile/${user.username ?? ""}`} className="w-full">
-                    My profile
+                    My profile &amp; circle
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>

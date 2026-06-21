@@ -46,7 +46,7 @@ const INTENT = [
   { id: "zone", label: "Proper unwind", desc: "Fully switch off for a while" },
 ];
 
-const STEPS = ["Spirits", "Flavours", "Intensity", "The plan"] as const;
+const STEPS = ["Your taste", "The night"] as const;
 
 function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -94,15 +94,15 @@ export function OnboardingQuiz({ username }: { username: string }) {
   const isLast = step === STEPS.length - 1;
 
   return (
-    <div className="glass-panel w-full max-w-lg rounded-3xl border border-white/10 p-6 shadow-2xl sm:p-8">
+    <div className="glass-panel w-full max-w-lg rounded-3xl border border-white/10 p-6 shadow-2xl sm:p-8 md:max-w-2xl">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="font-display text-xl font-bold text-primary">
             Welcome, {username}
           </p>
           <p className="text-sm text-muted-foreground">
-            Four quick taps so James pours you the right things.
+            Two quick steps so James pours you the right things.
           </p>
         </div>
         <button
@@ -137,75 +137,75 @@ export function OnboardingQuiz({ username }: { username: string }) {
           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         >
           {step === 0 && (
-            <Question
-              title="What's on your mind to drink?"
-              hint="Pick all that tempt you — or none, your call."
-            >
-              <div className="grid grid-cols-3 gap-2.5">
-                {SPIRITS.map((s) => (
-                  <Chip
-                    key={s.id}
-                    active={spirits.includes(s.id)}
-                    onClick={() => setSpirits((p) => toggle(p, s.id))}
-                  >
-                    <span className="text-lg">{s.emoji}</span>
-                    <span>{s.label}</span>
-                  </Chip>
-                ))}
-              </div>
-            </Question>
+            <div className="space-y-6">
+              <Question
+                title="What's on your mind to drink?"
+                hint="Pick all that tempt you — or none, your call."
+              >
+                <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 md:grid-cols-3">
+                  {SPIRITS.map((s) => (
+                    <Chip
+                      key={s.id}
+                      active={spirits.includes(s.id)}
+                      onClick={() => setSpirits((p) => toggle(p, s.id))}
+                    >
+                      <span className="text-lg">{s.emoji}</span>
+                      <span>{s.label}</span>
+                    </Chip>
+                  ))}
+                </div>
+              </Question>
+
+              <Question
+                title="Which flavours do you love?"
+                hint="The notes that make you go again."
+              >
+                <div className="flex flex-wrap gap-2">
+                  {FLAVOURS.map((f) => (
+                    <Chip
+                      key={f}
+                      active={flavours.includes(f)}
+                      onClick={() => setFlavours((p) => toggle(p, f))}
+                      pill
+                    >
+                      {f}
+                    </Chip>
+                  ))}
+                </div>
+              </Question>
+            </div>
           )}
 
           {step === 1 && (
-            <Question
-              title="Which flavours do you love?"
-              hint="The notes that make you go again."
-            >
-              <div className="flex flex-wrap gap-2">
-                {FLAVOURS.map((f) => (
-                  <Chip
-                    key={f}
-                    active={flavours.includes(f)}
-                    onClick={() => setFlavours((p) => toggle(p, f))}
-                    pill
-                  >
-                    {f}
-                  </Chip>
-                ))}
-              </div>
-            </Question>
-          )}
+            <div className="grid gap-6 md:grid-cols-2">
+              <Question title="What's the pace tonight?" hint="No judgement, just calibration.">
+                <div className="space-y-2.5">
+                  {INTENSITY.map((o) => (
+                    <Row
+                      key={o.id}
+                      label={o.label}
+                      desc={o.desc}
+                      active={intensity === o.id}
+                      onClick={() => setIntensity(o.id)}
+                    />
+                  ))}
+                </div>
+              </Question>
 
-          {step === 2 && (
-            <Question title="What's the pace tonight?" hint="No judgement, just calibration.">
-              <div className="space-y-2.5">
-                {INTENSITY.map((o) => (
-                  <Row
-                    key={o.id}
-                    label={o.label}
-                    desc={o.desc}
-                    active={intensity === o.id}
-                    onClick={() => setIntensity(o.id)}
-                  />
-                ))}
-              </div>
-            </Question>
-          )}
-
-          {step === 3 && (
-            <Question title="What's the plan?" hint="So James reads the room right.">
-              <div className="space-y-2.5">
-                {INTENT.map((o) => (
-                  <Row
-                    key={o.id}
-                    label={o.label}
-                    desc={o.desc}
-                    active={intent === o.id}
-                    onClick={() => setIntent(o.id)}
-                  />
-                ))}
-              </div>
-            </Question>
+              <Question title="What's the plan?" hint="So James reads the room right.">
+                <div className="space-y-2.5">
+                  {INTENT.map((o) => (
+                    <Row
+                      key={o.id}
+                      label={o.label}
+                      desc={o.desc}
+                      active={intent === o.id}
+                      onClick={() => setIntent(o.id)}
+                    />
+                  ))}
+                </div>
+              </Question>
+            </div>
           )}
         </motion.div>
       </AnimatePresence>
