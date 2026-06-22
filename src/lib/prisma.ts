@@ -21,6 +21,9 @@ function createPrismaClient() {
   const adapter = new PrismaPg({
     connectionString: url,
     ssl: isLocalDb(url) ? false : { rejectUnauthorized: false },
+    // Serverless: cap the pool so concurrent Vercel function instances
+    // don't exhaust Supabase's session-mode limit (pool_size=15).
+    max: isLocalDb(url) ? 10 : 1,
   });
   return new PrismaClient({ adapter });
 }
