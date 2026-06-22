@@ -538,14 +538,24 @@ model CocktailCreation {
   imageUrl    String?  @map("image_url")
   score       Int      @default(0)
   isPublic    Boolean  @default(true) @map("is_public")
+  category    String?  @db.VarChar(80)
+  glass       String?  @db.VarChar(80)
+  garnish     String?
+  sourceBarId String?  @map("source_bar_id") @db.Uuid
+  sourceLabel String?  @map("source_label") @db.VarChar(200)
+  isCurated   Boolean  @default(false) @map("is_curated")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   author      User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  sourceBar   Bar?                 @relation(fields: [sourceBarId], references: [id])
   ingredients CocktailIngredient[]
 
+  @@unique([authorId, name, sourceLabel])
   @@index([authorId])
   @@index([score])
+  @@index([sourceBarId])
+  @@index([isCurated])
   @@map("cocktail_creations")
 }
 
@@ -837,7 +847,8 @@ model Bar {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  reviews BarReview[]
+  reviews   BarReview[]
+  cocktails CocktailCreation[]
 
   @@index([city])
   @@index([type])

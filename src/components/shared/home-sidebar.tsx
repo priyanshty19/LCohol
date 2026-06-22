@@ -7,23 +7,47 @@ import { Card } from "@/components/ui/card";
 import { VIBES } from "@/lib/vibe-config";
 import { COCKTAIL_RECIPES } from "@/lib/cocktail-recipes";
 
+type ApiPick = {
+  name: string;
+  category: string | null;
+  sourceBar: { name: string; city: string } | null;
+} | null;
+
 export function HomeSidebar() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [trendingDrinks, setTrendingDrinks] = useState<any[]>([]);
-  // Start with a deterministic item so server and first client render match,
-  // then randomize after mount (client-only) to avoid a hydration mismatch.
+  // Start with a deterministic static recipe so server and first client render
+  // match. We then upgrade to a curated DB pick if /api/cocktails/random
+  // responds; falls back to a random static recipe if the API is unreachable.
   const [randomRecipe, setRandomRecipe] = useState(COCKTAIL_RECIPES[0]);
+  const [apiPick, setApiPick] = useState<ApiPick>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRandomRecipe(
       COCKTAIL_RECIPES[Math.floor(Math.random() * COCKTAIL_RECIPES.length)]
     );
+    fetch("/api/cocktails/random")
+      .then((r) => r.json())
+      .then((d) => {
+        const c = d?.data?.cocktail;
+        if (c?.name) setApiPick({ name: c.name, category: c.category, sourceBar: c.sourceBar });
+      })
+      .catch(() => {});
     fetch("/api/drinks?sort=popular&limit=5")
       .then((r) => r.json())
       .then((d) => setTrendingDrinks(d.data?.slice(0, 5) ?? []))
       .catch(() => {});
   }, []);
+
+  const displayName = apiPick?.name ?? randomRecipe.name;
+  const displayTagline = apiPick
+    ? apiPick.sourceBar
+      ? `${apiPick.sourceBar.name}, ${apiPick.sourceBar.city}`
+      : apiPick.category ?? "Editorial pick"
+    : randomRecipe.tagline;
+  const displayEmoji = apiPick ? "🍸" : randomRecipe.emoji;
+  const recipeHref = apiPick ? "/cocktails" : "/mix";
 
   return (
     <div className="space-y-5 sticky top-20">
@@ -33,10 +57,10 @@ export function HomeSidebar() {
           🎲 Tonight&apos;s Random Pick
         </h3>
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{randomRecipe.emoji}</span>
-          <div>
-            <p className="font-display font-semibold text-sm">{randomRecipe.name}</p>
-            <p className="text-[11px] text-muted-foreground">{randomRecipe.tagline}</p>
+          <span className="text-2xl">{displayEmoji}</span>
+          <div className="min-w-0">
+            <p className="font-display font-semibold text-sm truncate">{displayName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{displayTagline}</p>
           </div>
         </div>
         <Button
@@ -44,7 +68,7 @@ export function HomeSidebar() {
           size="sm"
           className="w-full"
           nativeButton={false}
-          render={<Link href="/mix" />}
+          render={<Link href={recipeHref} />}
         >
           Get the Recipe →
         </Button>

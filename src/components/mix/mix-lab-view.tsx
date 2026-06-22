@@ -1,11 +1,21 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import Link from "next/link";
 import { COCKTAIL_RECIPES, findMatchingRecipes } from "@/lib/cocktail-recipes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RecipeCard } from "./recipe-card";
+
+type EditorialPick = {
+  id: string;
+  name: string;
+  category: string | null;
+  glass: string | null;
+  sourceBar: { name: string; city: string } | null;
+  sourceLabel: string | null;
+};
 
 // All spirit/drink options the user can pick from
 const BOTTLE_OPTIONS = [
@@ -52,8 +62,17 @@ export function MixLabView() {
   const [activeRecipe, setActiveRecipe] = useState<string | null>(null);
   const [luckyRecipe, setLuckyRecipe] = useState<string | null>(null);
   const [seededFromPrefs, setSeededFromPrefs] = useState(false);
+  const [editorialPicks, setEditorialPicks] = useState<EditorialPick[]>([]);
   // True once the user touches a bottle — the prefs seed must not run after that.
   const touchedRef = useRef(false);
+
+  // Editorial picks from curated DB — surfaces the new corpus alongside Mix Lab.
+  useEffect(() => {
+    fetch("/api/cocktails?take=12")
+      .then((r) => r.json())
+      .then((d) => setEditorialPicks(d?.data?.cocktails ?? []))
+      .catch(() => {});
+  }, []);
 
   // Pre-fill the cabinet from the user's onboarding spirit prefs — one
   // representative bottle per liked category — so recipes show immediately.
@@ -129,9 +148,45 @@ export function MixLabView() {
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tell us what's in your cabinet — we'll tell you what to make
+          Tell us what&apos;s in your cabinet — we&apos;ll tell you what to make
         </p>
       </div>
+
+      {/* Editorial picks strip — curated from India's best bars */}
+      {editorialPicks.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              🍸 Editorial picks from India&apos;s bars
+            </h2>
+            <Link
+              href="/cocktails"
+              className="text-xs text-primary underline-offset-2 hover:underline"
+            >
+              Browse all →
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {editorialPicks.map((p) => (
+              <Link
+                key={p.id}
+                href="/cocktails"
+                className="shrink-0 w-56"
+              >
+                <Card variant="glass" className="h-full p-3 space-y-1.5 transition hover:border-primary/40">
+                  <p className="font-display font-semibold text-sm leading-tight">{p.name}</p>
+                  {p.category && (
+                    <p className="text-[11px] text-muted-foreground">{p.category}</p>
+                  )}
+                  <p className="text-[10px] text-muted-foreground/80 truncate">
+                    📍 {p.sourceBar ? `${p.sourceBar.name}, ${p.sourceBar.city}` : p.sourceLabel ?? "—"}
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottle Selector */}
       <div className="glass-panel space-y-4 rounded-xl p-5">

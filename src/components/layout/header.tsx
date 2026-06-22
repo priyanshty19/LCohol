@@ -18,6 +18,7 @@ import { SipStoriesLogo } from "@/components/brand/logo";
 const NAV = [
   { href: "/", label: "Feed" },
   { href: "/drinks", label: "Drinks" },
+  { href: "/cocktails", label: "🍸 Cocktails" },
   { href: "/bars", label: "🍻 Bars" },
   { href: "/mix", label: "Mix Lab" },
   { href: "/vibe", label: "Vibe" },

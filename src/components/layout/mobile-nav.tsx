@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type LucideIcon, Home, Wine, Plus, Beer, Moon } from "lucide-react";
+import { type LucideIcon, Home, Wine, Plus, Beer, Martini } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Feed", icon: Home },
   { href: "/drinks", label: "Drinks", icon: Wine },
   { href: "/bars", label: "Bars", icon: Beer },
-  { href: "/vibe", label: "Vibe", icon: Moon },
+  { href: "/cocktails", label: "Cocktails", icon: Martini },
 ];
 
 function NavBtn({ it, active }: { it: (typeof ITEMS)[number]; active: boolean }) {
