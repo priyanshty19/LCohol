@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Flag, X, Check } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ export function ReportButton({ postId, commentId, className }: Props) {
   const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  // Portal to <body> so the fixed overlay can't be trapped by a transformed
+  // ancestor (post-card hover/animation), which would confine it to the column.
+  const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setMounted(true), []);
 
   function reset() {
     setReason(null);
@@ -74,14 +80,16 @@ export function ReportButton({ postId, commentId, className }: Props) {
         Report
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-4"
             onClick={() => {
               setOpen(false);
               reset();
@@ -93,10 +101,10 @@ export function ReportButton({ postId, commentId, className }: Props) {
               exit={{ y: 24, opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-lapel w-full max-w-md rounded-t-2xl border border-white/10 p-5 shadow-2xl sm:rounded-2xl"
+              className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/5 sm:rounded-2xl"
             >
               {state === "done" ? (
-                <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ml-sober)]/20 text-[var(--ml-sober)]">
                     <Check className="h-6 w-6" />
                   </span>
@@ -109,7 +117,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                 </div>
               ) : (
                 <>
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
                     <h3 className="font-display text-lg font-semibold text-foreground">
                       Report this {commentId ? "comment" : "post"}
                     </h3>
@@ -125,7 +133,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                     </button>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5">
                     {REASONS.map((r) => (
                       <button
                         key={r.value}
@@ -135,7 +143,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                           "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-all",
                           reason === r.value
                             ? "border-[var(--ml-sos)] bg-[var(--ml-sos)]/10 text-foreground"
-                            : "border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/25 hover:text-foreground"
+                            : "border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground"
                         )}
                       >
                         {r.label}
@@ -146,35 +154,39 @@ export function ReportButton({ postId, commentId, className }: Props) {
                     ))}
                   </div>
 
-                  <textarea
-                    value={details}
-                    onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Add any detail (optional)…"
-                    rows={2}
-                    maxLength={500}
-                    className="mt-3 w-full resize-none rounded-lg border border-input bg-input/30 px-3 py-2 text-sm outline-none focus-visible:border-ring"
-                  />
+                  <div className="shrink-0 border-t border-border/50 px-5 pb-5 pt-3">
+                    <textarea
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      placeholder="Add any detail (optional)…"
+                      rows={2}
+                      maxLength={500}
+                      className="w-full resize-none rounded-lg border border-input bg-input/30 px-3 py-2 text-sm outline-none focus-visible:border-ring"
+                    />
 
-                  {state === "error" && (
-                    <p className="mt-2 text-xs text-[var(--ml-sos)]">
-                      Couldn&apos;t send that — try again in a moment.
-                    </p>
-                  )}
+                    {state === "error" && (
+                      <p className="mt-2 text-xs text-[var(--ml-sos)]">
+                        Couldn&apos;t send that — try again in a moment.
+                      </p>
+                    )}
 
-                  <button
-                    type="button"
-                    onClick={submit}
-                    disabled={!reason || state === "sending"}
-                    className="btn-velvet mt-4 flex h-10 w-full items-center justify-center rounded-lg font-semibold disabled:opacity-50"
-                  >
-                    {state === "sending" ? "Sending…" : "Submit report"}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={submit}
+                      disabled={!reason || state === "sending"}
+                      className="btn-velvet mt-3 flex h-10 w-full items-center justify-center rounded-lg font-semibold disabled:opacity-50"
+                    >
+                      {state === "sending" ? "Sending…" : "Submit report"}
+                    </button>
+                  </div>
                 </>
               )}
             </motion.div>
           </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </>
   );
 }

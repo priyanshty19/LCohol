@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import {
   EB_Garamond,
   Playfair_Display,
@@ -7,12 +8,25 @@ import {
 } from "next/font/google";
 import { AgeGateOverlay } from "@/components/shared/age-gate-overlay";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { getCurrentUser } from "@/lib/auth";
+import { THEME_COOKIE, isThemeId, type ThemeId } from "@/lib/theme";
 import "./globals.css";
 
-// Runs before first paint: set data-theme AND the dark/light class from the
-// cookie so there's no flash of the wrong palette, and so dark: variants only
-// fire on dark-family themes (light gets the .light class, never .dark).
-const THEME_BOOTSTRAP = `(function(){try{var m=document.cookie.match(/(?:^|; )sip_theme=([^;]+)/);var t=m?decodeURIComponent(m[1]):'light';var ok=['dark','light','party','chill','date-night','celebrate','solo','budget'];var theme=ok.indexOf(t)>-1?t:'light';var el=document.documentElement;el.dataset.theme=theme;el.classList.toggle('dark',theme!=='light');el.classList.toggle('light',theme==='light');}catch(e){}})();`;
+// Resolve the theme on the SERVER so the SSR HTML already carries the right
+// palette — no flash/flip after hydration. Priority: the signed-in user's saved
+// theme (DB) > the cookie (logged-out / fast path) > light default.
+async function resolveTheme(): Promise<ThemeId> {
+  try {
+    const [user, cookieStore] = await Promise.all([getCurrentUser(), cookies()]);
+    const dbTheme = user?.profile?.theme;
+    if (isThemeId(dbTheme)) return dbTheme;
+    const cookieTheme = cookieStore.get(THEME_COOKIE)?.value;
+    if (isThemeId(cookieTheme)) return cookieTheme;
+  } catch {
+    /* fall through to default */
+  }
+  return "light";
+}
 
 const ebGaramond = EB_Garamond({
   variable: "--font-heading",
@@ -57,20 +71,21 @@ export const metadata: Metadata = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await resolveTheme();
+  const isLight = theme === "light";
+
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased`}
+      data-theme={theme}
+      className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased ${isLight ? "light" : "dark"}`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-      </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider />
         <AgeGateOverlay />

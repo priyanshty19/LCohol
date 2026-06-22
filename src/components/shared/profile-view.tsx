@@ -111,13 +111,13 @@ export function ProfileView({ username }: ProfileViewProps) {
     <div className="mx-auto max-w-2xl space-y-6">
       <Card variant="glass">
         <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-wrap items-start gap-4">
             <Avatar className="h-16 w-16">
               <AvatarFallback className="bg-primary/20 text-primary text-xl">
                 {profile.username[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <h1 className="font-display text-2xl font-bold text-primary">
                 {profile.displayName ?? profile.username}
               </h1>
@@ -146,19 +146,26 @@ export function ProfileView({ username }: ProfileViewProps) {
               </div>
             </div>
 
-            {/* Circle action — only when viewing someone else's profile. */}
+            {/* Circle action — only when viewing someone else's profile.
+                Full-width below the name on phones; top-right on desktop. */}
             {me && rel !== "self" && (
-              <div className="shrink-0">
+              <div className="w-full sm:w-auto sm:shrink-0">
                 {rel === "connected" ? (
                   <Badge variant="recommendation">In your circle ✓</Badge>
                 ) : rel === "outgoing" ? (
-                  <Button variant="outline" size="sm" disabled>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    disabled
+                  >
                     Request sent
                   </Button>
                 ) : rel === "incoming" ? (
                   <Button
                     variant="gold"
                     size="sm"
+                    className="w-full sm:w-auto"
                     disabled={busy}
                     onClick={acceptRequest}
                   >
@@ -168,6 +175,7 @@ export function ProfileView({ username }: ProfileViewProps) {
                   <Button
                     variant="default"
                     size="sm"
+                    className="w-full sm:w-auto"
                     disabled={busy}
                     onClick={addToCircle}
                   >
