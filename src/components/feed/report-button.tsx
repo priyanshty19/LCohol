@@ -81,7 +81,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-4"
             onClick={() => {
               setOpen(false);
               reset();
@@ -93,7 +93,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
               exit={{ y: 24, opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-lapel flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-white/10 shadow-2xl sm:rounded-2xl"
+              className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/5 sm:rounded-2xl"
             >
               {state === "done" ? (
                 <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
@@ -125,7 +125,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                     </button>
                   </div>
 
-                  <div className="flex-1 space-y-1.5 overflow-y-auto px-5">
+                  <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5">
                     {REASONS.map((r) => (
                       <button
                         key={r.value}
@@ -135,7 +135,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                           "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-all",
                           reason === r.value
                             ? "border-[var(--ml-sos)] bg-[var(--ml-sos)]/10 text-foreground"
-                            : "border-white/10 bg-white/[0.03] text-muted-foreground hover:border-white/25 hover:text-foreground"
+                            : "border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground"
                         )}
                       >
                         {r.label}
@@ -146,7 +146,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                     ))}
                   </div>
 
-                  <div className="shrink-0 border-t border-white/5 px-5 pb-5 pt-3">
+                  <div className="shrink-0 border-t border-border/50 px-5 pb-5 pt-3">
                     <textarea
                       value={details}
                       onChange={(e) => setDetails(e.target.value)}
