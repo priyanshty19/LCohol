@@ -11,6 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:admins": "npx tsx prisma/seed-admins.ts",
+    "db:seed:cocktails": "npx tsx prisma/seed-cocktails.ts",
+    "db:unseed:cocktails": "npx tsx prisma/unseed-cocktails.ts",
     "db:reset": "prisma migrate reset"
   },
   "prisma": {
