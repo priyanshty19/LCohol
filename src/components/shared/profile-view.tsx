@@ -24,17 +24,20 @@ const DRINKING_STYLE_LABELS: Record<string, string> = {
 
 interface ProfileViewProps {
   username: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialProfile?: any;
 }
 
-export function ProfileView({ username }: ProfileViewProps) {
+export function ProfileView({ username, initialProfile }: ProfileViewProps) {
+  // Seeded from the server render; the effect below silently refreshes + polls.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(initialProfile ?? null);
+  const [loading, setLoading] = useState(initialProfile == null);
   const { user: me } = useAuth();
   // The circle (invites + connections) is private — only on your own profile.
   const isOwnProfile = Boolean(me?.username && me.username === username);
-  const [rel, setRel] = useState<Relationship>("none");
-  const [reqId, setReqId] = useState<string | null>(null);
+  const [rel, setRel] = useState<Relationship>(initialProfile?.viewer?.relationship ?? "none");
+  const [reqId, setReqId] = useState<string | null>(initialProfile?.viewer?.requestId ?? null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {

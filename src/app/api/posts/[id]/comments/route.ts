@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { COMMENTS_PAGE_SIZE } from "@/lib/constants";
+import { persistMentions } from "@/lib/mentions";
+import { recomputeKarma } from "@/lib/karma";
 
 export async function GET(
   request: Request,
@@ -86,6 +88,15 @@ export async function POST(
       _count: { select: { replies: true } },
     },
   });
+
+  await persistMentions({
+    mentionerId: dbUser.id,
+    body: comment.body,
+    commentId: comment.id,
+    postId,
+    notifyType: "MENTION",
+  });
+  await recomputeKarma(dbUser.id);
 
   return NextResponse.json({ data: comment }, { status: 201 });
 }

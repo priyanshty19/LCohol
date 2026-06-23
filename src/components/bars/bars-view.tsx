@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -128,15 +128,19 @@ function BarCard({
   );
 }
 
-export function BarsView() {
+export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   const [city, setCity] = useState("Delhi NCR");
   const [type, setType] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [bars, setBars] = useState<Bar[]>([]);
+  const [bars, setBars] = useState<Bar[]>(initialBars); // seeded from server
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // StrictMode-safe mount guard (see cocktails-view): skip while unchanged.
+  const initialSig = useRef(`${city}|${type}|${q}`);
 
   useEffect(() => {
+    const sig = `${city}|${type}|${q}`;
+    if (sig === initialSig.current) return; // unchanged from server render
     setLoading(true);
     const params = new URLSearchParams({ city });
     if (type) params.set("type", type);

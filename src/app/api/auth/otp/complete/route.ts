@@ -225,6 +225,30 @@ export async function POST(request: NextRequest) {
           where: { id: newUser.id },
           data: { invitedById: inviterId },
         });
+
+        // If the code is also a party invite link, RSVP the new member GOING.
+        const partyLink = await tx.partyInvite.findUnique({
+          where: { code: referralCode },
+          select: { partyPlanId: true, partyPlan: { select: { status: true } } },
+        });
+        if (partyLink && partyLink.partyPlan.status !== "CANCELLED") {
+          await tx.partyInvite.upsert({
+            where: {
+              partyPlanId_invitedUserId: {
+                partyPlanId: partyLink.partyPlanId,
+                invitedUserId: newUser.id,
+              },
+            },
+            create: {
+              partyPlanId: partyLink.partyPlanId,
+              inviterId,
+              invitedUserId: newUser.id,
+              rsvp: "GOING",
+              respondedAt: new Date(),
+            },
+            update: { rsvp: "GOING", respondedAt: new Date() },
+          });
+        }
       });
     } catch (e) {
       if (e instanceof ReferralUnavailableError) {

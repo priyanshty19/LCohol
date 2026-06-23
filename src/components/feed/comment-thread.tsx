@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { renderMentions } from "@/components/shared/render-mentions";
 import type { CommentWithRelations } from "@/types/database";
 
 interface CommentThreadProps {
@@ -133,7 +134,7 @@ function CommentItem({
             <span className="text-muted-foreground/60">{timeAgo}</span>
           </div>
           <p className="mt-0.5 text-sm text-foreground/90 whitespace-pre-wrap">
-            {comment.body}
+            {renderMentions(comment.body)}
           </p>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <span className="tabular-nums text-primary/70">

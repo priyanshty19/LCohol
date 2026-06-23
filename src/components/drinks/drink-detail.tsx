@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TasteProfileChart } from "./taste-profile-chart";
+import { CategoryIcon } from "./category-icons";
 import type { DrinkWithRelations } from "@/types/database";
 
 const PRICE_LABELS: Record<string, string> = {
@@ -91,9 +92,15 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
           {drink.category.name}
           {drink.subcategory && ` / ${drink.subcategory.name}`}
         </p>
-        <h1 className="mt-2 font-display text-2xl font-bold text-primary text-glow sm:text-3xl">
-          {drink.name}
-        </h1>
+        <div className="mt-2 flex items-center gap-3">
+          <CategoryIcon
+            category={drink.category.name}
+            className="h-9 w-9 shrink-0 text-primary/70"
+          />
+          <h1 className="font-display text-2xl font-bold text-primary text-glow sm:text-3xl">
+            {drink.name}
+          </h1>
+        </div>
         {drink.brand && (
           <p className="text-muted-foreground">{drink.brand}</p>
         )}

@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { areConnected } from "@/lib/connections";
-
-type ViewerRelationship = "self" | "connected" | "incoming" | "outgoing" | "none";
+import { getProfileWithViewer } from "@/lib/profile";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,61 +11,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Username required" }, { status: 400 });
   }
 
-  const profile = await prisma.profile.findUnique({
-    where: { username },
-    include: {
-      user: {
-        select: {
-          createdAt: true,
-          _count: { select: { posts: true, comments: true } },
-        },
-      },
-      favoriteDrink: {
-        select: { id: true, name: true, slug: true },
-      },
-    },
-  });
+  const me = await getCurrentUser();
+  const data = await getProfileWithViewer(username, me?.id ?? null);
 
-  if (!profile) {
+  if (!data) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
-  // Relationship of the signed-in viewer to this profile, so the page can show
-  // the right circle action. Wrapped defensively so a DB without the social
-  // tables still serves the profile.
-  let relationship: ViewerRelationship = "none";
-  let requestId: string | null = null;
-  try {
-    const me = await getCurrentUser();
-    if (me) {
-      if (me.id === profile.userId) {
-        relationship = "self";
-      } else if (await areConnected(me.id, profile.userId)) {
-        relationship = "connected";
-      } else {
-        const pending = await prisma.connectionRequest.findFirst({
-          where: {
-            status: "PENDING",
-            OR: [
-              { fromUserId: me.id, toUserId: profile.userId },
-              { fromUserId: profile.userId, toUserId: me.id },
-            ],
-          },
-          select: { id: true, fromUserId: true },
-        });
-        if (pending) {
-          relationship = pending.fromUserId === me.id ? "outgoing" : "incoming";
-          requestId = pending.id;
-        }
-      }
-    }
-  } catch {
-    relationship = "none";
-  }
-
-  return NextResponse.json({
-    data: { ...profile, viewer: { relationship, requestId } },
-  });
+  return NextResponse.json({ data });
 }
 
 export async function PATCH(request: Request) {

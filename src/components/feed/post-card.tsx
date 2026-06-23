@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { VoteButtons } from "./vote-buttons";
 import { ReportButton } from "./report-button";
+import { ShareButton } from "./share-button";
+import { renderMentions } from "@/components/shared/render-mentions";
 import type { PostWithRelations } from "@/types/database";
 import { formatDistanceToNow } from "date-fns";
 
@@ -79,17 +81,17 @@ export function PostCard({ post }: PostCardProps) {
             <span className="text-muted-foreground/60">{timeAgo}</span>
           </div>
 
-          {/* Title + body */}
+          {/* Title (links to post) + body (separate so @mention links don't nest anchors) */}
           <Link href={`/post/${post.id}`} className="mt-2 block">
             <h2 className="font-display text-base font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
               {post.title}
             </h2>
-            {post.body && (
-              <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground/80">
-                {post.body}
-              </p>
-            )}
           </Link>
+          {post.body && (
+            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground/80">
+              {renderMentions(post.body)}
+            </p>
+          )}
 
           {/* Image */}
           {post.imageUrl && (
@@ -156,23 +158,7 @@ export function PostCard({ post }: PostCardProps) {
               {post._count.comments}{" "}
               {post._count.comments === 1 ? "comment" : "comments"}
             </Link>
-            <button className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 transition-colors hover:text-primary">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
-              Share
-            </button>
+            <ShareButton postId={post.id} />
             <ReportButton postId={post.id} className="ml-auto" />
           </div>
         </div>

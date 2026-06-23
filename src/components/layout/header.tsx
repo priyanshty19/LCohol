@@ -14,12 +14,14 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { SipStoriesLogo } from "@/components/brand/logo";
+import { NotificationBell } from "./notification-bell";
 
 const NAV = [
   { href: "/", label: "Feed" },
   { href: "/drinks", label: "Drinks" },
   { href: "/cocktails", label: "🍸 Cocktails" },
   { href: "/bars", label: "🍻 Bars" },
+  { href: "/parties", label: "🎉 Parties" },
   { href: "/mix", label: "Mix Lab" },
   { href: "/vibe", label: "Vibe" },
   { href: "/search", label: "Search" },
@@ -82,6 +84,8 @@ export function Header() {
             </Button>
           </Link>
 
+          {user && <NotificationBell />}
+
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-accent">
@@ -106,6 +110,11 @@ export function Header() {
                 <DropdownMenuItem>
                   <Link href={`/profile/${user.username ?? ""}`} className="w-full">
                     My profile &amp; circle
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Link href="/parties" className="w-full">
+                    🎉 Parties
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>

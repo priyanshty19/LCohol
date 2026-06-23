@@ -36,7 +36,9 @@ export default async function MainLayout({
       <ResponsibleDrinkingBanner />
       <GeoDisclaimer />
       <FirstRunVibe />
-      <JamesWidget />
+      {/* Mounted (no floating launcher) so the "Ask James" buttons on the bars
+          and help pages can still summon the chat via the ask-james event. */}
+      <JamesWidget showLauncher={false} />
       <MobileNav />
     </div>
   );

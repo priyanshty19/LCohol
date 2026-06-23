@@ -63,7 +63,7 @@ function greetingFor(theme: string): Msg {
   return { role: "assistant", content: GREETING_BY_THEME[theme] ?? GREETING_BY_THEME.light };
 }
 
-export function JamesWidget() {
+export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean }) {
   const greetingRef = useRef<Msg>(greetingFor("light"));
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [greetingRef.current]);
@@ -171,25 +171,27 @@ export function JamesWidget() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Ask James, your bartender"
-        className="glow-velvet fixed right-4 bottom-24 z-50 h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
-      >
-        {open ? (
-          <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
-            <X className="h-6 w-6" />
-          </span>
-        ) : (
-          <JamesAvatar className="h-full w-full" />
-        )}
-      </button>
+      {showLauncher && (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Ask James, your bartender"
+          className="glow-velvet fixed right-4 bottom-24 z-50 h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
+        >
+          {open ? (
+            <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
+              <X className="h-6 w-6" />
+            </span>
+          ) : (
+            <JamesAvatar className="h-full w-full" />
+          )}
+        </button>
+      )}
 
       {open && (
         <div className="glass-lapel fixed right-4 bottom-40 z-50 flex h-[60vh] max-h-[560px] w-[min(92vw,400px)] flex-col overflow-hidden rounded-2xl shadow-2xl md:bottom-24">
           <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
             <JamesAvatar className="h-10 w-10 shrink-0 rounded-full" />
-            <div>
+            <div className="flex-1">
               <div className="font-display text-base font-semibold text-[var(--ml-velvet-hover)]">
                 James
               </div>
@@ -197,6 +199,14 @@ export function JamesWidget() {
                 the house bartender
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close"
+              className="rounded-full p-1.5 text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">

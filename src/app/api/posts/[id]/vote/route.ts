@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { recomputeKarma } from "@/lib/karma";
 
 export async function POST(
   request: Request,
@@ -32,6 +33,7 @@ export async function POST(
           data: { score: { decrement: value } },
         }),
       ]);
+      await recomputeKarma(dbUser.id);
       return NextResponse.json({ data: { vote: null } });
     } else {
       await prisma.$transaction([
@@ -41,6 +43,7 @@ export async function POST(
           data: { score: { increment: value * 2 } },
         }),
       ]);
+      await recomputeKarma(dbUser.id);
       return NextResponse.json({ data: { vote: value } });
     }
   }
@@ -55,5 +58,6 @@ export async function POST(
     }),
   ]);
 
+  await recomputeKarma(dbUser.id);
   return NextResponse.json({ data: { vote: value } }, { status: 201 });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
 import { createConnectionTx } from "@/lib/connections";
+import { recomputeKarma } from "@/lib/karma";
 
 // POST /api/connections/requests/[id]/accept — recipient accepts → forms the
 // mutual connection. Atomic: claim the PENDING request, then create the link.
@@ -34,6 +35,9 @@ export async function POST(
       if (claimed.count === 0) throw new Error("already handled");
       await createConnectionTx(tx, req.fromUserId, req.toUserId);
     });
+
+    // Both sides gained a circle friend — refresh their karma.
+    await Promise.all([recomputeKarma(req.fromUserId), recomputeKarma(req.toUserId)]);
 
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {

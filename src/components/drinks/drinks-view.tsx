@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DrinkCard } from "./drink-card";
+import { CategoryIcon } from "./category-icons";
 import { StateSelector, useStateSelection } from "./state-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,14 +33,22 @@ const SORT_OPTIONS = [
   { value: "newest", label: "Newest" },
 ];
 
-export function DrinksView() {
-  const [drinks, setDrinks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filtersLoading, setFiltersLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterData | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>();
-  const [totalShown, setTotalShown] = useState(0);
+export function DrinksView({
+  initialDrinks,
+  initialFilters,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialDrinks: { data: any[]; hasMore: boolean; nextCursor?: string };
+  initialFilters: FilterData;
+}) {
+  // Seeded from the server render — no mount fetch (filters + first page).
+  const [drinks, setDrinks] = useState<any[]>(initialDrinks.data);
+  const [loading, setLoading] = useState(false);
+  const [filtersLoading, setFiltersLoading] = useState(false);
+  const [filters, setFilters] = useState<FilterData | null>(initialFilters);
+  const [hasMore, setHasMore] = useState(initialDrinks.hasMore);
+  const [cursor, setCursor] = useState<string | undefined>(initialDrinks.nextCursor);
+  const [totalShown, setTotalShown] = useState(initialDrinks.data.length);
   const { stateCode, setStateCode, loaded } = useStateSelection();
 
   // Filter state
@@ -48,21 +57,14 @@ export function DrinksView() {
   const [brand, setBrand] = useState("all");
   const [sort, setSort] = useState("name");
   const [searchDebounced, setSearchDebounced] = useState("");
+  // StrictMode-safe mount guard (see cocktails-view): skip while unchanged.
+  const initialSig = useRef(`${sort}|${category}|${brand}|${searchDebounced}`);
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setSearchDebounced(search), 300);
     return () => clearTimeout(timer);
   }, [search]);
-
-  // Load filter options
-  useEffect(() => {
-    fetch("/api/drinks/filters")
-      .then((r) => r.json())
-      .then(setFilters)
-      .catch(console.error)
-      .finally(() => setFiltersLoading(false));
-  }, []);
 
   const fetchDrinks = useCallback(
     async (loadMore = false) => {
@@ -94,8 +96,10 @@ export function DrinksView() {
     [sort, category, brand, searchDebounced, cursor]
   );
 
-  // Re-fetch when filters change
+  // Re-fetch when filters change (skip while unchanged from the server render).
   useEffect(() => {
+    const sig = `${sort}|${category}|${brand}|${searchDebounced}`;
+    if (sig === initialSig.current) return;
     setCursor(undefined);
     fetchDrinks(false);
   }, [sort, category, brand, searchDebounced]);
@@ -263,7 +267,7 @@ export function DrinksView() {
         </div>
       ) : drinks.length === 0 ? (
         <div className="glass-panel flex flex-col items-center justify-center rounded-xl py-20 text-center">
-          <span className="text-4xl">🔍</span>
+          <CategoryIcon className="h-14 w-14 text-muted-foreground/40" />
           <p className="mt-3 font-display text-lg font-medium">No drinks found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasActiveFilters
