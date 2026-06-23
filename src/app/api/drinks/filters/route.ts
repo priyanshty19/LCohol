@@ -1,30 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getDrinkFilters } from "@/lib/drinks";
+
+// Categories + brand list change very rarely — cache aggressively (a day),
+// serve stale while revalidating. Query logic in src/lib/drinks.ts.
+export const revalidate = 86400;
+const CACHE_HEADERS = { "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400" };
 
 export async function GET() {
-  const [categories, brands] = await Promise.all([
-    prisma.drinkCategory.findMany({
-      orderBy: { sortOrder: "asc" },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        subcategories: {
-          orderBy: { sortOrder: "asc" },
-          select: { id: true, name: true, slug: true },
-        },
-      },
-    }),
-    prisma.drink.findMany({
-      where: { brand: { not: null } },
-      select: { brand: true },
-      distinct: ["brand"],
-      orderBy: { brand: "asc" },
-    }),
-  ]);
-
-  return NextResponse.json({
-    categories,
-    brands: brands.map((b) => b.brand).filter(Boolean),
-  });
+  const filters = await getDrinkFilters();
+  return NextResponse.json(filters, { headers: CACHE_HEADERS });
 }

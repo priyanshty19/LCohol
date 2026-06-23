@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { CategoryIcon } from "./category-icons";
 import { calculateStatePrice, formatPriceINR } from "@/lib/state-pricing";
 
 interface DrinkCardProps {
@@ -21,20 +22,7 @@ interface DrinkCardProps {
   stateCode?: string;
 }
 
-const CATEGORY_ICONS: Record<string, string> = {
-  Beer: "🍺",
-  Wine: "🍷",
-  Whiskey: "🥃",
-  Rum: "🍹",
-  Gin: "🫒",
-  Vodka: "🧊",
-  Tequila: "🌵",
-  Brandy: "🥂",
-  Liqueur: "🍸",
-};
-
 export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
-  const icon = CATEGORY_ICONS[drink.category.name] ?? "🥃";
   const statePrice =
     drink.basePriceInr != null
       ? calculateStatePrice(drink.basePriceInr, stateCode)
@@ -61,8 +49,11 @@ export function DrinkCard({ drink, stateCode = "DL" }: DrinkCardProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
             </>
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <span className="text-5xl opacity-20">{icon}</span>
+            <div className="flex h-full items-center justify-center bg-gradient-to-br from-muted/40 via-transparent to-transparent">
+              <CategoryIcon
+                category={drink.category.name}
+                className="h-16 w-16 text-primary/45 transition-transform duration-300 group-hover:scale-110"
+              />
             </div>
           )}
           {/* Category pill overlay */}

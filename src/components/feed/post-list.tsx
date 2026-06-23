@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { PostCard } from "./post-card";
 import { Reveal } from "@/components/fx/motion";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,19 @@ import type { PostWithRelations, FeedSortOption } from "@/types/database";
 interface PostListProps {
   sort: FeedSortOption;
   postType?: string;
+  initialPosts?: PostWithRelations[];
+  initialHasMore?: boolean;
+  initialCursor?: string;
 }
 
-export function PostList({ sort, postType }: PostListProps) {
-  const [posts, setPosts] = useState<PostWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>();
+export function PostList({ sort, postType, initialPosts, initialHasMore, initialCursor }: PostListProps) {
+  const [posts, setPosts] = useState<PostWithRelations[]>(initialPosts ?? []);
+  const [loading, setLoading] = useState(initialPosts == null);
+  const [hasMore, setHasMore] = useState(initialHasMore ?? false);
+  const [cursor, setCursor] = useState<string | undefined>(initialCursor);
+  // StrictMode-safe mount guard: when seeded, skip the fetch while sort/postType
+  // still match the server-rendered page (null = not seeded → fetch on mount).
+  const initialSig = useRef(initialPosts != null ? `${sort}|${postType ?? ""}` : null);
 
   const fetchPosts = useCallback(
     async (loadMore = false) => {
@@ -44,6 +50,8 @@ export function PostList({ sort, postType }: PostListProps) {
   );
 
   useEffect(() => {
+    const sig = `${sort}|${postType ?? ""}`;
+    if (sig === initialSig.current) return; // server-seeded for this sort
     setCursor(undefined);
     fetchPosts(false);
   }, [sort, postType]);

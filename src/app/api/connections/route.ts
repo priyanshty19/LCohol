@@ -24,6 +24,7 @@ export async function GET() {
         id: true,
         createdAt: true,
         userAId: true,
+        userBId: true,
         userA: profileSelect,
         userB: profileSelect,
       },
@@ -32,7 +33,8 @@ export async function GET() {
     const data = rows.map((r) => {
       const other = r.userAId === me ? r.userB : r.userA;
       return {
-        id: r.id,
+        id: r.id, // connection row id (kept for existing circle UI)
+        userId: r.userAId === me ? r.userBId : r.userAId, // the other user's id
         since: r.createdAt,
         username: other.profile?.username ?? null,
         displayName: other.profile?.displayName ?? null,

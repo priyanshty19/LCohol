@@ -1,26 +1,11 @@
 import { NextResponse } from "next/server";
-import { PostType, PostVisibility, Prisma } from "@/generated/prisma/client";
+import { PostType, PostVisibility } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
-import { FEED_PAGE_SIZE } from "@/lib/constants";
-
-/**
- * The audience filter for a viewer: every PUBLIC post, plus CIRCLE posts
- * authored by the viewer or someone in their circle. Logged-out viewers see
- * only PUBLIC posts.
- */
-async function visibilityWhere(): Promise<Prisma.PostWhereInput> {
-  const me = await getCurrentUser();
-  if (!me) return { visibility: "PUBLIC" };
-  const circleAuthorIds = [me.id, ...(await getConnectionUserIds(me.id))];
-  return {
-    OR: [
-      { visibility: "PUBLIC" },
-      { visibility: "CIRCLE", authorId: { in: circleAuthorIds } },
-    ],
-  };
-}
+import { getPostsFeed } from "@/lib/posts";
+import { recomputeKarma } from "@/lib/karma";
+import { persistMentions } from "@/lib/mentions";
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
  *  under the public storage path. Structural checks — no substring matching. */
@@ -47,105 +32,18 @@ function sanitizeImageUrl(value: unknown): string | null {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const sort = searchParams.get("sort") || "new";
-  const cursor = searchParams.get("cursor");
-  const postType = searchParams.get("type");
+  const me = await getCurrentUser();
+  const connectionIds = me ? await getConnectionUserIds(me.id) : [];
 
-  const where: Prisma.PostWhereInput = {
-    isDeleted: false,
-    ...(postType ? { postType: postType as PostType } : {}),
-    ...(await visibilityWhere()),
-  };
-
-  const include = {
-    author: {
-      select: {
-        profile: {
-          select: { username: true, displayName: true, avatarUrl: true },
-        },
-      },
-    },
-    tags: { include: { tag: true } },
-    drinks: {
-      include: {
-        drink: { select: { id: true, name: true, slug: true, imageUrl: true } },
-      },
-    },
-    _count: { select: { comments: true, votes: true } },
-  } as const;
-
-  // "hot" uses a Reddit-style time-decayed engagement ranking computed in-app
-  // over a recent candidate window. Pagination is VALUE-based keyset on the
-  // (hotScore, id) tuple — not an offset into the re-sorted array — so pages
-  // never skip/duplicate and the cursor needs no lookup even if its post left
-  // the window. The cursor is the opaque string `${hot}_${id}` of the last item.
-  if (sort === "hot") {
-    const HOT_WINDOW = 500;
-    const candidates = await prisma.post.findMany({
-      where,
-      orderBy: { createdAt: "desc" as const },
-      take: HOT_WINDOW,
-      include,
-    });
-
-    const ranked = candidates
-      .map((p) => {
-        const eng = p.score + 2 * p._count.comments;
-        const sign = eng > 0 ? 1 : eng < 0 ? -1 : 0;
-        // log10 of engagement (early votes weigh most) + age boost (newer = higher).
-        const hot =
-          sign * Math.log10(Math.max(Math.abs(eng), 1)) +
-          new Date(p.createdAt).getTime() / 45_000_000;
-        return { p, hot };
-      })
-      // hot desc, id desc as a stable tie-break so the keyset is total-ordered.
-      .sort((a, b) => b.hot - a.hot || (a.p.id < b.p.id ? 1 : -1));
-
-    let after = ranked;
-    if (cursor) {
-      const sep = cursor.lastIndexOf("_");
-      const curHot = Number(cursor.slice(0, sep));
-      const curId = cursor.slice(sep + 1);
-      if (!Number.isNaN(curHot)) {
-        after = ranked.filter(
-          ({ p, hot }) => hot < curHot || (hot === curHot && p.id < curId)
-        );
-      }
-    }
-
-    const page = after.slice(0, FEED_PAGE_SIZE + 1);
-    const hasMore = page.length > FEED_PAGE_SIZE;
-    const shown = hasMore ? page.slice(0, FEED_PAGE_SIZE) : page;
-    const last = shown[shown.length - 1];
-
-    return NextResponse.json({
-      data: shown.map((x) => x.p),
-      hasMore,
-      nextCursor: hasMore && last ? `${last.hot}_${last.p.id}` : undefined,
-    });
-  }
-
-  const orderBy =
-    sort === "top"
-      ? [{ score: "desc" as const }]
-      : [{ createdAt: "desc" as const }];
-
-  const posts = await prisma.post.findMany({
-    where,
-    orderBy,
-    take: FEED_PAGE_SIZE + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include,
+  const result = await getPostsFeed({
+    sort: searchParams.get("sort") || "new",
+    cursor: searchParams.get("cursor"),
+    postType: searchParams.get("type"),
+    viewerId: me?.id ?? null,
+    connectionIds,
   });
 
-  const hasMore = posts.length > FEED_PAGE_SIZE;
-  const data = hasMore ? posts.slice(0, FEED_PAGE_SIZE) : posts;
-
-  return NextResponse.json({
-    data,
-    hasMore,
-    nextCursor: hasMore ? data[data.length - 1]?.id : undefined,
-  });
+  return NextResponse.json(result);
 }
 
 export async function POST(request: Request) {
@@ -218,5 +116,12 @@ export async function POST(request: Request) {
     },
   });
 
+  await persistMentions({
+    mentionerId: dbUser.id,
+    body: `${title} ${postBody ?? ""}`,
+    postId: post.id,
+    notifyType: "TAG",
+  });
+  await recomputeKarma(dbUser.id);
   return NextResponse.json({ data: post }, { status: 201 });
 }

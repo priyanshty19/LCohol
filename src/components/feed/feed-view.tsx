@@ -4,8 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AskJames } from "@/components/james/ask-james";
 import { PostList } from "./post-list";
-import type { FeedSortOption } from "@/types/database";
+import type { FeedSortOption, PostWithRelations } from "@/types/database";
 
 const SORT_OPTIONS: { value: FeedSortOption; label: string }[] = [
   { value: "hot", label: "Hot" },
@@ -13,11 +14,17 @@ const SORT_OPTIONS: { value: FeedSortOption; label: string }[] = [
   { value: "top", label: "Top" },
 ];
 
-export function FeedView() {
+export function FeedView({
+  initialFeed,
+}: {
+  initialFeed: { data: PostWithRelations[]; hasMore: boolean; nextCursor?: string };
+}) {
   const [sort, setSort] = useState<FeedSortOption>("hot");
 
   return (
     <div className="space-y-6">
+      <AskJames />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div
           role="tablist"
@@ -50,7 +57,12 @@ export function FeedView() {
         </Link>
       </div>
 
-      <PostList sort={sort} />
+      <PostList
+        sort={sort}
+        initialPosts={initialFeed.data}
+        initialHasMore={initialFeed.hasMore}
+        initialCursor={initialFeed.nextCursor}
+      />
     </div>
   );
 }

@@ -48,6 +48,15 @@ model User {
   connectionsB       Connection[] @relation("ConnectionB")
   requestsSent       ConnectionRequest[] @relation("RequestsSent")
   requestsReceived   ConnectionRequest[] @relation("RequestsReceived")
+  postShares           PostShare[]
+  postSendsSent        PostSend[]    @relation("PostSendFrom")
+  postSendsReceived    PostSend[]    @relation("PostSendTo")
+  mentionsMade         Mention[]     @relation("MentionFrom")
+  mentionsReceived     Mention[]     @relation("MentionTo")
+  notifications        Notification[] @relation("NotificationRecipient")
+  notificationsActed   Notification[] @relation("NotificationActor")
+  partyInvitesSent     PartyInvite[]  @relation("PartyInviteInviter")
+  partyInvitesReceived PartyInvite[]  @relation("PartyInviteInvited")
 
   @@map("users")
 }
@@ -200,6 +209,9 @@ model Post {
   tags     PostTag[]
   drinks   PostDrink[]
   reports  Report[]
+  shares   PostShare[]
+  sends    PostSend[]
+  mentions Mention[]
 
   @@index([authorId])
   @@index([createdAt])
@@ -243,6 +255,7 @@ model Comment {
   replies  Comment[] @relation("CommentReplies")
   votes    Vote[]
   reports  Report[]
+  mentions Mention[]
 
   @@index([postId])
   @@index([authorId])
@@ -617,14 +630,31 @@ model PartyPlan {
   budget      BudgetRange?
   occasion    Occasion?
   eventDate   DateTime? @map("event_date") @db.Date
+  startsAt     DateTime?      @map("starts_at")
+  locationText String?        @map("location_text") @db.VarChar(200)
+  barId        String?        @map("bar_id") @db.Uuid
+  status       PartyStatus    @default(UPCOMING)
+  visibility   PostVisibility @default(CIRCLE)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  author User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  drinks PartyPlanDrink[]
+  author        User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  bar           Bar?             @relation(fields: [barId], references: [id])
+  drinks        PartyPlanDrink[]
+  invites       PartyInvite[]
+  notifications Notification[]
 
   @@index([authorId])
+  @@index([barId])
   @@map("party_plans")
+}
+
+enum PartyStatus {
+  UPCOMING
+  CANCELLED
+  PAST
+
+  @@map("party_status")
 }
 
 enum BudgetRange {
@@ -849,6 +879,7 @@ model Bar {
 
   reviews   BarReview[]
   cocktails CocktailCreation[]
+  parties   PartyPlan[]
 
   @@index([city])
   @@index([type])
@@ -869,4 +900,121 @@ model BarReview {
   @@unique([barId, authorId])
   @@index([barId])
   @@map("bar_reviews")
+}
+
+// ============================================================================
+// SHARING · MENTIONS · NOTIFICATIONS · PARTY INVITES
+// ============================================================================
+
+model PostShare {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  sharerId  String   @map("sharer_id") @db.Uuid
+  note      String?  @db.VarChar(280)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  sharer User @relation(fields: [sharerId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, sharerId])
+  @@index([sharerId])
+  @@index([postId])
+  @@map("post_shares")
+}
+
+model PostSend {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  postId     String   @map("post_id") @db.Uuid
+  fromUserId String   @map("from_user_id") @db.Uuid
+  toUserId   String   @map("to_user_id") @db.Uuid
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  from User @relation("PostSendFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to   User @relation("PostSendTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([toUserId, read])
+  @@index([fromUserId])
+  @@map("post_sends")
+}
+
+model Mention {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mentionerId String   @map("mentioner_id") @db.Uuid
+  mentionedId String   @map("mentioned_id") @db.Uuid
+  postId      String?  @map("post_id") @db.Uuid
+  commentId   String?  @map("comment_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  mentioner User     @relation("MentionFrom", fields: [mentionerId], references: [id], onDelete: Cascade)
+  mentioned User     @relation("MentionTo", fields: [mentionedId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([mentionedId])
+  @@index([postId])
+  @@index([commentId])
+  @@map("mentions")
+}
+
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  actorId   String?          @map("actor_id") @db.Uuid
+  type      NotificationType
+  postId    String?          @map("post_id") @db.Uuid
+  commentId String?          @map("comment_id") @db.Uuid
+  partyId   String?          @map("party_id") @db.Uuid
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user      User       @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor     User?      @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  partyPlan PartyPlan? @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  MENTION
+  TAG
+  SHARE
+  SEND
+  PARTY_INVITE
+  RSVP
+
+  @@map("notification_type")
+}
+
+model PartyInvite {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partyPlanId   String     @map("party_plan_id") @db.Uuid
+  inviterId     String     @map("inviter_id") @db.Uuid
+  invitedUserId String?    @map("invited_user_id") @db.Uuid
+  code          String?    @unique
+  rsvp          RsvpStatus @default(INVITED)
+  expiresAt     DateTime?  @map("expires_at")
+  respondedAt   DateTime?  @map("responded_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  partyPlan   PartyPlan @relation(fields: [partyPlanId], references: [id], onDelete: Cascade)
+  inviter     User      @relation("PartyInviteInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitedUser User?     @relation("PartyInviteInvited", fields: [invitedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([partyPlanId, invitedUserId])
+  @@index([partyPlanId])
+  @@index([invitedUserId])
+  @@map("party_invites")
+}
+
+enum RsvpStatus {
+  INVITED
+  GOING
+  MAYBE
+  DECLINED
+
+  @@map("rsvp_status")
 }
