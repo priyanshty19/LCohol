@@ -67,3 +67,64 @@ export type FeedSortOption = "hot" | "new" | "top";
 export type TimePeriod = "day" | "week" | "month" | "year" | "all";
 
 export type { PostType, PriceRange, Occasion, Mood };
+
+// ============================================================================
+// CATALOG — the canonical unified shape for "a thing you can drink".
+// Promoted from the merged CatalogItem in src/lib/james/search.ts so drinks and
+// cocktails share ONE type + ONE display component instead of three divergent
+// shapes. Discriminated on `kind`; map Prisma rows into this via src/lib/catalog.ts.
+// ============================================================================
+
+export type CatalogKind = "drink" | "cocktail";
+
+export type CatalogIngredientRef = {
+  name: string;
+  // Ingredient.slug / .category are non-nullable in the schema. A recipe line
+  // that points at a Drink instead is represented by the sibling `drink` field,
+  // not here — so within an ingredient ref these are always present.
+  slug: string;
+  /** IngredientCategory enum value (SPIRIT | MIXER | JUICE | SYRUP | …). */
+  category: string;
+};
+
+type CatalogCore = {
+  id: string;
+  kind: CatalogKind;
+  name: string;
+  /** Deep-link slug. Drinks always have one; cocktails do after the backfill. */
+  slug: string | null;
+  /** Human display label for the category. */
+  category: string | null;
+  /** Controlled, normalized category slug for filtering. */
+  categorySlug: string | null;
+  imageUrl: string | null;
+  /** One-line secondary label (brand, or source bar/glass). */
+  subtitle: string | null;
+};
+
+export type CatalogDrinkEntry = CatalogCore & {
+  kind: "drink";
+  brand: string | null;
+  abv: number | null;
+  priceRange: string | null;
+  basePriceInr: number | null;
+  subcategory: string | null;
+  counts: { reviews: number; posts: number };
+};
+
+export type CatalogCocktailEntry = CatalogCore & {
+  kind: "cocktail";
+  glass: string | null;
+  garnish: string | null;
+  instructions: string | null;
+  isCurated: boolean;
+  sourceBar: { id: string; name: string; slug: string; city: string } | null;
+  sourceLabel: string | null;
+  ingredients: {
+    sortOrder: number;
+    ingredient: CatalogIngredientRef | null;
+    drink: { name: string; slug: string } | null;
+  }[];
+};
+
+export type CatalogEntry = CatalogDrinkEntry | CatalogCocktailEntry;

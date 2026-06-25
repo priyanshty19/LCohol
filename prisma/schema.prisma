@@ -57,6 +57,9 @@ model User {
   notificationsActed   Notification[] @relation("NotificationActor")
   partyInvitesSent     PartyInvite[]  @relation("PartyInviteInviter")
   partyInvitesReceived PartyInvite[]  @relation("PartyInviteInvited")
+  partyDrinkSuggestions PartyDrinkSuggestion[]
+  partyGameSuggestions  PartyGameSuggestion[]
+  partyGameVotes        PartyGameVote[]
 
   @@map("users")
 }
@@ -396,6 +399,7 @@ model Drink {
   favoritedBy  Profile[]
   cocktailIngredients CocktailIngredient[]
   partyPlanDrinks PartyPlanDrink[]
+  partyDrinkSuggestions PartyDrinkSuggestion[]
 
   @@index([categoryId])
   @@index([subcategoryId])
@@ -546,12 +550,21 @@ model CocktailCreation {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   authorId    String   @map("author_id") @db.Uuid
   name        String   @db.VarChar(200)
+  // Plain nullable+indexed (not a DB UNIQUE constraint): the backfill guarantees
+  // uniqueness-in-practice, and adding a formal UNIQUE on prod would trip Prisma's
+  // data-loss gate. Indexed for deep-link lookups (/cocktails/[slug]). Hardening to
+  // a true UNIQUE constraint is a deliberate follow-up once the backfill is verified.
+  slug        String?  @db.VarChar(220)
   description String?
   instructions String?
   imageUrl    String?  @map("image_url")
   score       Int      @default(0)
   isPublic    Boolean  @default(true) @map("is_public")
+  // Raw free-text category from the CSV "Source" column (display label).
   category    String?  @db.VarChar(80)
+  // Controlled slug derived from `category` via normalizeCocktailCategory() — the
+  // standardized axis shared with the drink taxonomy for filtering/unification.
+  categorySlug String? @map("category_slug") @db.VarChar(80)
   glass       String?  @db.VarChar(80)
   garnish     String?
   sourceBarId String?  @map("source_bar_id") @db.Uuid
@@ -563,12 +576,18 @@ model CocktailCreation {
   author      User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
   sourceBar   Bar?                 @relation(fields: [sourceBarId], references: [id])
   ingredients CocktailIngredient[]
+  partyDrinkSuggestions PartyDrinkSuggestion[]
 
   @@unique([authorId, name, sourceLabel])
   @@index([authorId])
   @@index([score])
   @@index([sourceBarId])
   @@index([isCurated])
+  // Covering index for the default list sort (orderBy isCurated desc, name asc)
+  // and the category filter over the 10k-row table — both unindexed before.
+  @@index([isCurated, name])
+  @@index([categorySlug])
+  @@index([slug])
   @@map("cocktail_creations")
 }
 
@@ -638,11 +657,13 @@ model PartyPlan {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  author        User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  bar           Bar?             @relation(fields: [barId], references: [id])
-  drinks        PartyPlanDrink[]
-  invites       PartyInvite[]
-  notifications Notification[]
+  author          User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  bar             Bar?                   @relation(fields: [barId], references: [id])
+  drinks          PartyPlanDrink[]
+  invites         PartyInvite[]
+  notifications   Notification[]
+  drinkSuggestions PartyDrinkSuggestion[]
+  gameSuggestions  PartyGameSuggestion[]
 
   @@index([authorId])
   @@index([barId])
@@ -677,6 +698,56 @@ model PartyPlanDrink {
 
   @@id([partyPlanId, drinkId])
   @@map("party_plan_drinks")
+}
+
+// Member-contributed cocktail/drink suggestions for a party. Holds EITHER a
+// catalog Drink (drinkId) OR a cocktail recipe (cocktailId) — the unified-model
+// "either drink or cocktail". A dedicated table (vs reusing PartyPlanDrink) keeps
+// the change additive and records who suggested it (any member may contribute).
+model PartyDrinkSuggestion {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partyPlanId   String   @map("party_plan_id") @db.Uuid
+  suggestedById String   @map("suggested_by_id") @db.Uuid
+  drinkId       String?  @map("drink_id") @db.Uuid
+  cocktailId    String?  @map("cocktail_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  partyPlan   PartyPlan         @relation(fields: [partyPlanId], references: [id], onDelete: Cascade)
+  suggestedBy User              @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  drink       Drink?            @relation(fields: [drinkId], references: [id], onDelete: Cascade)
+  cocktail    CocktailCreation? @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
+
+  @@index([partyPlanId])
+  @@map("party_drink_suggestions")
+}
+
+// Member-suggested party games, upvotable by any member (one vote each via the
+// PartyGameVote join — proper dedup instead of a raw counter).
+model PartyGameSuggestion {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partyPlanId   String   @map("party_plan_id") @db.Uuid
+  suggestedById String   @map("suggested_by_id") @db.Uuid
+  text          String   @db.VarChar(200)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  partyPlan   PartyPlan       @relation(fields: [partyPlanId], references: [id], onDelete: Cascade)
+  suggestedBy User            @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  votes       PartyGameVote[]
+
+  @@index([partyPlanId])
+  @@map("party_game_suggestions")
+}
+
+model PartyGameVote {
+  gameSuggestionId String   @map("game_suggestion_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  gameSuggestion PartyGameSuggestion @relation(fields: [gameSuggestionId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([gameSuggestionId, userId])
+  @@map("party_game_votes")
 }
 
 // ============================================================================

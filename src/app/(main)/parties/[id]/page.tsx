@@ -17,5 +17,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
   const myInvite = party.invites.find((i) => i.invitedUserId === user.id);
   if (!isHost && !myInvite) notFound(); // only host + invited guests
 
-  return <PartyDetail party={party} isHost={isHost} myRsvp={myInvite?.rsvp ?? null} />;
+  return (
+    <PartyDetail party={party} isHost={isHost} myRsvp={myInvite?.rsvp ?? null} meId={user.id} />
+  );
 }

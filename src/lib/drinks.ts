@@ -12,10 +12,14 @@ export type DrinksQuery = {
   search?: string | null;
   sort?: string;
   cursor?: string | null;
+  /** Page size, capped at DRINKS_PAGE_SIZE. Lets light callers (e.g. the home
+   *  sidebar's top-5) avoid fetching a full relation-heavy page. */
+  take?: number;
 };
 
 export async function getDrinks(opts: DrinksQuery = {}) {
   const sort = opts.sort || "name";
+  const pageSize = Math.min(Math.max(1, opts.take ?? DRINKS_PAGE_SIZE), DRINKS_PAGE_SIZE);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
@@ -45,7 +49,7 @@ export async function getDrinks(opts: DrinksQuery = {}) {
   const drinks = await prisma.drink.findMany({
     where,
     orderBy,
-    take: DRINKS_PAGE_SIZE + 1,
+    take: pageSize + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     include: {
       category: true,
@@ -55,8 +59,8 @@ export async function getDrinks(opts: DrinksQuery = {}) {
     },
   });
 
-  const hasMore = drinks.length > DRINKS_PAGE_SIZE;
-  const page = hasMore ? drinks.slice(0, DRINKS_PAGE_SIZE) : drinks;
+  const hasMore = drinks.length > pageSize;
+  const page = hasMore ? drinks.slice(0, pageSize) : drinks;
 
   // Decimal → number so the result is serializable across the server→client
   // prop boundary (RSC rejects Prisma.Decimal class instances).

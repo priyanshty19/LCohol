@@ -34,7 +34,7 @@ export function HomeSidebar() {
         if (c?.name) setApiPick({ name: c.name, category: c.category, sourceBar: c.sourceBar });
       })
       .catch(() => {});
-    fetch("/api/drinks?sort=popular&limit=5")
+    fetch("/api/drinks?sort=popular&take=5")
       .then((r) => r.json())
       .then((d) => setTrendingDrinks(d.data?.slice(0, 5) ?? []))
       .catch(() => {});

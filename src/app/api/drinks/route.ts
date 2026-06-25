@@ -8,6 +8,10 @@ const CACHE_HEADERS = { "Cache-Control": "public, max-age=300, stale-while-reval
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
+  // Accept `take` (or legacy `limit`) so light callers fetch only what they need.
+  const takeParam = searchParams.get("take") ?? searchParams.get("limit");
+  const take = takeParam ? Number(takeParam) : undefined;
+
   const result = await getDrinks({
     category: searchParams.get("category"),
     subcategory: searchParams.get("subcategory"),
@@ -16,6 +20,7 @@ export async function GET(request: Request) {
     search: searchParams.get("search"),
     sort: searchParams.get("sort") || "name",
     cursor: searchParams.get("cursor"),
+    take: Number.isFinite(take) ? take : undefined,
   });
 
   return NextResponse.json(result, { headers: CACHE_HEADERS });
