@@ -1,0 +1,12 @@
+{
+  "name": "Sip Stories",
+  "short_name": "Sip Stories",
+  "description": "Anonymous social home for India's drinking culture.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1012",
+  "theme_color": "#1a1012",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

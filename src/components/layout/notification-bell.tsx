@@ -23,6 +23,7 @@ const LABELS: Record<string, string> = {
   SEND: "sent you a post",
   PARTY_INVITE: "invited you to a party",
   RSVP: "responded to your party",
+  CIRCLE_POST: "shared a new post",
 };
 
 function hrefFor(n: Notif): string {

@@ -6,6 +6,7 @@ import { getConnectionUserIds } from "@/lib/connections";
 import { getPostsFeed } from "@/lib/posts";
 import { recomputeKarma } from "@/lib/karma";
 import { persistMentions } from "@/lib/mentions";
+import { notifyMany } from "@/lib/notifications";
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
  *  under the public storage path. Structural checks — no substring matching. */
@@ -125,6 +126,13 @@ export async function POST(request: Request) {
       notifyType: "TAG",
     }),
     recomputeKarma(dbUser.id),
+    // New post on a private (circle-only) feed → notify the author's circle —
+    // i.e. the people they're connected to via referral.
+    post.visibility === PostVisibility.CIRCLE
+      ? getConnectionUserIds(dbUser.id).then((ids) =>
+          notifyMany(ids, { type: "CIRCLE_POST", postId: post.id, actorId: dbUser.id }),
+        )
+      : Promise.resolve(),
   ]);
   return NextResponse.json({ data: post }, { status: 201 });
 }

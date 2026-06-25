@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { NotificationToggle } from "@/components/settings/notification-toggle";
 
 const DRINKING_STYLES = [
   { value: "SOCIAL", label: "Social Drinker" },
@@ -39,11 +40,24 @@ export function SettingsView() {
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [emailNotif, setEmailNotif] = useState(true);
 
   useEffect(() => {
     if (user?.emergencyPhone) setEmergencyPhone(user.emergencyPhone);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pref = (user as any)?.profile?.emailNotifications;
+    if (typeof pref === "boolean") setEmailNotif(pref);
     setLoading(false);
   }, [user]);
+
+  async function toggleEmail(value: boolean) {
+    setEmailNotif(value);
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emailNotifications: value }),
+    }).catch(() => {});
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -179,6 +193,32 @@ export function SettingsView() {
             Pick a mood. It follows you across devices.
           </p>
           <ThemeSwitcher />
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardContent className="space-y-4 pt-6">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Notifications
+          </h2>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Push (this device)</p>
+            <NotificationToggle />
+          </div>
+          <label className="flex cursor-pointer items-center justify-between gap-3">
+            <span>
+              <span className="block text-sm font-medium">Email notifications</span>
+              <span className="block text-xs text-muted-foreground">
+                Invites, RSVPs &amp; new circle posts to {user?.email ?? "your email"}.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={emailNotif}
+              onChange={(e) => toggleEmail(e.target.checked)}
+              className="h-5 w-5 shrink-0 accent-primary"
+            />
+          </label>
         </CardContent>
       </Card>
 

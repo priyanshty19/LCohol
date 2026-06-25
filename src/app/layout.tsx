@@ -57,6 +57,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  manifest: "/manifest.json",
   title: {
     default: "SIPSTORIES",
     template: "%s | SIPSTORIES",
