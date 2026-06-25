@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
 import { notifyMany } from "@/lib/notifications";
 import { generateUniqueReferralCode, referralExpiry } from "@/lib/referrals";
+import { requireHost } from "@/lib/parties";
 
 // POST /api/parties/[id]/invites
 //   { userIds?: string[] }   → invite circle members (notify each)
@@ -13,11 +14,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const party = await prisma.partyPlan.findUnique({
-    where: { id },
-    select: { id: true, authorId: true, startsAt: true },
-  });
-  if (!party || party.authorId !== me.id) {
+  const party = await requireHost(id, me.id);
+  if (!party) {
     return NextResponse.json({ error: "Party not found" }, { status: 404 });
   }
 
@@ -67,4 +65,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   return NextResponse.json({ data: result });
+}
+
+// DELETE /api/parties/[id]/invites  { inviteId }
+//   Host revokes an invitee (any rsvp state) or a shareable link invite.
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const me = await getCurrentUser();
+  if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const party = await requireHost(id, me.id);
+  if (!party) return NextResponse.json({ error: "Party not found" }, { status: 404 });
+
+  const body = await request.json().catch(() => ({}));
+  const inviteId = typeof body.inviteId === "string" ? body.inviteId : null;
+  if (!inviteId) return NextResponse.json({ error: "inviteId required" }, { status: 400 });
+
+  // Scope the lookup to this party so a host can't delete another party's invite.
+  const invite = await prisma.partyInvite.findFirst({
+    where: { id: inviteId, partyPlanId: id },
+    select: { id: true, code: true },
+  });
+  if (!invite) return NextResponse.json({ error: "Invite not found" }, { status: 404 });
+
+  // A link invite's `code` is also a Referral row (created together in POST), so
+  // revoke must remove both — otherwise the code stays redeemable at signup.
+  if (invite.code) {
+    await prisma.$transaction([
+      prisma.partyInvite.delete({ where: { id: invite.id } }),
+      prisma.referral.deleteMany({ where: { code: invite.code } }),
+    ]);
+  } else {
+    await prisma.partyInvite.delete({ where: { id: invite.id } });
+  }
+
+  return NextResponse.json({ data: { revoked: invite.id } });
 }

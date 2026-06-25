@@ -1,31 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
-import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Chevron } from "@/components/ui/chevron";
+import { EntryCard } from "@/components/catalog/entry-card";
+import { toCatalogCocktail, type CocktailSelectRow } from "@/lib/catalog";
 
-type IngredientLite = { name: string; slug: string; category?: string };
-type DrinkLite = { name: string; slug: string };
 type BarLite = { id: string; name: string; slug: string; city: string };
 
-type Cocktail = {
-  id: string;
-  name: string;
-  category: string | null;
-  glass: string | null;
-  garnish: string | null;
-  instructions: string | null;
-  sourceLabel: string | null;
-  isCurated: boolean;
-  sourceBar: BarLite | null;
-  ingredients: { sortOrder: number; ingredient: IngredientLite | null; drink: DrinkLite | null }[];
-};
+// Rows arrive in the cocktailSelect shape (from SSR initial + /api/cocktails) and
+// are mapped to the canonical CatalogEntry at render time via toCatalogCocktail.
+type Cocktail = CocktailSelectRow;
 
 type ApiResponse = { data: { cocktails: Cocktail[]; nextCursor: string | null } };
 
@@ -43,16 +30,10 @@ export function CocktailsView({
   const [includeDiscover, setIncludeDiscover] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [openCocktail, setOpenCocktail] = useState<Cocktail | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   // StrictMode-safe mount guard: skip the fetch while filters still match what
   // the server already rendered; only a real change differs from this signature.
   const initialSig = useRef(`${activeCategory}|${activeBarId}|${debouncedQuery}|${includeDiscover}`);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -230,39 +211,9 @@ export function CocktailsView({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {cocktails.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setOpenCocktail(c)}
-            className="text-left"
-            type="button"
-          >
-            <Card className="h-full transition hover:border-foreground/30 hover:shadow-md">
-              <CardHeader className="space-y-1">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base leading-snug">{c.name}</CardTitle>
-                  {!c.isCurated && (
-                    <Badge variant="outline" className="shrink-0 text-[10px]">
-                      Discover
-                    </Badge>
-                  )}
-                </div>
-                {c.category && (
-                  <div className="text-xs text-muted-foreground">{c.category}</div>
-                )}
-              </CardHeader>
-              <CardContent className="space-y-1.5 text-xs text-muted-foreground">
-                {c.glass && <div>🥃 {c.glass}</div>}
-                {c.sourceBar && (
-                  <div>📍 {c.sourceBar.name}, {c.sourceBar.city}</div>
-                )}
-                {!c.sourceBar && c.sourceLabel && (
-                  <div className="line-clamp-1">📍 {c.sourceLabel}</div>
-                )}
-              </CardContent>
-            </Card>
-          </button>
+          <EntryCard key={c.id} entry={toCatalogCocktail(c)} />
         ))}
       </div>
 
@@ -273,100 +224,6 @@ export function CocktailsView({
           </Button>
         </div>
       )}
-
-      {mounted &&
-        createPortal(
-          <AnimatePresence>
-            {openCocktail && (
-              <motion.div
-                key="backdrop"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setOpenCocktail(null)}
-                className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70 p-0 backdrop-blur-md sm:items-center sm:p-4"
-              >
-                <motion.div
-                  key="card"
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 16 }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-border/60 bg-popover text-popover-foreground shadow-2xl ring-1 ring-black/5 sm:rounded-2xl"
-                >
-                  <div className="shrink-0 border-b border-border/50 px-5 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-lg font-semibold">{openCocktail.name}</h2>
-                        {openCocktail.category && (
-                          <div className="text-xs text-muted-foreground">{openCocktail.category}</div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setOpenCocktail(null)}
-                        className="rounded p-1 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-                        aria-label="Close"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                    {openCocktail.ingredients.length > 0 && (
-                      <section>
-                        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Ingredients
-                        </h3>
-                        <ul className="space-y-1 text-sm">
-                          {openCocktail.ingredients.map((i, idx) => (
-                            <li key={idx}>
-                              • {i.ingredient?.name ?? i.drink?.name ?? "Unknown"}
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    )}
-                    {openCocktail.instructions && (
-                      <section>
-                        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Method
-                        </h3>
-                        <p className="whitespace-pre-line text-sm leading-relaxed">
-                          {openCocktail.instructions}
-                        </p>
-                      </section>
-                    )}
-                    {openCocktail.garnish && (
-                      <section>
-                        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Garnish
-                        </h3>
-                        <p className="text-sm">{openCocktail.garnish}</p>
-                      </section>
-                    )}
-                    {openCocktail.glass && (
-                      <div className="text-xs text-muted-foreground">Served in: {openCocktail.glass}</div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      Spotted at:{" "}
-                      {openCocktail.sourceBar ? (
-                        <Link
-                          href={`/bars/${openCocktail.sourceBar.slug}`}
-                          className="underline-offset-2 hover:underline"
-                        >
-                          {openCocktail.sourceBar.name}, {openCocktail.sourceBar.city}
-                        </Link>
-                      ) : (
-                        openCocktail.sourceLabel ?? "Unknown"
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
     </div>
   );
 }

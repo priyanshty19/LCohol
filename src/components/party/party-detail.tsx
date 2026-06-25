@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PartyDrinks, PartyGames } from "@/components/party/party-suggestions";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Party = any;
@@ -28,7 +29,7 @@ const RSVP_TONE: Record<string, string> = {
   INVITED: "text-muted-foreground",
 };
 
-export function PartyDetail({ party, isHost, myRsvp }: { party: Party; isHost: boolean; myRsvp: string | null }) {
+export function PartyDetail({ party, isHost, myRsvp, meId }: { party: Party; isHost: boolean; myRsvp: string | null; meId: string }) {
   const router = useRouter();
   const [rsvp, setRsvp] = useState<string | null>(myRsvp);
   const [invites, setInvites] = useState<Party["invites"]>(party.invites);
@@ -49,6 +50,30 @@ export function PartyDetail({ party, isHost, myRsvp }: { party: Party; isHost: b
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function revokeInvite(inviteId: string) {
+    // Optimistically remove the row. Freshly-invited rows carry a temporary id
+    // (tmp-…) until a refresh assigns the real one — those aren't yet revocable by
+    // id, so resync from the server instead of issuing a doomed DELETE.
+    if (inviteId.startsWith("tmp-")) {
+      router.refresh();
+      return;
+    }
+    const prev = invites;
+    setInvites((list: Party["invites"]) => list.filter((i: Party) => i.id !== inviteId));
+    try {
+      const r = await fetch(`/api/parties/${party.id}/invites`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteId }),
+      });
+      if (!r.ok) {
+        setInvites(prev); // restore on failure
+      }
+    } catch {
+      setInvites(prev);
     }
   }
 
@@ -109,6 +134,24 @@ export function PartyDetail({ party, isHost, myRsvp }: { party: Party; isHost: b
         />
       )}
 
+      {/* Member suggestions — drinks & games (any member can contribute) */}
+      {party.status !== "CANCELLED" && (
+        <>
+          <PartyDrinks
+            partyId={party.id}
+            meId={meId}
+            isHost={isHost}
+            initial={party.drinkSuggestions ?? []}
+          />
+          <PartyGames
+            partyId={party.id}
+            meId={meId}
+            isHost={isHost}
+            initial={party.gameSuggestions ?? []}
+          />
+        </>
+      )}
+
       {/* Guest list */}
       <section className="space-y-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -133,6 +176,17 @@ export function PartyDetail({ party, isHost, myRsvp }: { party: Party; isHost: b
                   </span>
                   <span className="min-w-0 flex-1 truncate">{i.invitedUser ? name : "Invite link"}</span>
                   <span className={`text-xs capitalize ${RSVP_TONE[i.rsvp] ?? ""}`}>{i.rsvp.toLowerCase()}</span>
+                  {isHost && party.status !== "CANCELLED" && (
+                    <button
+                      type="button"
+                      onClick={() => revokeInvite(i.id)}
+                      aria-label={`Remove ${i.invitedUser ? name : "invite link"}`}
+                      title="Remove"
+                      className="shrink-0 rounded p-1 text-muted-foreground/50 transition hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </motion.div>
               );
             })}

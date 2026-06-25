@@ -116,12 +116,15 @@ export async function POST(request: Request) {
     },
   });
 
-  await persistMentions({
-    mentionerId: dbUser.id,
-    body: `${title} ${postBody ?? ""}`,
-    postId: post.id,
-    notifyType: "TAG",
-  });
-  await recomputeKarma(dbUser.id);
+  // Independent post-create side effects — run concurrently.
+  await Promise.all([
+    persistMentions({
+      mentionerId: dbUser.id,
+      body: `${title} ${postBody ?? ""}`,
+      postId: post.id,
+      notifyType: "TAG",
+    }),
+    recomputeKarma(dbUser.id),
+  ]);
   return NextResponse.json({ data: post }, { status: 201 });
 }

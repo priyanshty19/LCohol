@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CocktailsView } from "@/components/cocktails/cocktails-view";
+import { IngredientSearch } from "@/components/cocktails/ingredient-search";
 import { getCocktails } from "@/lib/cocktails";
 
 export const metadata: Metadata = {
@@ -11,5 +12,10 @@ export default async function CocktailsPage() {
   // Server-fetch the first page (curated only, matching the view's defaults) so
   // the list is in the SSR HTML — no client mount-fetch waterfall.
   const initial = await getCocktails({ take: 30 });
-  return <CocktailsView initial={initial} />;
+  return (
+    <div className="space-y-8">
+      <IngredientSearch />
+      <CocktailsView initial={initial} />
+    </div>
+  );
 }
