@@ -909,7 +909,7 @@ model UserInteraction {
   userId          String          @map("user_id") @db.Uuid
   interactionType InteractionType @map("interaction_type")
   targetType      TargetType      @map("target_type")
-  targetId        String          @map("target_id") @db.Uuid
+  targetId        String?         @map("target_id") @db.Uuid // null for query/feature events (no uuid target)
   context         Json?           // flexible context: search query, occasion, mood, etc.
   createdAt       DateTime        @default(now()) @map("created_at")
 
@@ -932,6 +932,8 @@ enum InteractionType {
   CLICK_DRINK
   CREATE_COCKTAIL
   CREATE_POST
+  RSVP
+  ASK_JAMES
 
   @@map("interaction_type")
 }
@@ -943,6 +945,11 @@ enum TargetType {
   COCKTAIL
   PROFILE
   SEARCH_QUERY
+  BAR
+  PARTY
+  MIXLAB
+  JAMES
+  FEATURE
 
   @@map("target_type")
 }

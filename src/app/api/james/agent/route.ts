@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ChatGroq } from "@langchain/groq";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getCurrentUser } from "@/lib/auth";
+import { logInteraction } from "@/lib/interactions";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { retrieveDrinks } from "@/lib/james/retriever";
@@ -86,6 +87,13 @@ export async function POST(request: NextRequest) {
   if (!lastUser.trim()) {
     return NextResponse.json({ error: "Ask James something first." }, { status: 400 });
   }
+
+  logInteraction({
+    userId: user.id,
+    interactionType: "ASK_JAMES",
+    targetType: "JAMES",
+    context: { q: lastUser.slice(0, 200) },
+  });
 
   let favoriteDrink: string | null = null;
   if (user.profile?.favoriteDrinkId) {

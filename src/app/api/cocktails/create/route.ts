@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { logInteraction } from "@/lib/interactions";
 
 // POST /api/cocktails/create
 //   { name, glass?, garnish?, isPublic?, ingredientSlugs: string[] }
@@ -78,6 +79,14 @@ export async function POST(request: Request) {
       },
     },
     select: { id: true, slug: true },
+  });
+
+  logInteraction({
+    userId: me.id,
+    interactionType: "CREATE_COCKTAIL",
+    targetType: "MIXLAB",
+    targetId: created.id,
+    context: { name, ingredientCount: slugs.length, isPublic: body.isPublic === true },
   });
 
   return NextResponse.json({ data: created });
