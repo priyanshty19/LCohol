@@ -1200,6 +1200,21 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+// Survives account deletion ON PURPOSE — deliberately NOT a relation to User, so
+// the user's data purge (cascade) does not remove it. Email is retained ONLY when
+// the leaver explicitly consents (emailConsent), per DPDP erasure expectations;
+// otherwise email stays null and only the anonymized feedback is kept.
+model AccountDeletionFeedback {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String?
+  feedback     String?  @db.VarChar(2000)
+  reason       String?  @db.VarChar(80)
+  emailConsent Boolean  @default(false) @map("email_consent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("account_deletion_feedback")
+}
+
 model PartyInvite {
   id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   partyPlanId   String     @map("party_plan_id") @db.Uuid

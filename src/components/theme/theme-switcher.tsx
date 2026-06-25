@@ -33,16 +33,16 @@ export function ThemeSwitcher() {
             "group relative flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all active:scale-[0.98]",
             active === t.id
               ? "border-[var(--primary)] shadow-[0_0_0_1px_var(--primary)]"
-              : "border-white/10 hover:border-white/25"
+              : "border-[var(--glass-border)] hover:border-[var(--foreground)]/30"
           )}
           // Paint each card in its own theme's atmosphere as a live preview.
           style={{ background: "var(--background)" }}
         >
           {/* Mini palette preview using that theme's tokens */}
           <span className="flex items-center gap-1">
-            <span className="h-4 w-4 rounded-full" style={{ background: "var(--primary)" }} />
-            <span className="h-4 w-4 rounded-full" style={{ background: "var(--accent)" }} />
-            <span className="h-4 w-4 rounded-full" style={{ background: "var(--card)" }} />
+            <span className="h-4 w-4 rounded-full ring-1 ring-inset ring-[var(--glass-border)]" style={{ background: "var(--primary)" }} />
+            <span className="h-4 w-4 rounded-full ring-1 ring-inset ring-[var(--glass-border)]" style={{ background: "var(--accent)" }} />
+            <span className="h-4 w-4 rounded-full ring-1 ring-inset ring-[var(--glass-border)]" style={{ background: "var(--card)" }} />
           </span>
           <span
             className="flex items-center gap-1 text-xs font-medium"

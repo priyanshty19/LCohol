@@ -12,9 +12,33 @@ import { clerkBackend } from "@/lib/clerk";
 // relation is onDelete: Cascade; optional back-refs like invitedBy / notification
 // actor are SetNull). Then we clear the session cookie so the browser is logged
 // out immediately.
-export async function DELETE() {
+export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await request.json().catch(() => ({}));
+  const feedback = typeof body.feedback === "string" ? body.feedback.trim().slice(0, 2000) : null;
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 80) : null;
+  const keepEmail = body.keepEmail === true;
+
+  // Capture exit feedback BEFORE the purge (the user row is about to vanish). This
+  // record is intentionally orphaned — it has no FK to User, so the cascade below
+  // won't delete it. Email is stored ONLY with explicit consent (keepEmail); without
+  // it we keep just the anonymized feedback. Best-effort: never blocks deletion.
+  if (feedback || reason || keepEmail) {
+    try {
+      await prisma.accountDeletionFeedback.create({
+        data: {
+          email: keepEmail ? user.email : null,
+          feedback,
+          reason,
+          emailConsent: keepEmail,
+        },
+      });
+    } catch (e) {
+      console.error("[account delete] feedback capture failed", e);
+    }
+  }
 
   // Best-effort: remove the Clerk user that holds this email (Clerk is used only
   // for OTP delivery). Never block account deletion on a Clerk-side failure.
