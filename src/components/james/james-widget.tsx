@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import { getActiveTheme } from "@/lib/theme";
+import { applyTheme, getActiveTheme, isThemeId } from "@/lib/theme";
+import type { JamesAction } from "@/lib/james/actions";
 import { JamesAvatar } from "./james-avatar";
+
+type AgentResponse = { reply: string; actions: JamesAction[]; error?: string };
 
 // James speaks in Markdown. Map each element to the wine theme so his replies
 // read as a clean menu card, not a wall of raw `**asterisks**`.
@@ -64,6 +68,11 @@ function greetingFor(theme: string): Msg {
 }
 
 export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  // Feed/home already shows James at the top (AskJames), so the floating
+  // bottom-right launcher appears on every OTHER screen.
+  const launcherOn = showLauncher && pathname !== "/";
   const greetingRef = useRef<Msg>(greetingFor("light"));
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [greetingRef.current]);
@@ -71,7 +80,20 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // James's "hands" on the floating widget: same agentic actions as the feed
+  // composer, so "ask James, James takes you there" works on every screen.
+  function runActions(actions: JamesAction[]) {
+    for (const a of actions) {
+      if (a.type === "set_vibe" && isThemeId(a.theme)) {
+        applyTheme(a.theme, { persist: true });
+      } else if (a.type === "navigate" && a.path) {
+        if (navTimer.current) clearTimeout(navTimer.current);
+        navTimer.current = setTimeout(() => router.push(a.path), 800);
+      }
+    }
+  }
 
   // Track the active vibe/theme: swap James's starters, and his greeting too
   // (only while the conversation hasn't started yet).
@@ -100,10 +122,8 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
     });
   }, [messages, open]);
 
-  // Cancel any in-flight stream when the widget unmounts (e.g. logout navigates
-  // out of the (main) layout) so we don't setState on an unmounted component or
-  // leak the reader/connection.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  // Clear a pending navigate timer on unmount (e.g. logout leaves the layout).
+  useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
 
   async function send(text: string) {
     const content = text.trim();
@@ -112,45 +132,36 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
     const next = [...messages, { role: "user" as const, content }];
     setMessages(next);
     setBusy(true);
-    const controller = new AbortController();
-    abortRef.current = controller;
     try {
-      const res = await fetch("/api/james/chat", {
+      // Agentic route (same brain as the feed composer): returns a reply + actions
+      // (navigate / set_vibe), so James can walk the user to any module from here.
+      const res = await fetch("/api/james/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next.filter((m) => m !== greetingRef.current) }),
-        signal: controller.signal,
+        body: JSON.stringify({
+          messages: next
+            .filter((m) => m !== greetingRef.current)
+            .slice(-12)
+            .map((m) => ({ role: m.role, content: m.content })),
+        }),
       });
-      if (!res.ok || !res.body) {
-        const e = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as AgentResponse;
+      if (!res.ok) {
         setMessages((m) => [
           ...m,
-          { role: "assistant", content: e.error ?? "James stepped away. Try again in a moment." },
+          { role: "assistant", content: data.error ?? "James stepped away. Try again in a moment." },
         ]);
         return;
       }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      setMessages((m) => [...m, { role: "assistant", content: "" }]);
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done || controller.signal.aborted) break;
-        acc += decoder.decode(value, { stream: true });
-        setMessages((m) => {
-          const copy = [...m];
-          copy[copy.length - 1] = { role: "assistant", content: acc };
-          return copy;
-        });
-      }
+      runActions(data.actions ?? []);
+      setMessages((m) => [...m, { role: "assistant", content: data.reply || "…" }]);
     } catch {
-      if (controller.signal.aborted) return; // unmounted/cancelled — stay quiet
       setMessages((m) => [
         ...m,
         { role: "assistant", content: "Lost the line there. One more time?" },
       ]);
     } finally {
-      if (!controller.signal.aborted) setBusy(false);
+      setBusy(false);
     }
   }
 
@@ -171,11 +182,11 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
 
   return (
     <>
-      {showLauncher && (
+      {launcherOn && (
         <button
           onClick={() => setOpen((v) => !v)}
           aria-label="Ask James, your bartender"
-          className="glow-velvet fixed right-4 bottom-24 z-50 h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
+          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-50 h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
         >
           {open ? (
             <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">

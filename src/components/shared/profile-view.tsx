@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { CircleView } from "@/components/circle/circle-view";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 type Relationship = "self" | "connected" | "incoming" | "outgoing" | "none";
 
@@ -39,6 +40,10 @@ export function ProfileView({ username, initialProfile }: ProfileViewProps) {
   const [rel, setRel] = useState<Relationship>(initialProfile?.viewer?.relationship ?? "none");
   const [reqId, setReqId] = useState<string | null>(initialProfile?.viewer?.requestId ?? null);
   const [busy, setBusy] = useState(false);
+  // The page already server-rendered this profile (initialProfile). Skip the
+  // first client fetch when seeded — it duplicated the exact SSR query over HTTP
+  // on every profile view. The interval/focus re-sync below still refreshes.
+  const seeded = useRef(initialProfile != null);
 
   useEffect(() => {
     let alive = true;
@@ -52,7 +57,8 @@ export function ProfileView({ username, initialProfile }: ProfileViewProps) {
       }
       if (alive) setLoading(false);
     }
-    load();
+    if (seeded.current) seeded.current = false; // use the SSR seed for first paint
+    else load();
 
     // Quietly re-sync the relationship so the circle button reflects the other
     // person accepting/declining without a full reload.
@@ -241,6 +247,49 @@ export function ProfileView({ username, initialProfile }: ProfileViewProps) {
 
       {isOwnProfile && (
         <>
+          <Card variant="glass">
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Your Vibe
+                </h2>
+                <Link
+                  href="/vibe"
+                  className="shrink-0 text-xs text-primary underline-offset-2 hover:underline"
+                >
+                  Mood explorer →
+                </Link>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pick a mood. It themes the whole app and follows you across
+                devices.
+              </p>
+              <ThemeSwitcher />
+            </CardContent>
+          </Card>
+
+          <Card variant="glass">
+            <CardContent className="space-y-3 pt-6">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Legal &amp; Safety
+              </h2>
+              <div className="flex flex-col divide-y divide-border/30">
+                <Link href="/compliance/terms" className="py-2 text-sm text-foreground/90 hover:text-primary">
+                  Terms of Service
+                </Link>
+                <Link href="/compliance/privacy" className="py-2 text-sm text-foreground/90 hover:text-primary">
+                  Privacy Policy
+                </Link>
+                <Link href="/compliance/grievance" className="py-2 text-sm text-foreground/90 hover:text-primary">
+                  Grievance Officer
+                </Link>
+                <Link href="/help" className="py-2 text-sm text-[var(--ml-sos)] hover:underline">
+                  🆘 Help &amp; Safety
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+
           <Separator className="border-border/30" />
           <CircleView embedded />
         </>

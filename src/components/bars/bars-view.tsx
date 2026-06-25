@@ -29,6 +29,7 @@ type Bar = {
   rating: number | string | null;
   bestsellers: string[];
   description: string | null;
+  external?: boolean;
 };
 
 const CITIES = ["Delhi NCR", "Bangalore", "Pune", "Hyderabad", "Chandigarh"];
@@ -135,10 +136,16 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   const [bars, setBars] = useState<Bar[]>(initialBars); // seeded from server
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Nearby (Google Places) mode — real bars around the user's location.
+  const [nearby, setNearby] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [nearbyMsg, setNearbyMsg] = useState<string | null>(null);
+  const [userLoc, setUserLoc] = useState<[number, number] | null>(null);
   // StrictMode-safe mount guard (see cocktails-view): skip while unchanged.
   const initialSig = useRef(`${city}|${type}|${q}`);
 
   useEffect(() => {
+    if (nearby) return; // nearby results override the curated city list
     const sig = `${city}|${type}|${q}`;
     if (sig === initialSig.current) return; // unchanged from server render
     setLoading(true);
@@ -152,7 +159,60 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
         setSelected(null);
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, type, q]);
+
+  function fetchCity() {
+    setLoading(true);
+    const params = new URLSearchParams({ city });
+    if (type) params.set("type", type);
+    if (q) params.set("q", q);
+    fetch(`/api/bars?${params.toString()}`)
+      .then((r) => r.json())
+      .then((d) => { setBars(d.data ?? []); setSelected(null); })
+      .finally(() => setLoading(false));
+  }
+
+  function nearMe() {
+    if (!("geolocation" in navigator)) {
+      setNearbyMsg("Your browser can't share location.");
+      return;
+    }
+    setLocating(true);
+    setNearbyMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserLoc([latitude, longitude]);
+        fetch(`/api/bars/nearby?lat=${latitude}&lng=${longitude}&radius=3000`)
+          .then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }))
+          .then(({ ok, body }) => {
+            if (!ok) {
+              setNearbyMsg(body.error ?? "Couldn't fetch nearby bars.");
+              return;
+            }
+            setNearby(true);
+            setBars(body.data ?? []);
+            setSelected(null);
+            if (!body.data?.length) setNearbyMsg("No bars found within ~3 km.");
+          })
+          .catch(() => setNearbyMsg("Couldn't fetch nearby bars."))
+          .finally(() => setLocating(false));
+      },
+      () => {
+        setLocating(false);
+        setNearbyMsg("Location permission denied — showing city bars instead.");
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
+    );
+  }
+
+  function exitNearby() {
+    setNearby(false);
+    setUserLoc(null);
+    setNearbyMsg(null);
+    fetchCity(); // restore curated city bars
+  }
 
   function askJames(b: Bar) {
     window.dispatchEvent(
@@ -164,7 +224,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
     );
   }
 
-  const center = CITY_CENTER[city] ?? [28.55, 77.15];
+  const center: [number, number] = nearby && userLoc ? userLoc : CITY_CENTER[city] ?? [28.55, 77.15];
   const mapBars = bars.map((b) => ({
     id: b.id,
     name: b.name,
@@ -185,19 +245,46 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
       </div>
 
       <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+        <button
+          onClick={nearMe}
+          disabled={locating}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm",
+            nearby ? "pill-active" : "pill-inactive"
+          )}
+        >
+          📍 {locating ? "Locating…" : "Near me"}
+        </button>
         {CITIES.map((c) => (
           <button
             key={c}
-            onClick={() => setCity(c)}
+            onClick={() => {
+              const wasNearby = nearby;
+              setNearby(false);
+              setUserLoc(null);
+              setNearbyMsg(null);
+              if (c !== city) setCity(c);
+              else if (wasNearby) fetchCity();
+            }}
             className={cn(
               "shrink-0 rounded-full px-3 py-1.5 text-sm",
-              c === city ? "pill-active" : "pill-inactive"
+              !nearby && c === city ? "pill-active" : "pill-inactive"
             )}
           >
             {c}
           </button>
         ))}
       </div>
+      {(nearby || nearbyMsg) && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          <span>{nearby ? "Showing real bars near you (Google Places)." : nearbyMsg}</span>
+          {nearby && (
+            <button onClick={exitNearby} className="shrink-0 text-primary underline-offset-2 hover:underline">
+              Back to city bars
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input

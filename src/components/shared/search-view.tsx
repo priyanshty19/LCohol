@@ -16,6 +16,18 @@ const SEARCH_TABS: { value: SearchType; label: string }[] = [
   { value: "users", label: "People" },
 ];
 
+// On a phone the bottom nav only holds the five core modules, so Search doubles
+// as the discovery hub: these tiles are the way in to Bars/Cocktails/Drinks.
+const BROWSE: { href: string; label: string; emoji: string; sub: string }[] = [
+  { href: "/bars", label: "Bars & Cocktails", emoji: "🍸", sub: "Where to go · what to order" },
+  { href: "/drinks", label: "Drinks", emoji: "🍷", sub: "Spirits, beers & wines" },
+  { href: "/parties", label: "Parties", emoji: "🎉", sub: "Plan the night" },
+  { href: "/mix", label: "Mix Lab", emoji: "🧪", sub: "Build your own" },
+  // Safety surface — keep it one tap from the always-reachable Search hub, not
+  // buried in the avatar menu (it's the page you want when you're least sober).
+  { href: "/help", label: "Help & Safety", emoji: "🆘", sub: "Sober up · get home safe" },
+];
+
 export function SearchView() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<SearchType>("all");
@@ -102,6 +114,33 @@ export function SearchView() {
           ))}
         </div>
       </div>
+
+      {/* Discovery hub — shown until the user actually searches. Keeps the
+          browse surfaces one tap away on phones, where they left the nav bar. */}
+      {!searched && !loading && (
+        <div className="space-y-3">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Browse
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {BROWSE.map((b) => (
+              <Link
+                key={b.href}
+                href={b.href}
+                className="glass-panel flex min-h-11 flex-col gap-1 rounded-xl p-4 transition-all hover:border-primary/40 hover:glow-primary"
+              >
+                <span className="text-2xl" aria-hidden>
+                  {b.emoji}
+                </span>
+                <span className="font-display font-semibold text-foreground">
+                  {b.label}
+                </span>
+                <span className="text-xs text-muted-foreground">{b.sub}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div className="space-y-3">

@@ -21,6 +21,12 @@ export const NAV_TARGETS: Record<string, { path: string; label: string }> = {
   hangover: { path: "/hangover", label: "Hangover SOS" },
   help: { path: "/help", label: "Help & Safety" },
   create: { path: "/create", label: "Share a Story" },
+  parties: { path: "/parties", label: "Parties" },
+  circle: { path: "/circle", label: "your Circle" },
+  settings: { path: "/settings", label: "Settings" },
+  terms: { path: "/compliance/terms", label: "Terms & Conditions" },
+  privacy: { path: "/compliance/privacy", label: "the Privacy Policy" },
+  grievance: { path: "/compliance/grievance", label: "the Grievance Officer" },
 };
 
 export const NAV_IDS = Object.keys(NAV_TARGETS);
