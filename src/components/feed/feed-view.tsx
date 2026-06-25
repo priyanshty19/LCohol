@@ -9,6 +9,7 @@ import { PostList } from "./post-list";
 import type { FeedSortOption, PostWithRelations } from "@/types/database";
 
 const SORT_OPTIONS: { value: FeedSortOption; label: string }[] = [
+  { value: "for-you", label: "For You" },
   { value: "hot", label: "Hot" },
   { value: "new", label: "New" },
   { value: "top", label: "Top" },
@@ -19,7 +20,7 @@ export function FeedView({
 }: {
   initialFeed: { data: PostWithRelations[]; hasMore: boolean; nextCursor?: string };
 }) {
-  const [sort, setSort] = useState<FeedSortOption>("hot");
+  const [sort, setSort] = useState<FeedSortOption>("for-you");
 
   return (
     <div className="space-y-6">

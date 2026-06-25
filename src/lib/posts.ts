@@ -1,6 +1,7 @@
 import { PostType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { FEED_PAGE_SIZE } from "@/lib/constants";
+import { getTasteProfile } from "@/lib/behavior";
 
 // Shared feed query — used by the API route (client pagination/sort) and the
 // feed page server component (initial render). The audience filter is passed in
@@ -50,6 +51,61 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     ...(opts.postType ? { postType: opts.postType as PostType } : {}),
     ...audienceWhere(opts.viewerId, opts.connectionIds),
   };
+
+  // "for-you" — the hot ranking PLUS personal affinity boosts: posts from people in
+  // your circle, and posts featuring drinks you've recently been viewing. Same
+  // bounded-window + value-keyset approach as hot, so it stays fast and paginates.
+  // Logged-out (no viewerId) falls through to the plain branches below.
+  if (sort === "for-you" && opts.viewerId) {
+    const taste = await getTasteProfile(opts.viewerId);
+    const recentDrinks = new Set(taste.recentDrinks);
+    const circle = new Set(opts.connectionIds ?? []);
+    const FY_WINDOW = 500;
+
+    const candidates = await prisma.post.findMany({
+      where,
+      orderBy: { createdAt: "desc" as const },
+      take: FY_WINDOW,
+      include,
+    });
+
+    const ranked = candidates
+      .map((p) => {
+        const eng = p.score + 2 * p._count.comments;
+        const sign = eng > 0 ? 1 : eng < 0 ? -1 : 0;
+        const hot =
+          sign * Math.log10(Math.max(Math.abs(eng), 1)) +
+          new Date(p.createdAt).getTime() / 45_000_000;
+        // Boosts are calibrated against the time term (1.0 ≈ 12.5h of recency):
+        // a circle post ranks as if ~1.5 days newer; a drink-you-eyed post ~1 day.
+        let bonus = 0;
+        if (circle.has(p.authorId)) bonus += 3;
+        if (p.drinks.some((d) => recentDrinks.has(d.drink.name))) bonus += 2;
+        return { p, fy: hot + bonus };
+      })
+      .sort((a, b) => b.fy - a.fy || (a.p.id < b.p.id ? 1 : -1));
+
+    let after = ranked;
+    if (cursor) {
+      const sep = cursor.lastIndexOf("_");
+      const curFy = Number(cursor.slice(0, sep));
+      const curId = cursor.slice(sep + 1);
+      if (!Number.isNaN(curFy)) {
+        after = ranked.filter(({ p, fy }) => fy < curFy || (fy === curFy && p.id < curId));
+      }
+    }
+
+    const page = after.slice(0, FEED_PAGE_SIZE + 1);
+    const hasMore = page.length > FEED_PAGE_SIZE;
+    const shown = hasMore ? page.slice(0, FEED_PAGE_SIZE) : page;
+    const last = shown[shown.length - 1];
+
+    return {
+      data: shown.map((x) => x.p),
+      hasMore,
+      nextCursor: hasMore && last ? `${last.fy}_${last.p.id}` : undefined,
+    };
+  }
 
   // "hot" — Reddit-style time-decayed ranking over a recent candidate window,
   // VALUE-based keyset on the (hotScore, id) tuple. Cursor = `${hot}_${id}`.
