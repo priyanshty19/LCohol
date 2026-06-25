@@ -133,7 +133,7 @@
   --border: #9b8f7e;
   --input: #9b8f7e;
   --ring: #7d5800;
-  --radius: 0.75rem;
+  --radius: 1rem;
   --amber: #a8243a;
   --amber-foreground: #fbefe3;
 
@@ -202,7 +202,7 @@
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.12);
   --ring: #c43049;
-  --radius: 0.75rem;
+  --radius: 1rem;
   --amber: #c43049;
   --amber-foreground: #fbefe3;
 
@@ -261,7 +261,7 @@
   --glass-nav-bg: rgba(26, 16, 18, 0.8);
   --glass-subtle-bg: rgba(36, 22, 25, 0.3);
   --glass-elevated-bg: rgba(28, 18, 20, 0.55);
-  --glass-lapel-bg: rgba(18, 11, 12, 0.72);
+  --glass-lapel-bg: rgba(18, 11, 12, 0.94);
   /* WebGL shader triplet (ink → oxblood → wine) */
   --shader-1: #160d0e;
   --shader-2: #7e1f2b;
@@ -311,7 +311,7 @@
   --glass-nav-bg: rgba(248, 244, 236, 0.85);
   --glass-subtle-bg: rgba(255, 253, 249, 0.5);
   --glass-elevated-bg: rgba(255, 254, 251, 0.8);
-  --glass-lapel-bg: rgba(252, 248, 241, 0.88);
+  --glass-lapel-bg: rgba(252, 248, 241, 0.96);
   --shader-1: #f8f4ec;
   --shader-2: #e0a6ad;
   --shader-3: #b11226;
@@ -492,17 +492,18 @@
    ============================================================ */
 
 @utility glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* Solid, vibe-themed card surface. A translucent backdrop-filter here smeared
+     the ambient page glow + film grain through every card, reading differently
+     in each vibe theme (same failure mode as glass-nav). --card retints per vibe. */
+  background: var(--card);
   border: 1px solid var(--glass-border);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 @utility glass-nav {
-  background: var(--glass-nav-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  /* Solid, vibe-themed surface (not translucent glass): a backdrop-filter nav
+     bleeds the page/map through and reads as broken. --card retints per vibe. */
+  background: var(--card);
   border-bottom: 1px solid var(--glass-border);
 }
 

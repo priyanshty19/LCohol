@@ -125,6 +125,12 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   // Clear a pending navigate timer on unmount (e.g. logout leaves the layout).
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
 
+  // On the feed, James already lives at the top (the AskJames composer), so the
+  // floating panel must not linger here if it was opened on another route.
+  useEffect(() => {
+    if (pathname === "/") setOpen(false);
+  }, [pathname]);
+
   async function send(text: string) {
     const content = text.trim();
     if (!content || busy) return;
@@ -186,7 +192,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
         <button
           onClick={() => setOpen((v) => !v)}
           aria-label="Ask James, your bartender"
-          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-50 h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
+          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[1200] h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
         >
           {open ? (
             <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
@@ -198,8 +204,18 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
         </button>
       )}
 
-      {open && (
-        <div className="glass-lapel fixed right-4 bottom-40 z-50 flex h-[60vh] max-h-[560px] w-[min(92vw,400px)] flex-col overflow-hidden rounded-2xl shadow-2xl md:bottom-24">
+      {launcherOn && open && (
+        <>
+          {/* Full-viewport solid scrim so the panel can NEVER be bled into by
+              Leaflet's GPU-composited map. transform-gpu forces scrim + panel onto
+              their own composite layers above the map. Tap to close (modal feel). */}
+          <button
+            type="button"
+            aria-label="Close James"
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-[1190] transform-gpu bg-black/60"
+          />
+          <div className="fixed right-4 bottom-40 z-[1200] flex h-[60vh] max-h-[560px] w-[min(92vw,400px)] transform-gpu flex-col overflow-hidden rounded-2xl border border-[var(--ml-brass)]/30 bg-popover shadow-2xl md:bottom-24">
           <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
             <JamesAvatar className="h-10 w-10 shrink-0 rounded-full" />
             <div className="flex-1">
@@ -290,6 +306,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
             </button>
           </form>
         </div>
+        </>
       )}
     </>
   );

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { VoteButtons } from "./vote-buttons";
 import { ReportButton } from "./report-button";
 import { ShareButton } from "./share-button";
+import { CommentModal } from "./comment-modal";
 import { renderMentions } from "@/components/shared/render-mentions";
 import type { PostWithRelations } from "@/types/database";
 import { formatDistanceToNow } from "date-fns";
@@ -137,27 +138,13 @@ export function PostCard({ post }: PostCardProps) {
             </div>
           )}
 
-          {/* Footer */}
+          {/* Footer — comments open in a blurred modal (no full navigation) */}
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground/60">
-            <Link
-              href={`/post/${post.id}`}
-              className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 transition-colors hover:text-primary"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-              {post._count.comments}{" "}
-              {post._count.comments === 1 ? "comment" : "comments"}
-            </Link>
+            <CommentModal
+              postId={post.id}
+              postTitle={post.title}
+              count={post._count.comments}
+            />
             <ShareButton postId={post.id} />
             <ReportButton postId={post.id} className="ml-auto" />
           </div>

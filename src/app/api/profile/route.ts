@@ -40,6 +40,7 @@ export async function PATCH(request: Request) {
     intensity,
     intent,
     theme,
+    emailNotifications,
     onboarded,
     geoDismissed,
   } = body;
@@ -74,6 +75,7 @@ export async function PATCH(request: Request) {
       ...(typeof intensity === "string" ? { intensity: intensity.slice(0, 20) } : {}),
       ...(typeof intent === "string" ? { intent: intent.slice(0, 20) } : {}),
       ...(typeof theme === "string" && ALLOWED_THEMES.has(theme) ? { theme } : {}),
+      ...(typeof emailNotifications === "boolean" ? { emailNotifications } : {}),
       ...(onboarded ? { onboardedAt: new Date() } : {}),
       ...(geoDismissed ? { geoDismissedAt: new Date() } : {}),
     },

@@ -335,7 +335,10 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
           ))}
         </div>
 
-        <div className="order-1 h-[42vh] overflow-hidden rounded-2xl border border-border/50 lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
+        {/* isolate = own stacking context, so Leaflet's internal z-indexes (panes
+            up to ~700, controls ~1000) can't escape and render over fixed overlays
+            like the James panel (z-50). */}
+        <div className="isolate order-1 h-[42vh] overflow-hidden rounded-2xl border border-border/50 lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
           <BarsMap
             bars={mapBars}
             center={center}

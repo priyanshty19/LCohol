@@ -61,6 +61,7 @@ model User {
   partyGameSuggestions  PartyGameSuggestion[]
   partyGameVotes        PartyGameVote[]
   beverages             Beverage[]            @relation("BeverageAuthor")
+  pushSubscriptions     PushSubscription[]
 
   @@map("users")
 }
@@ -167,6 +168,7 @@ model Profile {
   intent          String?  @db.VarChar(20)
   onboardedAt     DateTime? @map("onboarded_at")
   theme           String?  @default("light") @db.VarChar(24)
+  emailNotifications Boolean @default(true) @map("email_notifications")
   geoDismissedAt  DateTime? @map("geo_dismissed_at")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -1176,8 +1178,41 @@ enum NotificationType {
   SEND
   PARTY_INVITE
   RSVP
+  CIRCLE_POST
 
   @@map("notification_type")
+}
+
+// A browser Web Push subscription. One user can have many (per device/browser).
+// Pruned automatically when the push service returns 404/410 (gone).
+model PushSubscription {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+// Survives account deletion ON PURPOSE — deliberately NOT a relation to User, so
+// the user's data purge (cascade) does not remove it. Email is retained ONLY when
+// the leaver explicitly consents (emailConsent), per DPDP erasure expectations;
+// otherwise email stays null and only the anonymized feedback is kept.
+model AccountDeletionFeedback {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String?
+  feedback     String?  @db.VarChar(2000)
+  reason       String?  @db.VarChar(80)
+  emailConsent Boolean  @default(false) @map("email_consent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("account_deletion_feedback")
 }
 
 model PartyInvite {
