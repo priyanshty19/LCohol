@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CocktailsView } from "@/components/cocktails/cocktails-view";
 import { IngredientSearch } from "@/components/cocktails/ingredient-search";
+import { CatalogTabs } from "@/components/catalog/catalog-tabs";
 import { getCocktails } from "@/lib/cocktails";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default async function CocktailsPage() {
   const initial = await getCocktails({ take: 30 });
   return (
     <div className="space-y-8">
+      <CatalogTabs active="/cocktails" />
       <IngredientSearch />
       <CocktailsView initial={initial} />
     </div>

@@ -60,6 +60,7 @@ model User {
   partyDrinkSuggestions PartyDrinkSuggestion[]
   partyGameSuggestions  PartyGameSuggestion[]
   partyGameVotes        PartyGameVote[]
+  beverages             Beverage[]            @relation("BeverageAuthor")
 
   @@map("users")
 }
@@ -608,6 +609,123 @@ model CocktailIngredient {
 }
 
 // ============================================================================
+// CATALOG RE-MODEL — Stage 1 (ADDITIVE). New root-centered tables live ALONGSIDE
+// the legacy Drink/CocktailCreation/Ingredient tables. Nothing reads from these
+// yet; backfilled from existing rows with legacy* back-pointers for reversibility.
+// Cutover (switching reads + retiring old tables) is a later, approval-gated stage.
+// ============================================================================
+
+// One taxonomy for the whole catalog (replaces DrinkCategory FK + cocktail free-text).
+model Category {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(80)
+  slug      String   @unique @db.VarChar(90)
+  kind      String   @db.VarChar(20) // spirit | mixed | beer | wine | theme | other
+  parentId  String?  @map("parent_id") @db.Uuid
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  beverages Beverage[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// The ROOT catalog entity. Drink and Cocktail are both Beverages (discriminated by kind).
+model Beverage {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind             String   @db.VarChar(12) // DRINK | COCKTAIL
+  name             String   @db.VarChar(200)
+  slug             String   @unique @db.VarChar(220)
+  categoryId       String?  @map("category_id") @db.Uuid
+  imageUrl         String?  @map("image_url")
+  isCurated        Boolean  @default(false) @map("is_curated")
+  isPublic         Boolean  @default(true) @map("is_public")
+  authorId         String?  @map("author_id") @db.Uuid
+  legacyDrinkId    String?  @unique @map("legacy_drink_id") @db.Uuid
+  legacyCocktailId String?  @unique @map("legacy_cocktail_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  category          Category?            @relation(fields: [categoryId], references: [id])
+  author            User?                @relation("BeverageAuthor", fields: [authorId], references: [id])
+  drinkProfile      DrinkProfile?
+  recipe            Recipe?
+  recipeIngredients BeverageIngredient[] @relation("RecipeOf")
+  usedInRecipes     BeverageIngredient[] @relation("IngredientOf")
+  venues            VenueBeverage[]
+
+  @@index([kind])
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isCurated, name])
+  @@map("beverages")
+}
+
+// 1:1 with a Beverage of kind=DRINK (bottled product attributes).
+model DrinkProfile {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  beverageId   String      @unique @map("beverage_id") @db.Uuid
+  brand        String?     @db.VarChar(100)
+  abv          Decimal?    @db.Decimal(4, 1)
+  priceRange   PriceRange? @map("price_range")
+  basePriceInr Int?        @map("base_price_inr")
+  country      String?     @db.VarChar(50)
+
+  beverage Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+
+  @@map("drink_profiles")
+}
+
+// 1:1 with a Beverage of kind=COCKTAIL (recipe attributes).
+model Recipe {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  beverageId  String  @unique @map("beverage_id") @db.Uuid
+  instructions String?
+  glass       String? @db.VarChar(80)
+  garnish     String?
+  sourceBarId String? @map("source_bar_id") @db.Uuid
+  sourceLabel String? @map("source_label") @db.VarChar(200)
+
+  beverage  Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+  sourceBar Bar?     @relation(fields: [sourceBarId], references: [id])
+
+  @@map("recipes")
+}
+
+// A line in a cocktail recipe: either another Beverage (a spirit) or free text (syrup/mixer).
+model BeverageIngredient {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipeBevId     String  @map("recipe_bev_id") @db.Uuid
+  ingredientBevId String? @map("ingredient_bev_id") @db.Uuid
+  freeText        String? @map("free_text") @db.VarChar(120)
+  quantity        String? @db.VarChar(50)
+  unit            String? @db.VarChar(20)
+  sortOrder       Int     @default(0) @map("sort_order")
+
+  recipe     Beverage  @relation("RecipeOf", fields: [recipeBevId], references: [id], onDelete: Cascade)
+  ingredient Beverage? @relation("IngredientOf", fields: [ingredientBevId], references: [id])
+
+  @@index([recipeBevId])
+  @@map("beverage_ingredients")
+}
+
+// Links a venue (Bar) to the beverages it serves — connects Bar into the catalog graph.
+model VenueBeverage {
+  venueId     String  @map("venue_id") @db.Uuid
+  beverageId  String  @map("beverage_id") @db.Uuid
+  isSignature Boolean @default(false) @map("is_signature")
+
+  venue    Bar      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  beverage Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, beverageId])
+  @@map("venue_beverages")
+}
+
+// ============================================================================
 // COMMUNITY SCORES (Phase 2 foundation — computed, not user-entered)
 // ============================================================================
 
@@ -951,6 +1069,8 @@ model Bar {
   reviews   BarReview[]
   cocktails CocktailCreation[]
   parties   PartyPlan[]
+  recipes        Recipe[]
+  venueBeverages VenueBeverage[]
 
   @@index([city])
   @@index([type])

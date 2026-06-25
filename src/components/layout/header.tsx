@@ -16,14 +16,16 @@ import { cn } from "@/lib/utils";
 import { SipStoriesLogo } from "@/components/brand/logo";
 import { NotificationBell } from "./notification-bell";
 
-const NAV = [
+// Mirrors the mobile core (Feed · Parties · Mix Lab · Search) plus the two
+// browse surfaces desktop has room for. Bars + Cocktails are one entry (set/
+// subset) — the page itself carries the Bars|Cocktails toggle. Vibe is no longer
+// a top-level destination; it lives in the avatar menu and on your profile.
+const NAV: { href: string; label: string; match?: string[] }[] = [
   { href: "/", label: "Feed" },
-  { href: "/drinks", label: "Drinks" },
-  { href: "/cocktails", label: "🍸 Cocktails" },
-  { href: "/bars", label: "🍻 Bars" },
   { href: "/parties", label: "🎉 Parties" },
   { href: "/mix", label: "Mix Lab" },
-  { href: "/vibe", label: "Vibe" },
+  { href: "/bars", label: "🍸 Bars & Cocktails", match: ["/bars", "/cocktails"] },
+  { href: "/drinks", label: "Drinks" },
   { href: "/search", label: "Search" },
 ];
 
@@ -38,8 +40,20 @@ export function Header() {
     router.refresh();
   }
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  // Path-boundary guarded so "/bars" never lights on a future "/bars-archive".
+  const isActive = (n: (typeof NAV)[number]) =>
+    (n.match ?? [n.href]).some((p) =>
+      p === "/" ? pathname === "/" : pathname === p || pathname.startsWith(p + "/"),
+    );
+
+  // For a merged entry (Bars & Cocktails), link to whichever sub-route you're
+  // already on so the lit tab is a no-op instead of bouncing /cocktails → /bars.
+  const hrefFor = (n: (typeof NAV)[number]) => {
+    const here = n.match?.find(
+      (p) => pathname === p || pathname.startsWith(p + "/"),
+    );
+    return here ?? n.href;
+  };
 
   return (
     <header className="glass-nav sticky top-0 z-50">
@@ -50,7 +64,7 @@ export function Header() {
           </Link>
           <nav className="hidden items-center gap-0.5 md:flex">
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href}>
+              <Link key={n.href} href={hrefFor(n)}>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -58,7 +72,7 @@ export function Header() {
                     // Theme-aware hover (primary is vivid in every vibe, so the
                     // highlight stays visible on both light and dark nav bars).
                     "hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/15",
-                    isActive(n.href) && "text-primary",
+                    isActive(n) && "text-primary",
                   )}
                 >
                   {n.label}
@@ -113,8 +127,8 @@ export function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <Link href="/parties" className="w-full">
-                    🎉 Parties
+                  <Link href="/vibe" className="w-full">
+                    🌙 Tonight&apos;s vibe
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
@@ -122,17 +136,8 @@ export function Header() {
                     Settings
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Link href="/compliance/terms" className="w-full">
-                    Terms
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/compliance/privacy" className="w-full">
-                    Privacy
-                  </Link>
-                </DropdownMenuItem>
+                {/* Terms & Privacy now live only under the profile (legal &
+                    safety card) + the signup consent step — not duplicated here. */}
                 {(user.role === "ADMIN" || user.role === "MODERATOR") && (
                   <>
                     <DropdownMenuSeparator />

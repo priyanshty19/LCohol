@@ -5,7 +5,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { ResponsibleDrinkingBanner } from "@/components/shared/responsible-drinking-banner";
 import { GeoDisclaimer } from "@/components/shared/geo-disclaimer";
 import { JamesWidget } from "@/components/james/james-widget";
-import { FirstRunVibe } from "@/components/theme/first-run-vibe";
+import { DailyVibe } from "@/components/theme/daily-vibe";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +35,10 @@ export default async function MainLayout({
       </main>
       <ResponsibleDrinkingBanner />
       <GeoDisclaimer />
-      <FirstRunVibe />
-      {/* Mounted (no floating launcher) so the "Ask James" buttons on the bars
-          and help pages can still summon the chat via the ask-james event. */}
-      <JamesWidget showLauncher={false} />
+      <DailyVibe />
+      {/* Floating bottom-right James on every screen except the feed (which shows
+          James at top). Also stays summonable via the ask-james event from bars/help. */}
+      <JamesWidget />
       <MobileNav />
     </div>
   );

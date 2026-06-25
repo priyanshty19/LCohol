@@ -7,27 +7,69 @@ import { THEMES, applyTheme, type ThemeId } from "@/lib/theme";
 import { getCookie, setCookie } from "@/lib/client-cookies";
 import { AGE_COOKIE } from "@/components/shared/age-gate-overlay";
 
-const VIBE_PROMPT_COOKIE = "sip_vibe_prompt";
+// One ask per calendar day. We store the local date we last prompted on; when
+// today's local date differs (i.e. midnight has rolled over in the user's own
+// timezone) we ask again. Using the LOCAL date string means the rollover is
+// correct per-user with no server cron or UTC math.
+const VIBE_DAY_COOKIE = "sip_vibe_day";
 const VIBES = THEMES.filter((t) => t.group === "vibe");
 
+function todayKey(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 /**
- * One-time, on-first-open prompt to set a vibe (which themes the whole app).
- * Shown once the user is past the age gate; dismissed forever via a cookie.
+ * Daily, on-open prompt to set the app's vibe (which themes the whole app).
+ * Shown once the user is past the age gate, and re-shown on each new day.
  */
-export function FirstRunVibe() {
+export function DailyVibe() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (getCookie(VIBE_PROMPT_COOKIE)) return;
-    // Wait briefly so the age gate clears first, then show only if they entered.
-    const t = setTimeout(() => {
-      if (!getCookie(VIBE_PROMPT_COOKIE) && getCookie(AGE_COOKIE)) setOpen(true);
-    }, 900);
-    return () => clearTimeout(t);
+    const today = todayKey();
+    if (getCookie(VIBE_DAY_COOKIE) === today) return; // already asked today
+    let done = false;
+    function attempt() {
+      if (done) return;
+      // Another tab may have asked in the meantime — respect that.
+      if (getCookie(VIBE_DAY_COOKIE) === today) {
+        done = true;
+        return;
+      }
+      // Only once they're past the age gate. We POLL (not a single timeout)
+      // because a brand-new user accepts the age gate a moment AFTER mount; a
+      // one-shot timer would miss day 1 entirely.
+      if (getCookie(AGE_COOKIE)) {
+        done = true;
+        // Stamp at SHOW time, not just on answer: makes "one ask per day" exact
+        // and stops a second tab from double-prompting.
+        setCookie(VIBE_DAY_COOKIE, today);
+        setOpen(true);
+      }
+    }
+    const first = setTimeout(attempt, 900); // let the age gate settle
+    const poll = setInterval(attempt, 700);
+    const stop = setTimeout(() => {
+      done = true;
+    }, 15000); // give up after ~15s if they never enter
+    return () => {
+      clearTimeout(first);
+      clearInterval(poll);
+      clearTimeout(stop);
+    };
   }, []);
 
+  // Belt-and-braces: the cookie is already stamped at show time, but stamp again
+  // on interaction so the "asked today" record holds even on odd open paths.
+  function markAsked() {
+    setCookie(VIBE_DAY_COOKIE, todayKey());
+  }
+
   function dismiss() {
-    setCookie(VIBE_PROMPT_COOKIE, "1");
+    markAsked();
     setOpen(false);
   }
 
@@ -58,16 +100,17 @@ export function FirstRunVibe() {
             <div className="mb-1 flex items-start justify-between">
               <div>
                 <h2 className="font-display text-xl font-bold text-primary">
-                  What's the vibe tonight?
+                  What&apos;s the vibe today?
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Pick a mood and we'll dress the whole place in it.
+                  A fresh day, a fresh mood. Pick one and we&apos;ll dress the
+                  whole place in it.
                 </p>
               </div>
               <button
                 onClick={dismiss}
                 aria-label="Maybe later"
-                className="text-muted-foreground hover:text-foreground"
+                className="-m-1.5 rounded-full p-1.5 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -84,8 +127,11 @@ export function FirstRunVibe() {
                   style={{ background: "var(--background)" }}
                 >
                   <span className="flex items-center gap-1">
+                    {/* --accent is a near-black surface tone (invisible on the
+                        dark tile); --ml-velvet-hover is a visible tint of each
+                        vibe's own hue, so the pair previews the vibe's palette. */}
                     <span className="h-4 w-4 rounded-full" style={{ background: "var(--primary)" }} />
-                    <span className="h-4 w-4 rounded-full" style={{ background: "var(--accent)" }} />
+                    <span className="h-4 w-4 rounded-full" style={{ background: "var(--ml-velvet-hover)" }} />
                   </span>
                   <span
                     className="flex items-center gap-1 text-xs font-medium"
@@ -102,7 +148,7 @@ export function FirstRunVibe() {
               onClick={dismiss}
               className="mt-4 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
-              Maybe later — keep it cream
+              Maybe later — keep last night&apos;s look
             </button>
           </motion.div>
         </motion.div>

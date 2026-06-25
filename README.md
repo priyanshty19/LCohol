@@ -83,7 +83,7 @@ A running list of everything shipped, newest first, grouped by area.
 
 ### 🎨 Design system & theming
 - New **glass / gold / velvet** button and card variants with display fonts and shared theme tokens (including `--ml-sos`) across `globals.css`, `button`, `card`, `badge`, and `input`.
-- **Theme provider, theme switcher, and first-run vibe selection** so the look adapts to the user's chosen vibe.
+- **Theme provider, theme switcher, and a daily vibe prompt** (re-asks each calendar day) so the look adapts to the user's chosen vibe.
 - **Light "Day Lounge" theme** option.
 - **Liquid-glass FX backdrop** (shader-based) plus the vendored `public/vendor/liquid-glass-js` library.
 - Full visual restyle of every surface: feed, drinks, mix, hangover, vibe, profile, search, settings, auth, header, and mobile nav.
