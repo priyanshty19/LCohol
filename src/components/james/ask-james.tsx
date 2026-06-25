@@ -66,13 +66,17 @@ export function AskJames() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [sending, setSending] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear a pending navigate timer if the component unmounts first.
+  // Clear pending timers if the component unmounts first.
   useEffect(() => () => {
     if (navTimer.current) clearTimeout(navTimer.current);
+    if (blurTimer.current) clearTimeout(blurTimer.current);
   }, []);
 
   // Restore the session's conversation (sessionStorage clears on tab close).
@@ -107,6 +111,25 @@ export function AskJames() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, sending]);
 
+  // Auto-collapse the expanded panel once the user scrolls into the feed, so the
+  // James composer shrinks to just its hero bar (the "main module"). rAF-throttled
+  // + passive so it never janks the scroll.
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 72);
+        raf = 0;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   function runActions(actions: JamesAction[]) {
     for (const a of actions) {
       if (a.type === "set_vibe" && isThemeId(a.theme)) {
@@ -124,6 +147,8 @@ export function AskJames() {
     if (!content || sending) return;
     setInput("");
     setCollapsed(false);
+    // Bring the panel back into view if the user had scrolled it away.
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     const userMsg: Msg = { id: uid(), role: "user", content };
     const history = [...messages, userMsg];
     setMessages(history);
@@ -169,20 +194,34 @@ export function AskJames() {
   }
 
   const hasChat = messages.length > 0;
+  // The expanded greeting/chat shows only near the top; scrolling collapses it to
+  // the hero bar. The manual chevron still works independently.
+  const showExtra = !collapsed && !scrolled;
 
+  // No background band on the wrapper — it rendered as a faint rectangle around
+  // the curved pill. The pill itself is opaque, so it masks scrolled content.
   return (
-    <div className="sticky top-14 z-40 space-y-3 bg-background/80 py-2 backdrop-blur-md">
+    <div className="sticky top-14 z-40 space-y-3 py-2">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           send(input);
         }}
-        className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card/70 p-2.5 shadow-sm transition focus-within:border-foreground/30 sm:gap-3 sm:p-3"
+        className="glow-velvet flex items-center gap-2 rounded-full border border-[var(--ml-velvet-bright)]/30 bg-card p-2 pl-2.5 shadow-sm transition focus-within:border-[var(--ml-velvet-bright)]/60 sm:gap-3"
       >
-        <JamesAvatar className="h-11 w-11 shrink-0" />
+        {/* James is the app's hero character — a rounded, velvet-ringed avatar. */}
+        <JamesAvatar className="h-11 w-11 shrink-0 rounded-full ring-2 ring-[var(--ml-velvet-bright)]/40" />
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onFocus={() => {
+            if (blurTimer.current) clearTimeout(blurTimer.current);
+            setFocused(true);
+          }}
+          onBlur={() => {
+            // Delay so tapping a suggestion chip registers before the hints close.
+            blurTimer.current = setTimeout(() => setFocused(false), 150);
+          }}
           placeholder="Ask James anything, or tell him to set the vibe…"
           aria-label="Ask James"
           className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
@@ -210,7 +249,7 @@ export function AskJames() {
       </form>
 
       <AnimatePresence initial={false}>
-        {!collapsed && (hasChat || sending) && (
+        {showExtra && (hasChat || sending) && (
           <motion.div
             key="chat"
             initial={{ opacity: 0, y: -8 }}
@@ -240,7 +279,9 @@ export function AskJames() {
           </motion.div>
         )}
 
-        {!collapsed && !hasChat && !sending && (
+        {/* Hints (greeting + example asks) appear only when the user taps the
+            James bar — not by default — so the feed stays clean until intent. */}
+        {focused && !hasChat && !sending && (
           <motion.div
             key="welcome"
             initial={{ opacity: 0, y: -8 }}
@@ -271,14 +312,17 @@ export function AskJames() {
           </motion.div>
         )}
 
-        {collapsed && hasChat && (
+        {(collapsed || scrolled) && hasChat && (
           <motion.button
             key="collapsed"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             type="button"
-            onClick={() => setCollapsed(false)}
+            onClick={() => {
+              setCollapsed(false);
+              if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
             className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/50 bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground"
           >
             <span className="truncate">Chat with James ({messages.length})</span>
