@@ -92,3 +92,135 @@ export function pickRetentionPitch(p: BehaviorProfile): RetentionPitch {
     href: "/mix",
   };
 }
+
+// A taste profile: stated preferences (onboarding) blended with demonstrated taste
+// (the categories of drinks the user has actually been viewing). Powers James
+// grounding + recommendations. Cheap: at most 3 queries, never on a hot path.
+export type TasteProfile = {
+  spirits: string[];
+  flavours: string[];
+  drinkingStyle: string | null;
+  intensity: string | null;
+  intent: string | null;
+  favoriteDrink: string | null;
+  topCategories: string[]; // behavioral — most-viewed drink categories
+  recentDrinks: string[]; // recently viewed drink names (for James colour)
+};
+
+export async function getTasteProfile(userId: string): Promise<TasteProfile> {
+  const [profile, views] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { userId },
+      select: {
+        preferredSpirits: true,
+        preferredFlavours: true,
+        drinkingStyle: true,
+        intensity: true,
+        intent: true,
+        favoriteDrink: { select: { name: true } },
+      },
+    }),
+    prisma.userInteraction.findMany({
+      where: { userId, interactionType: "CLICK_DRINK", targetType: "DRINK" },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      select: { context: true },
+    }),
+  ]);
+
+  const slugs = Array.from(
+    new Set(
+      views
+        .map((v) => (v.context as { slug?: unknown } | null)?.slug)
+        .filter((s): s is string => typeof s === "string"),
+    ),
+  ).slice(0, 20);
+
+  let topCategories: string[] = [];
+  let recentDrinks: string[] = [];
+  if (slugs.length) {
+    const drinks = await prisma.drink.findMany({
+      where: { slug: { in: slugs } },
+      select: { name: true, category: { select: { name: true } } },
+    });
+    recentDrinks = drinks.map((d) => d.name).slice(0, 8);
+    const catCount = new Map<string, number>();
+    for (const d of drinks) {
+      const c = d.category?.name;
+      if (c) catCount.set(c, (catCount.get(c) ?? 0) + 1);
+    }
+    topCategories = [...catCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([c]) => c)
+      .slice(0, 4);
+  }
+
+  return {
+    spirits: profile?.preferredSpirits ?? [],
+    flavours: profile?.preferredFlavours ?? [],
+    drinkingStyle: profile?.drinkingStyle ?? null,
+    intensity: profile?.intensity ?? null,
+    intent: profile?.intent ?? null,
+    favoriteDrink: profile?.favoriteDrink?.name ?? null,
+    topCategories,
+    recentDrinks,
+  };
+}
+
+export type RecDrink = {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  brand: string | null;
+  category: string | null;
+};
+
+const REC_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  imageUrl: true,
+  brand: true,
+  category: { select: { name: true } },
+} as const;
+
+function toRec(d: {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  brand: string | null;
+  category: { name: string } | null;
+}): RecDrink {
+  return { id: d.id, name: d.name, slug: d.slug, imageUrl: d.imageUrl, brand: d.brand, category: d.category?.name ?? null };
+}
+
+// "Picked for you" — drinks ranked by the user's taste (categories they browse +
+// stated spirits), most-reviewed first. Backfills with popular drinks on cold start
+// or sparse taste, so the rail is never empty.
+export async function getRecommendations(userId: string, take = 12): Promise<RecDrink[]> {
+  const taste = await getTasteProfile(userId);
+  const wanted = Array.from(new Set([...taste.topCategories, ...taste.spirits])).filter(Boolean);
+
+  const matched = wanted.length
+    ? await prisma.drink.findMany({
+        where: { category: { name: { in: wanted } } },
+        take,
+        orderBy: { reviews: { _count: "desc" } },
+        select: REC_SELECT,
+      })
+    : [];
+
+  if (matched.length >= take) return matched.map(toRec);
+
+  // Backfill with popular drinks not already included.
+  const have = new Set(matched.map((d) => d.id));
+  const extra = await prisma.drink.findMany({
+    where: have.size ? { id: { notIn: [...have] } } : {},
+    take: take - matched.length,
+    orderBy: { reviews: { _count: "desc" } },
+    select: REC_SELECT,
+  });
+  return [...matched, ...extra].map(toRec);
+}

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { PostCard } from "@/components/feed/post-card";
 import { DrinkCard } from "@/components/drinks/drink-card";
+import { PickedForYou } from "@/components/discovery/picked-for-you";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 
@@ -118,7 +119,11 @@ export function SearchView() {
       {/* Discovery hub — shown until the user actually searches. Keeps the
           browse surfaces one tap away on phones, where they left the nav bar. */}
       {!searched && !loading && (
-        <div className="space-y-3">
+        <div className="space-y-6">
+          {/* Personalized rail — drinks picked from the user's behavior. Hides
+              itself when there's nothing to show (logged-out / no data). */}
+          <PickedForYou />
+          <div className="space-y-3">
           <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Browse
           </h2>
@@ -138,6 +143,7 @@ export function SearchView() {
                 <span className="text-xs text-muted-foreground">{b.sub}</span>
               </Link>
             ))}
+          </div>
           </div>
         </div>
       )}
