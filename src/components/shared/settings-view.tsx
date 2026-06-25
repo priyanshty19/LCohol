@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { NotificationToggle } from "@/components/settings/notification-toggle";
+import { DeleteAccount } from "@/components/settings/delete-account";
 
 const DRINKING_STYLES = [
   { value: "SOCIAL", label: "Social Drinker" },
@@ -234,6 +235,7 @@ export function SettingsView() {
             Your email is private and never shown publicly. Your username is
             your public identity.
           </p>
+          <DeleteAccount />
         </CardContent>
       </Card>
     </div>

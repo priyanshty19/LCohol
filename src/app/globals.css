@@ -492,9 +492,10 @@
    ============================================================ */
 
 @utility glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* Solid, vibe-themed card surface. A translucent backdrop-filter here smeared
+     the ambient page glow + film grain through every card, reading differently
+     in each vibe theme (same failure mode as glass-nav). --card retints per vibe. */
+  background: var(--card);
   border: 1px solid var(--glass-border);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
