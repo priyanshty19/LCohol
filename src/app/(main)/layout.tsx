@@ -14,9 +14,16 @@ export default async function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Ban enforcement at the shell: a suspended account can read nothing.
   const user = await getCurrentUser();
-  if (user?.isBanned) redirect("/denied");
+
+  // Stale-session loop-breaker: a valid session cookie that no longer resolves to a
+  // DB user reaches here because the edge middleware only verifies the cookie (no DB).
+  // Without this, the page would redirect to /login and the middleware would bounce
+  // it back (cookie still "valid") → infinite redirect loop. Clear the cookie instead.
+  if (!user) redirect("/api/auth/logout");
+
+  // Ban enforcement at the shell: a suspended account can read nothing.
+  if (user.isBanned) redirect("/denied");
 
   // First-run gate: a logged-in user who hasn't finished (or skipped) the taste
   // quiz is bounced to /onboarding, which lives OUTSIDE this (main) group so the
