@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
+import { canonicalizeEmail } from "@/lib/email-normalize";
 import { isTestReferralCode } from "@/lib/referral";
 import {
   acceptReferralTx,
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const email = (body.email ?? "").trim().toLowerCase();
+    const email = canonicalizeEmail(body.email);
     const password: string = body.password ?? "";
     const username = (body.username ?? "").trim();
     const dobStr: string = body.dob ?? "";

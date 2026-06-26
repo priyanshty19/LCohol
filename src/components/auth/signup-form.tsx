@@ -14,6 +14,9 @@ import { generateFunkyName } from "@/lib/funky-names";
 
 type DrinkOption = { id: string; name: string; brand?: string | null };
 
+// Survives a refresh during the OTP wait — see the restore effect below.
+const SU_OTP_KEY = "ss_signup_otp";
+
 function clerkError(e: unknown, fallback: string): string {
   const er = e as { errors?: { longMessage?: string; message?: string }[] };
   return er?.errors?.[0]?.longMessage ?? er?.errors?.[0]?.message ?? fallback;
@@ -56,11 +59,28 @@ export function SignupForm() {
     consent: false,
   });
 
-  // Suggest a funky pseudonym on first paint (effect → no hydration mismatch).
+  // Restore an in-flight OTP step across a refresh: Clerk rehydrates its own
+  // verification attempt, so we only need to bring the form's step + captured
+  // details back (without this, a refresh dropped the user onto a blank form that
+  // then errored "email already registered"). Otherwise suggest a funky pseudonym.
   useEffect(() => {
-    // Random pseudonym is client-only to avoid an SSR/client hydration mismatch.
+    let restored = false;
+    try {
+      const raw = sessionStorage.getItem(SU_OTP_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s?.step === "otp" && s?.details?.email) {
+          setDetails(s.details);
+          setUsername(s.username || generateFunkyName());
+          setStep("otp");
+          restored = true;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUsername(generateFunkyName());
+    if (!restored) setUsername(generateFunkyName());
   }, []);
 
   useEffect(() => {
@@ -135,8 +155,17 @@ export function SignupForm() {
     try {
       await signUp.create({ emailAddress: email });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setDetails({ email, dob, referralCode, favoriteDrinkId, consent });
+      const captured = { email, dob, referralCode, favoriteDrinkId, consent };
+      setDetails(captured);
       setStep("otp");
+      try {
+        sessionStorage.setItem(
+          SU_OTP_KEY,
+          JSON.stringify({ step: "otp", details: captured, username: username.trim() }),
+        );
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       setError(
         clerkError(
@@ -195,6 +224,11 @@ export function SignupForm() {
         }
         setLoading(false);
         return;
+      }
+      try {
+        sessionStorage.removeItem(SU_OTP_KEY);
+      } catch {
+        /* ignore */
       }
       router.push("/onboarding");
       router.refresh();
@@ -271,6 +305,11 @@ export function SignupForm() {
                   setStep("details");
                   setCode("");
                   setError(null);
+                  try {
+                    sessionStorage.removeItem(SU_OTP_KEY);
+                  } catch {
+                    /* ignore */
+                  }
                 }}
                 className="hover:text-primary"
               >

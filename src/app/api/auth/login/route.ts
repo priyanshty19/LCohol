@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
+import { canonicalizeEmail } from "@/lib/email-normalize";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const email = (body.email ?? "").trim().toLowerCase();
+    const email = canonicalizeEmail(body.email);
     const password = body.password ?? "";
 
     if (!email || !password) {

@@ -9,6 +9,7 @@ import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { verifiedEmailFromClerkToken, clerkBackend } from "@/lib/clerk";
+import { canonicalizeEmail } from "@/lib/email-normalize";
 import {
   createSessionToken,
   SESSION_COOKIE,
@@ -63,7 +64,9 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-    const email = verified.email;
+    // Canonicalize so a Gmail address typed with/without dots resolves to the one
+    // account (the prod "no account / already exists" bug).
+    const email = canonicalizeEmail(verified.email);
 
     // We don't keep Clerk sessions around — fire-and-forget revoke.
     if (verified.sessionId) {
