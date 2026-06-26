@@ -64,7 +64,7 @@ export function ProfileView({ username, initialProfile }: ProfileViewProps) {
     // person accepting/declining without a full reload.
     const id = setInterval(() => {
       if (document.visibilityState === "visible") load();
-    }, 12000);
+    }, 30000);
     const onFocus = () => {
       if (document.visibilityState === "visible") load();
     };

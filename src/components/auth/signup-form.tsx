@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { generateFunkyName } from "@/lib/funky-names";
+import { bustAuthCache } from "@/hooks/use-auth";
 
 type DrinkOption = { id: string; name: string; brand?: string | null };
 
@@ -230,6 +231,7 @@ export function SignupForm() {
       } catch {
         /* ignore */
       }
+      bustAuthCache(); // brand-new member — clear any cached null /api/auth/me before the shell loads
       router.push("/onboarding");
       router.refresh();
     } catch (e) {
