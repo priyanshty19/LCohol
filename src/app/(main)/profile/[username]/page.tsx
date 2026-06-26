@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ProfileView } from "@/components/shared/profile-view";
+import { TrackView } from "@/components/track-view";
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileWithViewer } from "@/lib/profile";
 
@@ -13,5 +14,12 @@ export default async function ProfilePage({
   const initialProfile = await getProfileWithViewer(username, me?.id ?? null);
   if (!initialProfile) notFound();
 
-  return <ProfileView username={username} initialProfile={initialProfile} />;
+  return (
+    <>
+      {me?.profile?.username !== username && (
+        <TrackView targetType="PROFILE" context={{ username }} />
+      )}
+      <ProfileView username={username} initialProfile={initialProfile} />
+    </>
+  );
 }

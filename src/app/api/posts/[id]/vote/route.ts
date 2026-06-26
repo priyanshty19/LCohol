@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { recomputeKarma } from "@/lib/karma";
+import { logInteraction } from "@/lib/interactions";
 
 export async function POST(
   request: Request,
@@ -19,6 +20,13 @@ export async function POST(
   if (value !== 1 && value !== -1) {
     return NextResponse.json({ error: "Invalid vote value" }, { status: 400 });
   }
+
+  logInteraction({
+    userId: dbUser.id,
+    interactionType: value === 1 ? "UPVOTE" : "DOWNVOTE",
+    targetType: "POST",
+    targetId: postId,
+  });
 
   const existing = await prisma.vote.findUnique({
     where: { userId_postId: { userId: dbUser.id, postId } },

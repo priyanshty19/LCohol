@@ -11,6 +11,9 @@ export type JamesUserContext = {
   preferredFlavours?: string[] | null;
   intensity?: string | null;
   intent?: string | null;
+  // Demonstrated taste (from behavior), not just stated prefs.
+  recentDrinks?: string[] | null;
+  topCategories?: string[] | null;
 };
 
 const INTENSITY_LABELS: Record<string, string> = {
@@ -42,6 +45,12 @@ export function buildSystemPrompt(
     ctx.drinkingStyle ? `Drinking style: ${ctx.drinkingStyle.toLowerCase()}.` : null,
     spirits.length ? `Leans toward ${spirits.join(", ")}.` : null,
     flavours.length ? `Loves ${flavours.join(", ")} flavours.` : null,
+    ctx.topCategories?.length
+      ? `Lately browsing a lot of ${ctx.topCategories.slice(0, 3).join(", ")}.`
+      : null,
+    ctx.recentDrinks?.length
+      ? `Recently eyed: ${ctx.recentDrinks.slice(0, 4).join(", ")}.`
+      : null,
     ctx.intensity && INTENSITY_LABELS[ctx.intensity]
       ? `Tonight they're ${INTENSITY_LABELS[ctx.intensity]}.`
       : null,

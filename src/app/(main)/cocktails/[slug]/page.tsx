@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CocktailDetail } from "@/components/cocktails/cocktail-detail";
+import { TrackView } from "@/components/track-view";
 import { getCocktailBySlug } from "@/lib/cocktails";
 import { toCatalogCocktail } from "@/lib/catalog";
 import { getCurrentUser } from "@/lib/auth";
@@ -39,5 +40,10 @@ export default async function CocktailDetailPage({
     if (cocktail.authorId !== me?.id) notFound();
   }
 
-  return <CocktailDetail entry={toCatalogCocktail(cocktail)} />;
+  return (
+    <>
+      <TrackView targetType="COCKTAIL" targetId={cocktail.id} context={{ slug }} />
+      <CocktailDetail entry={toCatalogCocktail(cocktail)} />
+    </>
+  );
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ChatGroq } from "@langchain/groq";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getCurrentUser } from "@/lib/auth";
+import { logInteraction } from "@/lib/interactions";
+import { getTasteProfile } from "@/lib/behavior";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
 import { retrieveDrinks } from "@/lib/james/retriever";
@@ -87,6 +89,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ask James something first." }, { status: 400 });
   }
 
+  logInteraction({
+    userId: user.id,
+    interactionType: "ASK_JAMES",
+    targetType: "JAMES",
+    context: { q: lastUser.slice(0, 200) },
+  });
+
   let favoriteDrink: string | null = null;
   if (user.profile?.favoriteDrinkId) {
     const fav = await prisma.drink.findUnique({
@@ -96,7 +105,12 @@ export async function POST(request: NextRequest) {
     favoriteDrink = fav?.name ?? null;
   }
 
-  const groundingDrinks = await retrieveDrinks(lastUser);
+  // Fetch the grounding catalog + the user's demonstrated taste in parallel so the
+  // behavioral signal adds no latency over the existing retrieval step.
+  const [groundingDrinks, taste] = await Promise.all([
+    retrieveDrinks(lastUser),
+    getTasteProfile(user.id),
+  ]);
   const system =
     buildSystemPrompt(
       {
@@ -109,6 +123,8 @@ export async function POST(request: NextRequest) {
         preferredFlavours: user.profile?.preferredFlavours,
         intensity: user.profile?.intensity,
         intent: user.profile?.intent,
+        recentDrinks: taste.recentDrinks,
+        topCategories: taste.topCategories,
       },
       groundingDrinks
     ) + ACTION_PROTOCOL;

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getPartyDetail } from "@/lib/parties";
 import { PartyDetail } from "@/components/party/party-detail";
+import { TrackView } from "@/components/track-view";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
   if (!isHost && !myInvite) notFound(); // only host + invited guests
 
   return (
-    <PartyDetail party={party} isHost={isHost} myRsvp={myInvite?.rsvp ?? null} meId={user.id} />
+    <>
+      <TrackView targetType="PARTY" targetId={id} />
+      <PartyDetail party={party} isHost={isHost} myRsvp={myInvite?.rsvp ?? null} meId={user.id} />
+    </>
   );
 }

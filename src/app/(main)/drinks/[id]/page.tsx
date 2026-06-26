@@ -1,4 +1,6 @@
 import { DrinkDetail } from "@/components/drinks/drink-detail";
+import { TrackView } from "@/components/track-view";
+import { SimilarDrinks } from "@/components/discovery/similar-drinks";
 
 export default async function DrinkPage({
   params,
@@ -6,5 +8,13 @@ export default async function DrinkPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <DrinkDetail drinkSlug={id} />;
+  return (
+    <>
+      <TrackView interactionType="CLICK_DRINK" targetType="DRINK" context={{ slug: id }} />
+      <DrinkDetail drinkSlug={id} />
+      <div className="mt-8">
+        <SimilarDrinks slug={id} />
+      </div>
+    </>
+  );
 }

@@ -62,7 +62,7 @@ export type ProfileWithStats = Profile & {
   user: { _count: { posts: number; comments: number } };
 };
 
-export type FeedSortOption = "hot" | "new" | "top";
+export type FeedSortOption = "for-you" | "hot" | "new" | "top";
 
 export type TimePeriod = "day" | "week" | "month" | "year" | "all";
 

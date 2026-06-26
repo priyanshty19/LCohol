@@ -62,6 +62,7 @@ model User {
   partyGameVotes        PartyGameVote[]
   beverages             Beverage[]            @relation("BeverageAuthor")
   pushSubscriptions     PushSubscription[]
+  tasteVector           UserTasteVector?
 
   @@map("users")
 }
@@ -909,7 +910,7 @@ model UserInteraction {
   userId          String          @map("user_id") @db.Uuid
   interactionType InteractionType @map("interaction_type")
   targetType      TargetType      @map("target_type")
-  targetId        String          @map("target_id") @db.Uuid
+  targetId        String?         @map("target_id") @db.Uuid // null for query/feature events (no uuid target)
   context         Json?           // flexible context: search query, occasion, mood, etc.
   createdAt       DateTime        @default(now()) @map("created_at")
 
@@ -919,7 +920,40 @@ model UserInteraction {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@index([interactionType])
+  // Serves the hot personalization reads (getTasteProfile / getEngagedDrinkIds):
+  // filter userId + interactionType + targetType, ordered by createdAt, with a limit.
+  @@index([userId, interactionType, targetType, createdAt])
   @@map("user_interactions")
+}
+
+// Precomputed CONTENT taste vector per user — weighted feature affinities
+// (e.g. {"cat:Whisky":0.8,"mood:smoky":0.6}) derived from reviews + views + saves
+// + onboarding prefs, time-decayed. Rebuilt by the recompute cron so reads are O(1)
+// instead of a groupBy on every request.
+model UserTasteVector {
+  userId    String   @id @map("user_id") @db.Uuid
+  vector    Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_taste_vectors")
+}
+
+// Precomputed COLLABORATIVE item-item similarity (drink↔drink), from co-engagement
+// across users (cosine over the interaction matrix). Top-K neighbours per item.
+// Not FK'd to Drink — the recompute job rebuilds it wholesale, so stale rows are
+// harmless and we avoid cascade churn on catalog edits.
+model ItemSimilarity {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemType String @map("item_type") // "DRINK"
+  itemAId  String @map("item_a_id") @db.Uuid
+  itemBId  String @map("item_b_id") @db.Uuid
+  score    Float
+
+  @@unique([itemType, itemAId, itemBId])
+  @@index([itemType, itemAId, score])
+  @@map("item_similarity")
 }
 
 enum InteractionType {
@@ -932,6 +966,8 @@ enum InteractionType {
   CLICK_DRINK
   CREATE_COCKTAIL
   CREATE_POST
+  RSVP
+  ASK_JAMES
 
   @@map("interaction_type")
 }
@@ -943,6 +979,11 @@ enum TargetType {
   COCKTAIL
   PROFILE
   SEARCH_QUERY
+  BAR
+  PARTY
+  MIXLAB
+  JAMES
+  FEATURE
 
   @@map("target_type")
 }

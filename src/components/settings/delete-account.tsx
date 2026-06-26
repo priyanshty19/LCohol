@@ -28,6 +28,9 @@ export function DeleteAccount() {
   const [keepEmail, setKeepEmail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Personalized retention pitch — the under-used feature most worth pitching,
+  // chosen from the user's behavior. Falls back to the Mix Lab pitch.
+  const [pitch, setPitch] = useState<{ headline: string; body: string; href: string } | null>(null);
 
   function reset() {
     setStep("nudge");
@@ -64,7 +67,14 @@ export function DeleteAccount() {
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) reset();
+        if (o) {
+          fetch("/api/me/pitch")
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => d?.pitch && setPitch(d.pitch))
+            .catch(() => {});
+        } else {
+          reset();
+        }
       }}
     >
       <DialogTrigger
@@ -85,10 +95,8 @@ export function DeleteAccount() {
             <DialogHeader>
               <DialogTitle>Wait — before you go 🍸</DialogTitle>
               <DialogDescription>
-                Have you tried the{" "}
-                <span className="font-medium text-foreground">3D Mix Lab</span>? Pour,
-                stir and garnish your own cocktail, then save it to your shelf. Most
-                people who build their first one stick around for the next round.
+                {pitch?.body ??
+                  "Have you tried the 3D Mix Lab? Pour, stir and garnish your own cocktail, then save it to your shelf. Most people who build their first one stick around for the next round."}
               </DialogDescription>
             </DialogHeader>
 
@@ -97,11 +105,11 @@ export function DeleteAccount() {
               onClick={() => {
                 setOpen(false);
                 reset();
-                router.push("/mix");
+                router.push(pitch?.href ?? "/mix");
               }}
               className="w-full rounded-lg border border-[var(--ml-velvet-bright)]/30 bg-card p-3 text-left text-sm transition hover:border-[var(--ml-velvet-bright)]/60"
             >
-              🧪 <span className="font-medium">Open the Mix Lab</span>
+              ✨ <span className="font-medium">{pitch?.headline ?? "Open the Mix Lab"}</span>
               <span className="block text-xs text-muted-foreground">
                 Takes 30 seconds. No commitment.
               </span>

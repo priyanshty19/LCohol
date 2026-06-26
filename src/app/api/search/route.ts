@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
 import { SEARCH_PAGE_SIZE } from "@/lib/constants";
+import { logInteraction } from "@/lib/interactions";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -104,6 +105,26 @@ export async function GET(request: Request) {
   if (posts) results.posts = posts;
   if (drinks) results.drinks = drinks;
   if (profiles) results.profiles = profiles;
+
+  // Behavioral signal: what users search for (and how many results they got).
+  // getCurrentUser is request-cached, so this reuses the lookup above.
+  const me = await getCurrentUser();
+  if (me) {
+    logInteraction({
+      userId: me.id,
+      interactionType: "SEARCH",
+      targetType: "SEARCH_QUERY",
+      context: {
+        query: q.slice(0, 120),
+        type,
+        resultCounts: {
+          posts: posts?.length ?? 0,
+          drinks: drinks?.length ?? 0,
+          profiles: profiles?.length ?? 0,
+        },
+      },
+    });
+  }
 
   return NextResponse.json(results);
 }

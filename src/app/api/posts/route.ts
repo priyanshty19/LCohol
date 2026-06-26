@@ -7,6 +7,7 @@ import { getPostsFeed } from "@/lib/posts";
 import { recomputeKarma } from "@/lib/karma";
 import { persistMentions } from "@/lib/mentions";
 import { notifyMany } from "@/lib/notifications";
+import { logInteraction } from "@/lib/interactions";
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
  *  under the public storage path. Structural checks — no substring matching. */
@@ -134,5 +135,14 @@ export async function POST(request: Request) {
         )
       : Promise.resolve(),
   ]);
+
+  logInteraction({
+    userId: dbUser.id,
+    interactionType: "CREATE_POST",
+    targetType: "POST",
+    targetId: post.id,
+    context: { visibility: post.visibility },
+  });
+
   return NextResponse.json({ data: post }, { status: 201 });
 }

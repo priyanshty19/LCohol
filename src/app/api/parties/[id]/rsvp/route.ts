@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { notify } from "@/lib/notifications";
+import { logInteraction } from "@/lib/interactions";
 
 const VALID = new Set(["GOING", "MAYBE", "DECLINED"]);
 
@@ -36,6 +37,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   });
 
   await notify({ userId: party.authorId, actorId: me.id, type: "RSVP", partyId: id });
+
+  logInteraction({
+    userId: me.id,
+    interactionType: "RSVP",
+    targetType: "PARTY",
+    targetId: id,
+    context: { status: body.status },
+  });
 
   return NextResponse.json({ data: { rsvp: body.status } });
 }
