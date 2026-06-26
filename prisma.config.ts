@@ -9,6 +9,9 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations / db push need a SESSION or DIRECT connection (the transaction
+    // pooler can't run them). Prefer DIRECT_URL when set, so DATABASE_URL is free
+    // to point at the transaction pooler (port 6543) for the serverless runtime.
+    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });
