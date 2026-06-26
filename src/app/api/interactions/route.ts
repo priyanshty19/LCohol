@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { logInteraction } from "@/lib/interactions";
+import { rateLimit } from "@/lib/rate-limit";
 import type { InteractionType, TargetType } from "@/generated/prisma/client";
 
 // Client beacon for events that only exist in the browser (page views, opening a
@@ -13,9 +14,16 @@ const CLIENT_TARGETS = new Set<TargetType>([
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  // Beacons from logged-out visitors are silently ignored (still return 200 so
+  // Beacons from logged-out (or banned) visitors are silently ignored (still 200 so
   // sendBeacon never surfaces an error).
-  if (!user) return NextResponse.json({ ok: true });
+  if (!user || user.isBanned) return NextResponse.json({ ok: true });
+
+  // Cap write-amplification: a client could otherwise loop sendBeacon to flood
+  // inserts (cost + poisons the signals). 120 events/min/user is generous for
+  // genuine page views; excess is dropped silently.
+  if (!rateLimit(`beacon:${user.id}`, 120, 60_000)) {
+    return NextResponse.json({ ok: true });
+  }
 
   const body = await request.json().catch(() => ({}));
   const interactionType = body?.interactionType as InteractionType;

@@ -113,14 +113,20 @@ export async function recomputeSignals(): Promise<{
     for (const { b, s } of scored) simRows.push({ itemAId: a, itemBId: b, score: s });
   }
 
-  // Replace the DRINK similarity rows wholesale.
-  await prisma.itemSimilarity.deleteMany({ where: { itemType: "DRINK" } });
-  for (let i = 0; i < simRows.length; i += 1000) {
-    await prisma.itemSimilarity.createMany({
-      data: simRows.slice(i, i + 1000).map((r) => ({ itemType: "DRINK", ...r })),
-      skipDuplicates: true,
-    });
-  }
+  // Replace the DRINK similarity rows atomically, so live readers (recommendDrinks /
+  // similarDrinks) never observe an empty or partially-rebuilt table mid-rebuild.
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.itemSimilarity.deleteMany({ where: { itemType: "DRINK" } });
+      for (let i = 0; i < simRows.length; i += 1000) {
+        await tx.itemSimilarity.createMany({
+          data: simRows.slice(i, i + 1000).map((r) => ({ itemType: "DRINK", ...r })),
+          skipDuplicates: true,
+        });
+      }
+    },
+    { timeout: 30_000 },
+  );
 
   return { users: userCount, drinks: drinkTokens.size, pairs: simRows.length };
 }

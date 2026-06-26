@@ -33,7 +33,12 @@ function toRec(d: {
 // Drinks the user has demonstrably engaged with (reviews + recent views).
 async function getEngagedDrinkIds(userId: string): Promise<string[]> {
   const [reviews, views] = await Promise.all([
-    prisma.drinkReview.findMany({ where: { authorId: userId }, select: { drinkId: true }, take: 50 }),
+    prisma.drinkReview.findMany({
+      where: { authorId: userId },
+      orderBy: { createdAt: "desc" },
+      select: { drinkId: true },
+      take: 50,
+    }),
     prisma.userInteraction.findMany({
       where: { userId, interactionType: "CLICK_DRINK", targetType: "DRINK" },
       orderBy: { createdAt: "desc" },

@@ -141,9 +141,15 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
   if (slugs.length) {
     const drinks = await prisma.drink.findMany({
       where: { slug: { in: slugs } },
-      select: { name: true, category: { select: { name: true } } },
+      select: { slug: true, name: true, category: { select: { name: true } } },
     });
-    recentDrinks = drinks.map((d) => d.name).slice(0, 8);
+    // `IN (...)` does not preserve the slug array's order, so re-impose the
+    // recency order (slugs is newest-first) before taking the most-recent 8.
+    const order = new Map(slugs.map((s, i) => [s, i]));
+    recentDrinks = [...drinks]
+      .sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0))
+      .map((d) => d.name)
+      .slice(0, 8);
     const catCount = new Map<string, number>();
     for (const d of drinks) {
       const c = d.category?.name;
@@ -167,60 +173,6 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
   };
 }
 
-export type RecDrink = {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string | null;
-  brand: string | null;
-  category: string | null;
-};
-
-const REC_SELECT = {
-  id: true,
-  name: true,
-  slug: true,
-  imageUrl: true,
-  brand: true,
-  category: { select: { name: true } },
-} as const;
-
-function toRec(d: {
-  id: string;
-  name: string;
-  slug: string;
-  imageUrl: string | null;
-  brand: string | null;
-  category: { name: string } | null;
-}): RecDrink {
-  return { id: d.id, name: d.name, slug: d.slug, imageUrl: d.imageUrl, brand: d.brand, category: d.category?.name ?? null };
-}
-
-// "Picked for you" — drinks ranked by the user's taste (categories they browse +
-// stated spirits), most-reviewed first. Backfills with popular drinks on cold start
-// or sparse taste, so the rail is never empty.
-export async function getRecommendations(userId: string, take = 12): Promise<RecDrink[]> {
-  const taste = await getTasteProfile(userId);
-  const wanted = Array.from(new Set([...taste.topCategories, ...taste.spirits])).filter(Boolean);
-
-  const matched = wanted.length
-    ? await prisma.drink.findMany({
-        where: { category: { name: { in: wanted } } },
-        take,
-        orderBy: { reviews: { _count: "desc" } },
-        select: REC_SELECT,
-      })
-    : [];
-
-  if (matched.length >= take) return matched.map(toRec);
-
-  // Backfill with popular drinks not already included.
-  const have = new Set(matched.map((d) => d.id));
-  const extra = await prisma.drink.findMany({
-    where: have.size ? { id: { notIn: [...have] } } : {},
-    take: take - matched.length,
-    orderBy: { reviews: { _count: "desc" } },
-    select: REC_SELECT,
-  });
-  return [...matched, ...extra].map(toRec);
-}
+// NOTE: the drink recommender (getRecommendations/RecDrink/REC_SELECT/toRec) moved
+// to src/lib/recommend.ts (hybrid CF + content). This module keeps the taste profile
+// + retention pitch only.

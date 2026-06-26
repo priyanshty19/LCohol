@@ -35,7 +35,9 @@ export function DrinkRail({ title, endpoint }: { title: string; endpoint: string
     };
   }, [endpoint]);
 
-  if (!loaded || recs.length === 0) return null;
+  // Collapse only once we KNOW it's empty; while loading we reserve height with a
+  // skeleton so the content below doesn't jump (no layout shift / pop-in).
+  if (loaded && recs.length === 0) return null;
 
   return (
     <section className="space-y-2">
@@ -43,7 +45,15 @@ export function DrinkRail({ title, endpoint }: { title: string; endpoint: string
         {title}
       </h2>
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {recs.map((r) => (
+        {!loaded &&
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={`sk-${i}`} className="w-32 shrink-0" aria-hidden>
+              <div className="aspect-square animate-pulse rounded-xl border border-border/60 bg-muted" />
+              <div className="mt-1.5 h-4 w-24 animate-pulse rounded bg-muted" />
+            </div>
+          ))}
+        {loaded &&
+          recs.map((r) => (
           <Link key={r.id} href={`/drinks/${r.slug}`} className="group w-32 shrink-0">
             <div className="relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-card">
               {r.imageUrl ? (

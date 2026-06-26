@@ -920,6 +920,9 @@ model UserInteraction {
   @@index([targetType, targetId])
   @@index([createdAt])
   @@index([interactionType])
+  // Serves the hot personalization reads (getTasteProfile / getEngagedDrinkIds):
+  // filter userId + interactionType + targetType, ordered by createdAt, with a limit.
+  @@index([userId, interactionType, targetType, createdAt])
   @@map("user_interactions")
 }
 
