@@ -2,6 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
+import { canonicalizeEmail } from "@/lib/email-normalize";
 
 /**
  * Get the current authenticated user's DB record from the session cookie.
@@ -20,8 +21,10 @@ export const getCurrentUser = cache(async () => {
   const email = await verifySessionToken(token);
   if (!email) return null;
 
+  // Canonicalize so sessions minted before the email backfill (raw, possibly
+  // dotted Gmail) still resolve to the now-canonical user row.
   return prisma.user.findFirst({
-    where: { email },
+    where: { email: canonicalizeEmail(email) },
     include: { profile: true },
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+
+// Survives a refresh during the OTP wait — see the restore effect below.
+const LI_OTP_KEY = "ss_login_otp";
 
 function clerkError(e: unknown, fallback: string): string {
   const er = e as { errors?: { longMessage?: string; message?: string }[] };
@@ -31,6 +34,24 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Restore an in-flight OTP step across a refresh (Clerk rehydrates its own
+  // verification attempt; we just bring the step + email back).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(LI_OTP_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s?.step === "otp" && s?.email) {
+          setEmail(s.email);
+          setFlow(s.flow === "signup" ? "signup" : "signin");
+          setStep("otp");
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Step 1 — send the OTP.
   async function handleEmail(e: React.FormEvent<HTMLFormElement>) {
@@ -56,6 +77,11 @@ export function LoginForm() {
       });
       setFlow("signin");
       setStep("otp");
+      try {
+        sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email: addr, flow: "signin" }));
+      } catch {
+        /* ignore */
+      }
     } catch {
       // Clerk has no user for this email → verify via signUp; the backend will
       // tell us whether they're an existing member or need to register.
@@ -64,6 +90,11 @@ export function LoginForm() {
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
         setFlow("signup");
         setStep("otp");
+        try {
+          sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email: addr, flow: "signup" }));
+        } catch {
+          /* ignore */
+        }
       } catch (e2) {
         setError(clerkError(e2, "Couldn't send a code to that email."));
       }
@@ -118,6 +149,11 @@ export function LoginForm() {
         }
         setLoading(false);
         return;
+      }
+      try {
+        sessionStorage.removeItem(LI_OTP_KEY);
+      } catch {
+        /* ignore */
       }
       router.push("/");
       router.refresh();
@@ -205,6 +241,11 @@ export function LoginForm() {
                   setStep("email");
                   setCode("");
                   setError(null);
+                  try {
+                    sessionStorage.removeItem(LI_OTP_KEY);
+                  } catch {
+                    /* ignore */
+                  }
                 }}
                 className="hover:text-primary"
               >
