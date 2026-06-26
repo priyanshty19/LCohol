@@ -78,50 +78,37 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
   const [searching, setSearching] = useState(false);
   const [requests, setRequests] = useState<Requests>({ incoming: [], outgoing: [] });
 
-  const loadReferrals = useCallback(async () => {
-    const r = await fetch("/api/referrals");
+  // One fetch for all three sections (invites + connections + requests). The old
+  // code fired 3 separate requests per refresh; /api/circle/summary bundles them
+  // into a single DB round-trip — see that route for the rationale.
+  const loadSummary = useCallback(async () => {
+    const r = await fetch("/api/circle/summary");
     const d = await safeJson(r);
     if (r.ok && d) {
       setReferrals(d.data.referrals);
       setActiveCount(d.data.activeCount);
       setMaxActive(d.data.maxActive);
+      setConnections(d.data.connections);
+      setRequests(d.data.requests);
     } else {
-      setError("Couldn't load your invites. Please try again.");
+      setError("Couldn't load your circle. Please try again.");
     }
   }, []);
 
-  const loadConnections = useCallback(async () => {
-    const r = await fetch("/api/connections");
-    const d = await safeJson(r);
-    if (r.ok && d) setConnections(d.data);
-  }, []);
-
-  const loadRequests = useCallback(async () => {
-    const r = await fetch("/api/connections/requests");
-    const d = await safeJson(r);
-    if (r.ok && d) setRequests(d.data);
-  }, []);
-
   useEffect(() => {
-    void (async () => {
-      await Promise.all([loadReferrals(), loadConnections(), loadRequests()]);
-    })();
-  }, [loadReferrals, loadConnections, loadRequests]);
+    void loadSummary();
+  }, [loadSummary]);
 
-  // Near-real-time: quietly re-sync the sections every 12s while the tab is
-  // visible, and immediately when the user returns to it — so new invites,
-  // requests and connections appear without a manual reload.
+  // Near-real-time: quietly re-sync every 30s while the tab is visible, and
+  // immediately when the user returns to it — so new invites, requests and
+  // connections appear without a manual reload. 30s (was 12s) since one tab
+  // open all day shouldn't keep hammering the pool for low-churn data.
   useEffect(() => {
-    const refresh = () => {
-      void loadReferrals();
-      void loadConnections();
-      void loadRequests();
-    };
     const id = setInterval(() => {
-      if (document.visibilityState === "visible") refresh();
-    }, 12000);
+      if (document.visibilityState === "visible") void loadSummary();
+    }, 30000);
     const onFocus = () => {
-      if (document.visibilityState === "visible") refresh();
+      if (document.visibilityState === "visible") void loadSummary();
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
@@ -130,7 +117,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
     };
-  }, [loadReferrals, loadConnections, loadRequests]);
+  }, [loadSummary]);
 
   // Debounced people search (all state changes happen inside the timeout, not
   // synchronously in the effect body).
@@ -165,7 +152,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
       setResults((rs) =>
         rs.map((x) => (x.username === username ? { ...x, relationship: "pending" } : x)),
       );
-      await loadRequests();
+      await loadSummary();
     }
     setBusy(false);
   }
@@ -174,7 +161,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
     setBusy(true);
     setError(null);
     await fetch(`/api/connections/requests/${id}/${action}`, { method: "POST" });
-    await Promise.all([loadRequests(), loadConnections()]);
+    await loadSummary();
     setBusy(false);
   }
 
@@ -189,7 +176,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
     const d = await safeJson(r);
     if (!r.ok) setError(d?.error ?? "Couldn't create an invite.");
     else setLabel("");
-    await loadReferrals();
+    await loadSummary();
     setBusy(false);
   }
 
@@ -197,7 +184,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
     setBusy(true);
     setError(null);
     await fetch(`/api/referrals/${id}/revoke`, { method: "POST" });
-    await loadReferrals();
+    await loadSummary();
     setBusy(false);
   }
 

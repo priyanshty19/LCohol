@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, bustAuthCache } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ export function Header() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    bustAuthCache(); // soft-nav keeps the module cache — clear it so we don't show the old user
     router.push("/login");
     router.refresh();
   }

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 // Shared cocktail-list query. Used by BOTH the API route (client pagination /
@@ -65,6 +66,32 @@ export async function getCocktails(opts: CocktailsQuery = {}) {
   }
 
   return { cocktails: rows, nextCursor };
+}
+
+// Read-through Data Cache in front of getCocktails. The catalog is slow-changing
+// and the rows carry NO per-user or Prisma.Decimal fields (see cocktailSelect),
+// so a shared 5-min cache is safe and serializes cleanly. This matters because
+// the /api/cocktails route reads the query string, which forces the route
+// dynamic — so its `export const revalidate` is silently ignored and every call
+// would otherwise hit Postgres. Caching the *data* here absorbs request storms
+// (crawlers, retry loops) without holding a session-pool slot per hit.
+// unstable_cache keys on the stringified arguments, so we normalize first.
+const cocktailsListCache = unstable_cache(
+  (opts: CocktailsQuery) => getCocktails(opts),
+  ["cocktails-list"],
+  { revalidate: 300, tags: ["cocktails"] },
+);
+
+export function getCocktailsCached(opts: CocktailsQuery = {}) {
+  const key: CocktailsQuery = {
+    category: opts.category ?? null,
+    barId: opts.barId ?? null,
+    q: opts.q?.trim() || null,
+    includeDiscover: Boolean(opts.includeDiscover),
+    take: opts.take ?? COCKTAILS_DEFAULT_TAKE,
+    cursor: opts.cursor ?? null,
+  };
+  return cocktailsListCache(key);
 }
 
 // Ingredient-aware search ("the way James acts"): given a set of ingredient
