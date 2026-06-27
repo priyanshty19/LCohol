@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { recomputeKarma } from "@/lib/karma";
 import { logInteraction } from "@/lib/interactions";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 export async function POST(
   request: Request,
@@ -13,6 +15,16 @@ export async function POST(
   const dbUser = await getCurrentUser();
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (dbUser.isBanned) {
+    return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+  }
+
+  if (!rateLimit(`vote:${dbUser.id}`, 30, 60_000)) {
+    return NextResponse.json(
+      { error: "You're voting too fast. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
   }
 
   const { value } = await request.json();
@@ -28,44 +40,53 @@ export async function POST(
     targetId: postId,
   });
 
-  const existing = await prisma.vote.findUnique({
-    where: { userId_postId: { userId: dbUser.id, postId } },
-  });
+  try {
+    const existing = await prisma.vote.findUnique({
+      where: { userId_postId: { userId: dbUser.id, postId } },
+    });
 
-  if (existing) {
-    if (existing.value === value) {
-      await prisma.$transaction([
-        prisma.vote.delete({ where: { id: existing.id } }),
-        prisma.post.update({
-          where: { id: postId },
-          data: { score: { decrement: value } },
-        }),
-      ]);
-      await recomputeKarma(dbUser.id);
-      return NextResponse.json({ data: { vote: null } });
-    } else {
-      await prisma.$transaction([
-        prisma.vote.update({ where: { id: existing.id }, data: { value } }),
-        prisma.post.update({
-          where: { id: postId },
-          data: { score: { increment: value * 2 } },
-        }),
-      ]);
-      await recomputeKarma(dbUser.id);
-      return NextResponse.json({ data: { vote: value } });
+    if (existing) {
+      if (existing.value === value) {
+        await prisma.$transaction([
+          prisma.vote.delete({ where: { id: existing.id } }),
+          prisma.post.update({
+            where: { id: postId },
+            data: { score: { decrement: value } },
+          }),
+        ]);
+        await recomputeKarma(dbUser.id);
+        return NextResponse.json({ data: { vote: null } });
+      } else {
+        await prisma.$transaction([
+          prisma.vote.update({ where: { id: existing.id }, data: { value } }),
+          prisma.post.update({
+            where: { id: postId },
+            data: { score: { increment: value * 2 } },
+          }),
+        ]);
+        await recomputeKarma(dbUser.id);
+        return NextResponse.json({ data: { vote: value } });
+      }
     }
+
+    await prisma.$transaction([
+      prisma.vote.create({
+        data: { userId: dbUser.id, postId, value },
+      }),
+      prisma.post.update({
+        where: { id: postId },
+        data: { score: { increment: value } },
+      }),
+    ]);
+
+    await recomputeKarma(dbUser.id);
+    return NextResponse.json({ data: { vote: value } }, { status: 201 });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/posts/[id]/vote] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/posts/[id]/vote]", err);
+    return NextResponse.json({ error: "Couldn't record your vote." }, { status: 500 });
   }
-
-  await prisma.$transaction([
-    prisma.vote.create({
-      data: { userId: dbUser.id, postId, value },
-    }),
-    prisma.post.update({
-      where: { id: postId },
-      data: { score: { increment: value } },
-    }),
-  ]);
-
-  await recomputeKarma(dbUser.id);
-  return NextResponse.json({ data: { vote: value } }, { status: 201 });
 }

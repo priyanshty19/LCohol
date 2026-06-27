@@ -4,6 +4,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { COMMENTS_PAGE_SIZE } from "@/lib/constants";
 import { persistMentions } from "@/lib/mentions";
 import { recomputeKarma } from "@/lib/karma";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+
+const COMMENT_LIMIT_PER_MIN = 10;
+const MAX_COMMENTS_PER_POST = 100;
 
 export async function GET(
   request: Request,
@@ -55,13 +60,25 @@ export async function POST(
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (dbUser.isBanned) {
+    return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+  }
+
+  if (!rateLimit(`comment-create:${dbUser.id}`, COMMENT_LIMIT_PER_MIN, 60_000)) {
+    return NextResponse.json(
+      { error: "You're commenting too fast. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const post = await prisma.post.findUnique({ where: { id: postId, isDeleted: false }, select: { id: true } });
   if (!post) {
     return NextResponse.json({ error: "Post not found" }, { status: 404 });
   }
 
-  const { body, parentId } = await request.json();
+  const raw = await request.json().catch(() => ({}));
+  const body = typeof raw.body === "string" ? raw.body.slice(0, 4000) : "";
+  const parentId = typeof raw.parentId === "string" ? raw.parentId : null;
 
   if (!body || body.trim().length === 0) {
     return NextResponse.json(
@@ -70,33 +87,52 @@ export async function POST(
     );
   }
 
-  const comment = await prisma.comment.create({
-    data: {
-      postId,
-      authorId: dbUser.id,
-      body: body.trim(),
-      parentId: parentId || null,
-    },
-    include: {
-      author: {
-        select: {
-          profile: {
-            select: { username: true, displayName: true, avatarUrl: true },
+  try {
+    const myCount = await prisma.comment.count({
+      where: { postId, authorId: dbUser.id },
+    });
+    if (myCount >= MAX_COMMENTS_PER_POST) {
+      return NextResponse.json(
+        { error: `You've reached the ${MAX_COMMENTS_PER_POST}-comment limit on this post.` },
+        { status: 409 },
+      );
+    }
+
+    const comment = await prisma.comment.create({
+      data: {
+        postId,
+        authorId: dbUser.id,
+        body: body.trim(),
+        parentId: parentId || null,
+      },
+      include: {
+        author: {
+          select: {
+            profile: {
+              select: { username: true, displayName: true, avatarUrl: true },
+            },
           },
         },
+        _count: { select: { replies: true } },
       },
-      _count: { select: { replies: true } },
-    },
-  });
+    });
 
-  await persistMentions({
-    mentionerId: dbUser.id,
-    body: comment.body,
-    commentId: comment.id,
-    postId,
-    notifyType: "MENTION",
-  });
-  await recomputeKarma(dbUser.id);
+    await persistMentions({
+      mentionerId: dbUser.id,
+      body: comment.body,
+      commentId: comment.id,
+      postId,
+      notifyType: "MENTION",
+    });
+    await recomputeKarma(dbUser.id);
 
-  return NextResponse.json({ data: comment }, { status: 201 });
+    return NextResponse.json({ data: comment }, { status: 201 });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/posts/[id]/comments] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/posts/[id]/comments]", err);
+    return NextResponse.json({ error: "Couldn't post your comment." }, { status: 500 });
+  }
 }

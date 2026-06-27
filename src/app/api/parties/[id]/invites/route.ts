@@ -5,6 +5,10 @@ import { getConnectionUserIds } from "@/lib/connections";
 import { notifyMany } from "@/lib/notifications";
 import { generateUniqueReferralCode, referralExpiry } from "@/lib/referrals";
 import { requireHost } from "@/lib/parties";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+
+const MAX_LINK_INVITES_PER_USER = 100;
 
 // POST /api/parties/[id]/invites
 //   { userIds?: string[] }   → invite circle members (notify each)
@@ -13,6 +17,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+
+  if (!rateLimit(`party-invite:${me.id}`, 10, 60_000)) {
+    return NextResponse.json(
+      { error: "You're inviting too fast. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const party = await requireHost(id, me.id);
   if (!party) {
@@ -22,9 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => ({}));
   const result: { invited: number; code: string | null } = { invited: 0, code: null };
 
+  try {
   // Invite specific circle members.
   const requested: string[] = Array.isArray(body.userIds)
-    ? body.userIds.filter((x: unknown): x is string => typeof x === "string")
+    ? body.userIds.filter((x: unknown): x is string => typeof x === "string").slice(0, 50)
     : [];
   if (requested.length) {
     const circle = new Set(await getConnectionUserIds(me.id));
@@ -49,6 +62,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // Mint a shareable link. The code is a real Referral too, so a non-member who
   // opens it can sign up + join the host's circle (and gets RSVP'd on signup).
   if (body.generateLink) {
+    const linkInviteCount = await prisma.partyInvite.count({
+      where: { inviterId: me.id, code: { not: null } },
+    });
+    if (linkInviteCount >= MAX_LINK_INVITES_PER_USER) {
+      return NextResponse.json(
+        { error: `You've reached the ${MAX_LINK_INVITES_PER_USER}-link limit.` },
+        { status: 409 },
+      );
+    }
     const code = await generateUniqueReferralCode();
     const expires = party.startsAt && party.startsAt > new Date() ? party.startsAt : referralExpiry();
     // Atomic: the referral and its party-invite must both exist or neither —
@@ -65,6 +87,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   return NextResponse.json({ data: result });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/parties/[id]/invites] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/parties/[id]/invites]", err);
+    return NextResponse.json({ error: "Couldn't send invites." }, { status: 500 });
+  }
 }
 
 // DELETE /api/parties/[id]/invites  { inviteId }

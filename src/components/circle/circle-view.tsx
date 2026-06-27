@@ -540,6 +540,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
                 <Link
                   key={c.id}
                   href={`/profile/${c.username ?? ""}`}
+                  prefetch={false}
                   className="flex items-center gap-3 rounded-xl border border-border/40 px-4 py-3 transition-colors hover:border-primary/40"
                 >
                   <Avatar className="h-9 w-9">

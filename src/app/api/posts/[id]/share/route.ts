@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
 import { notify, notifyMany } from "@/lib/notifications";
 import { recomputeKarma } from "@/lib/karma";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // POST /api/posts/[id]/share
 //   { mode: "circle" }                     → re-share to your circle's feed
@@ -13,6 +15,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended." }, { status: 403 });
+
+  if (!rateLimit(`post-share:${me.id}`, 10, 60_000)) {
+    return NextResponse.json(
+      { error: "You're sharing too fast. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const post = await prisma.post.findFirst({
     where: { id, isDeleted: false },
@@ -33,35 +42,42 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => ({}));
   const mode = body.mode === "send" ? "send" : "circle";
 
-  if (mode === "circle") {
-    const note = typeof body.note === "string" ? body.note.slice(0, 280) : null;
-    await prisma.postShare.upsert({
-      where: { postId_sharerId: { postId: id, sharerId: me.id } },
-      create: { postId: id, sharerId: me.id, note },
-      update: { note },
+  try {
+    if (mode === "circle") {
+      const note = typeof body.note === "string" ? body.note.slice(0, 280) : null;
+      await prisma.postShare.upsert({
+        where: { postId_sharerId: { postId: id, sharerId: me.id } },
+        create: { postId: id, sharerId: me.id, note },
+        update: { note },
+      });
+      await notify({ userId: post.authorId, actorId: me.id, type: "SHARE", postId: id });
+      await recomputeKarma(me.id);
+      return NextResponse.json({ data: { shared: true } }, { status: 201 });
+    }
+
+    // send: recipients must be in the sharer's circle
+    const requested: string[] = Array.isArray(body.toUserIds)
+      ? [...new Set((body.toUserIds as unknown[]).filter((x): x is string => typeof x === "string"))].slice(0, 50)
+      : [];
+    if (!requested.length) {
+      return NextResponse.json({ error: "Pick at least one person." }, { status: 400 });
+    }
+    const circle = new Set(await getConnectionUserIds(me.id));
+    const valid = requested.filter((uid) => circle.has(uid));
+    if (!valid.length) {
+      return NextResponse.json({ error: "You can only send to people in your circle." }, { status: 400 });
+    }
+
+    await prisma.postSend.createMany({
+      data: valid.map((toUserId) => ({ postId: id, fromUserId: me.id, toUserId })),
+      skipDuplicates: true,
     });
-    await notify({ userId: post.authorId, actorId: me.id, type: "SHARE", postId: id });
-    await recomputeKarma(me.id);
-    return NextResponse.json({ data: { shared: true } }, { status: 201 });
-  }
+    await notifyMany(valid, { actorId: me.id, type: "SEND", postId: id });
 
-  // send: recipients must be in the sharer's circle
-  const requested: string[] = Array.isArray(body.toUserIds)
-    ? body.toUserIds.filter((x: unknown): x is string => typeof x === "string")
-    : [];
-  if (!requested.length) {
-    return NextResponse.json({ error: "Pick at least one person." }, { status: 400 });
+    return NextResponse.json({ data: { sent: valid.length } }, { status: 201 });
+  } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    console.error("[api/posts/[id]/share]", err);
+    return NextResponse.json({ error: "Couldn't share that post." }, { status: 500 });
   }
-  const circle = new Set(await getConnectionUserIds(me.id));
-  const valid = requested.filter((uid) => circle.has(uid));
-  if (!valid.length) {
-    return NextResponse.json({ error: "You can only send to people in your circle." }, { status: 400 });
-  }
-
-  await prisma.postSend.createMany({
-    data: valid.map((toUserId) => ({ postId: id, fromUserId: me.id, toUserId })),
-  });
-  await notifyMany(valid, { actorId: me.id, type: "SEND", postId: id });
-
-  return NextResponse.json({ data: { sent: valid.length } }, { status: 201 });
 }
