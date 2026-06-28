@@ -73,6 +73,38 @@ export async function getDrinks(opts: DrinksQuery = {}) {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Single drink by slug (or uuid) for the SSR detail page + the /api/drinks/[id]
+// route. Coerces Decimal → number (abv, communityScores.value) so the object
+// crosses the server→client prop boundary (RSC rejects Prisma.Decimal). Only
+// probe the uuid column when `slugOrId` looks like one, else Postgres tries to
+// cast the slug to uuid and throws (P2007).
+export async function getDrinkBySlug(slugOrId: string) {
+  const drink = await prisma.drink.findFirst({
+    where: UUID_RE.test(slugOrId) ? { OR: [{ id: slugOrId }, { slug: slugOrId }] } : { slug: slugOrId },
+    include: {
+      category: true,
+      subcategory: true,
+      tasteProfile: true,
+      occasions: true,
+      moods: true,
+      foodPairings: true,
+      communityScores: true,
+      _count: { select: { reviews: true, posts: true } },
+    },
+  });
+  if (!drink) return null;
+  return {
+    ...drink,
+    abv: drink.abv == null ? null : Number(drink.abv),
+    communityScores: drink.communityScores.map((c) => ({
+      ...c,
+      value: c.value == null ? null : Number(c.value),
+    })),
+  };
+}
+
 export async function getDrinkFilters() {
   const [categories, brands] = await Promise.all([
     prisma.drinkCategory.findMany({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Share2, Sparkles, Star } from "lucide-react";
@@ -52,6 +52,7 @@ const MOOD_LABELS: Record<string, string> = {
 
 interface DrinkDetailProps {
   drinkSlug: string;
+  initialDrink?: DrinkWithRelations | null;
 }
 
 // Editorial label above a section/title (brass overline, like a magazine kicker).
@@ -63,20 +64,31 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
-  const [drink, setDrink] = useState<DrinkWithRelations | null>(null);
-  const [loading, setLoading] = useState(true);
+export function DrinkDetail({ drinkSlug, initialDrink }: DrinkDetailProps) {
+  // Seeded from the server render; the effect only refetches on slug change so
+  // there's no blank-shell → client-fetch waterfall on first paint.
+  const [drink, setDrink] = useState<DrinkWithRelations | null>(initialDrink ?? null);
+  const [loading, setLoading] = useState(initialDrink == null);
+  const seeded = useRef(initialDrink != null);
 
   useEffect(() => {
+    if (seeded.current) {
+      seeded.current = false; // use the SSR seed for first paint
+      return;
+    }
+    let alive = true;
     async function load() {
       const res = await fetch(`/api/drinks/${drinkSlug}`);
-      if (res.ok) {
+      if (alive && res.ok) {
         const json = await res.json();
         setDrink(json.data);
       }
-      setLoading(false);
+      if (alive) setLoading(false);
     }
     load();
+    return () => {
+      alive = false;
+    };
   }, [drinkSlug]);
 
   function askJames(name: string) {
