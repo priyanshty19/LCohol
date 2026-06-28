@@ -58,10 +58,17 @@ A bare 500 (or a swallowed 200) on saturation invites immediate retries that amp
 - ✅ `bars/nearby` denial-of-wallet (auth + per-user/per-IP limit + coord cache), `clientIp()` un-spoofed (`33822c9`).
 - ✅ All 9 P0 + all P1/P2 mutation routes + party DELETE handlers (earlier commits).
 
-## Remaining (deferred — needs schema, infra, or is medium/low)
-- **HIGH — session revocation / immortality** (`src/lib/session.ts`): tokens sign only the email (no `iat`/epoch) → non-revocable. Needs a `User.tokenEpoch` column (**schema change → `db push` on shared prod, needs approval**) + sign `{email, iat, v}` + reject stale/`v != tokenEpoch`. *Mitigation already in place:* setting a real `SESSION_SECRET` invalidates all old tokens on deploy.
-- **MEDIUM — public-read DoS** (no rate limit + cache-bypass via query variation): `/api/posts` hot feed (500-row include + JS rank), `/api/cocktails?q=` (10k ILIKE per unique q), `/api/drinks` + `/api/drinks/search` (unindexed ILIKE incl. description). Fix: per-IP `rateLimit` (now meaningful post-`clientIp` fix) + min `q` length + ship the **pg_trgm index via a real migration** (currently only in a manual script) + `isPoolExhausted` 503 on these GETs. Edge WAF is the real backstop.
-- **MEDIUM/LOW (22+10)** — performance (indexes, denormalized popularity counters) + experience (empty/error/loading states, a11y, trust/feedback). Enumerated by a fresh audit run.
+## Done since (commits on `hotfix/prod-stabilization`)
+- ✅ **Session revocation + self-expiry** — `tokenEpoch` + `iat` (`1698d30`). *Needs `db push` to add `token_epoch` BEFORE deploy (see commit).*
+- ✅ **Public-read DoS** — per-IP rate limit + query bounds + 503 on `/api/posts`, `/api/cocktails`, `/api/drinks`, `/api/drinks/search` (`0ad97f3`).
+- ✅ **pg_trgm migration** — `prisma/add-trgm-indexes.ts` upgraded (CONCURRENTLY + description/address; operator runs it) (`1698d30`).
+- ✅ **Correctness/perf/UX batch** (`c7ca906`): rbac canonicalize, open-redirect, TEST_REFERRAL_CODES gated, moderation rank-check + karma, post id validation, getConnectionUserIds cache, cocktails/random, empty-feed state, share/comment error states, fake-"46" removed, error boundaries.
+
+## Still remaining (medium/low — careful hand-work or judgment, not auto-edit)
+- **Data-integrity (transactions):** vote score atomicity (concurrent double-click drift), RSVP write-after-check race → 404, signup/otp uniqueness P2002 → 409. Hot mutation paths — do by hand.
+- **a11y:** shared `role="alert"`/`aria-live` form-message primitive, modal Escape + focus-trap (daily-vibe, bell `aria-expanded`), bar cards as real buttons + `aria-pressed`.
+- **Larger refactors:** drink-detail SSR (kill the client-fetch waterfall), recommend-rail `unstable_cache`, drop blanket `force-dynamic` on `(main)`, denormalized popularity counter for `sort=popular`.
+- **Infra (operator):** distributed limiter (Upstash) behind `rateLimit()`, Vercel WAF.
 
 ## Ship gate before merging PR #23 to main (operator)
 1. **Set `SESSION_SECRET`** (long random) in Vercel — app won't boot without it now; forces a clean re-login.
