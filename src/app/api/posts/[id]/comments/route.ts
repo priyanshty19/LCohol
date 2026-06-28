@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { getConnectionUserIds } from "@/lib/connections";
 import { COMMENTS_PAGE_SIZE } from "@/lib/constants";
 import { persistMentions } from "@/lib/mentions";
 import { recomputeKarma } from "@/lib/karma";
@@ -15,6 +16,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: postId } = await params;
+
+  // A CIRCLE post's comments are as private as the post. Gate the read the same
+  // way the post route does and 404 (not 403) so existence doesn't leak — the
+  // edge middleware lets all /api/* through unauthenticated.
+  const post = await prisma.post.findUnique({
+    where: { id: postId, isDeleted: false },
+    select: { authorId: true, visibility: true },
+  });
+  if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+  if (post.visibility === "CIRCLE") {
+    const me = await getCurrentUser();
+    const allowed =
+      !!me &&
+      (me.id === post.authorId ||
+        (await getConnectionUserIds(me.id)).includes(post.authorId));
+    if (!allowed) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+  }
 
   const comments = await prisma.comment.findMany({
     where: { postId, parentId: null, isDeleted: false },
@@ -96,6 +114,18 @@ export async function POST(
         { error: `You've reached the ${MAX_COMMENTS_PER_POST}-comment limit on this post.` },
         { status: 409 },
       );
+    }
+
+    // A reply must point at a real, undeleted comment ON THIS POST — else a reply
+    // can be smuggled onto another post's thread, or a junk id 500s.
+    if (parentId) {
+      const parent = await prisma.comment.findFirst({
+        where: { id: parentId, postId, isDeleted: false },
+        select: { id: true },
+      });
+      if (!parent) {
+        return NextResponse.json({ error: "Parent comment not found" }, { status: 404 });
+      }
     }
 
     const comment = await prisma.comment.create({

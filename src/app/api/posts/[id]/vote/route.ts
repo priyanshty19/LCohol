@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { getConnectionUserIds } from "@/lib/connections";
 import { recomputeKarma } from "@/lib/karma";
 import { logInteraction } from "@/lib/interactions";
 import { rateLimit } from "@/lib/rate-limit";
@@ -33,14 +34,28 @@ export async function POST(
     return NextResponse.json({ error: "Invalid vote value" }, { status: 400 });
   }
 
-  logInteraction({
-    userId: dbUser.id,
-    interactionType: value === 1 ? "UPVOTE" : "DOWNVOTE",
-    targetType: "POST",
-    targetId: postId,
-  });
-
   try {
+    // Don't mutate score on a post the caller can't see — blocks score
+    // manipulation on hidden posts and an existence oracle for soft-deleted ids.
+    const post = await prisma.post.findFirst({
+      where: { id: postId, isDeleted: false },
+      select: { authorId: true, visibility: true },
+    });
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    if (post.visibility === "CIRCLE") {
+      const allowed =
+        dbUser.id === post.authorId ||
+        (await getConnectionUserIds(dbUser.id)).includes(post.authorId);
+      if (!allowed) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    logInteraction({
+      userId: dbUser.id,
+      interactionType: value === 1 ? "UPVOTE" : "DOWNVOTE",
+      targetType: "POST",
+      targetId: postId,
+    });
+
     const existing = await prisma.vote.findUnique({
       where: { userId_postId: { userId: dbUser.id, postId } },
     });
