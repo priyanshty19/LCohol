@@ -4,18 +4,23 @@
  * Functions take the role string directly so they compose with Prisma's enum.
  */
 
+import { canonicalizeEmail } from "@/lib/email-normalize";
+
 export type Role = "USER" | "MODERATOR" | "ADMIN";
 
 const RANK: Record<string, number> = { USER: 0, MODERATOR: 1, ADMIN: 2 };
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((e) => canonicalizeEmail(e))
+);
 
 /** The global admins, sourced from env (server-controlled — no self-escalation). */
 export function isAdminEmail(email: string): boolean {
-  return ADMIN_EMAILS.includes(email.trim().toLowerCase());
+  return ADMIN_EMAILS.has(canonicalizeEmail(email));
 }
 
 export function isAdmin(role: string | null | undefined): boolean {

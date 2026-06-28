@@ -125,6 +125,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // Intersect supplied relation ids against what actually exists — unknown ids
+    // would otherwise hit a nested-create FK violation (500) or persist a
+    // phantom relation. Drop anything that doesn't resolve to a real row.
+    const wantTagIds: string[] = Array.isArray(tagIds)
+      ? tagIds.filter((id: unknown): id is string => typeof id === "string")
+      : [];
+    const wantDrinkIds: string[] = Array.isArray(drinkIds)
+      ? drinkIds.filter((id: unknown): id is string => typeof id === "string")
+      : [];
+
+    const [existingTags, existingDrinks] = await Promise.all([
+      wantTagIds.length
+        ? prisma.tag.findMany({ where: { id: { in: wantTagIds } }, select: { id: true } })
+        : Promise.resolve([]),
+      wantDrinkIds.length
+        ? prisma.drink.findMany({ where: { id: { in: wantDrinkIds } }, select: { id: true } })
+        : Promise.resolve([]),
+    ]);
+
+    const validTagIds = existingTags.map((t) => t.id);
+    const validDrinkIds = existingDrinks.map((d) => d.id);
+
     const post = await prisma.post.create({
       data: {
         authorId: dbUser.id,
@@ -133,11 +155,11 @@ export async function POST(request: Request) {
         postType: postType as PostType,
         visibility: postVisibility,
         imageUrl: safeImageUrl,
-        tags: tagIds?.length
-          ? { create: tagIds.map((id: string) => ({ tagId: id })) }
+        tags: validTagIds.length
+          ? { create: validTagIds.map((id: string) => ({ tagId: id })) }
           : undefined,
-        drinks: drinkIds?.length
-          ? { create: drinkIds.map((id: string) => ({ drinkId: id })) }
+        drinks: validDrinkIds.length
+          ? { create: validDrinkIds.map((id: string) => ({ drinkId: id })) }
           : undefined,
       },
       include: {

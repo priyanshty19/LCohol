@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -38,10 +39,12 @@ export async function areConnected(a: string, b: string): Promise<boolean> {
 }
 
 /** All user ids connected to `userId` (the other side of each connection). */
-export async function getConnectionUserIds(userId: string): Promise<string[]> {
-  const rows = await prisma.connection.findMany({
-    where: { OR: [{ userAId: userId }, { userBId: userId }] },
-    select: { userAId: true, userBId: true },
-  });
-  return rows.map((r) => (r.userAId === userId ? r.userBId : r.userAId));
-}
+export const getConnectionUserIds = cache(
+  async (userId: string): Promise<string[]> => {
+    const rows = await prisma.connection.findMany({
+      where: { OR: [{ userAId: userId }, { userBId: userId }] },
+      select: { userAId: true, userBId: true },
+    });
+    return rows.map((r) => (r.userAId === userId ? r.userBId : r.userAId));
+  },
+);

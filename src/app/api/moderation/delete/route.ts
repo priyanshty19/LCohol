@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
+import { canModerate } from "@/lib/rbac";
+import { recomputeKarma } from "@/lib/karma";
 import { rateLimit } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
@@ -22,11 +24,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "type ('post'|'comment') and id are required." }, { status: 400 });
     }
 
+    const target =
+      type === "post"
+        ? await prisma.post.findUnique({ where: { id }, select: { authorId: true, author: { select: { role: true } } } })
+        : await prisma.comment.findUnique({ where: { id }, select: { authorId: true, author: { select: { role: true } } } });
+    if (!target) {
+      return NextResponse.json({ error: "Content not found." }, { status: 404 });
+    }
+    if (!canModerate(guard.user.role, target.author.role)) {
+      return NextResponse.json({ error: "You don't have permission to moderate this content." }, { status: 403 });
+    }
+
     if (type === "post") {
       await prisma.post.update({ where: { id }, data: { isDeleted: true } });
     } else {
       await prisma.comment.update({ where: { id }, data: { isDeleted: true } });
     }
+
+    await recomputeKarma(target.authorId);
 
     await prisma.moderationAction.create({
       data: {
@@ -41,6 +56,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (isPoolExhausted(err)) return poolBusyResponse();
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "P2025") {
+      return NextResponse.json({ error: "Content not found." }, { status: 404 });
+    }
     console.error("[moderation/delete]", err);
     return NextResponse.json({ error: "Could not delete." }, { status: 500 });
   }

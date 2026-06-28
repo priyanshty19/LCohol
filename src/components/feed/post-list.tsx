@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { Wine } from "lucide-react";
 import { PostCard } from "./post-card";
 import { Reveal } from "@/components/fx/motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { PostWithRelations, FeedSortOption } from "@/types/database";
 
 interface PostListProps {
@@ -70,7 +72,23 @@ export function PostList({ sort, postType, initialPosts, initialHasMore, initial
   }
 
   if (posts.length === 0) {
-    return null;
+    const subtitle =
+      sort === "new"
+        ? "No fresh pours yet."
+        : sort === "hot"
+          ? "Nothing's heating up right now."
+          : sort === "top"
+            ? "No top stories yet."
+            : "No stories here yet.";
+    return (
+      <div className="glass-panel-subtle flex flex-col items-center gap-3 rounded-xl px-6 py-12 text-center">
+        <Wine className="h-8 w-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
+        <Link href="/create" className={buttonVariants({ variant: "glass", size: "lg" })}>
+          Share the first one
+        </Link>
+      </div>
+    );
   }
 
   return (

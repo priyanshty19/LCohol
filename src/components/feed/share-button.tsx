@@ -20,6 +20,7 @@ export function ShareButton({ postId }: { postId: string }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const [doneError, setDoneError] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -36,6 +37,7 @@ export function ShareButton({ postId }: { postId: string }) {
     setTimeout(() => {
       setSelected(new Set());
       setDone(null);
+      setDoneError(false);
     }, 200);
   }
 
@@ -48,13 +50,16 @@ export function ShareButton({ postId }: { postId: string }) {
         body: JSON.stringify(payload),
       });
       if (r.ok) {
+        setDoneError(false);
         setDone(success);
         setTimeout(close, 1100);
       } else {
         const e = await r.json().catch(() => ({}));
+        setDoneError(true);
         setDone(e.error ?? "Couldn't share. Try again.");
       }
     } catch {
+      setDoneError(true);
       setDone("Couldn't share. Try again.");
     } finally {
       setBusy(false);
@@ -163,7 +168,14 @@ export function ShareButton({ postId }: { postId: string }) {
                   </div>
 
                   <div className="space-y-2 border-t border-border/50 px-5 py-3">
-                    {done && <p className="text-center text-sm text-primary">{done}</p>}
+                    {done && (
+                      <p
+                        className="text-center text-sm"
+                        style={doneError ? { color: "var(--ml-sos)" } : undefined}
+                      >
+                        <span className={doneError ? undefined : "text-primary"}>{done}</span>
+                      </p>
+                    )}
                     <Button
                       variant="outline"
                       className="w-full"

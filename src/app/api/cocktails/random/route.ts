@@ -6,14 +6,15 @@ export const dynamic = "force-dynamic";
 // GET /api/cocktails/random — one curated pick at random for the home sidebar.
 export async function GET() {
   try {
-    const count = await prisma.cocktailCreation.count({ where: { isCurated: true, isPublic: true } });
-    if (count === 0) return NextResponse.json({ data: { cocktail: null } });
-
-    const skip = Math.floor(Math.random() * count);
-    const cocktail = await prisma.cocktailCreation.findFirst({
+    const ids = await prisma.cocktailCreation.findMany({
       where: { isCurated: true, isPublic: true },
-      skip,
-      orderBy: { id: "asc" },
+      select: { id: true },
+    });
+    if (ids.length === 0) return NextResponse.json({ data: { cocktail: null } });
+
+    const pickedId = ids[Math.floor(Math.random() * ids.length)].id;
+    const cocktail = await prisma.cocktailCreation.findFirst({
+      where: { id: pickedId, isCurated: true, isPublic: true },
       select: {
         id: true,
         name: true,
