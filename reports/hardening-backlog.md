@@ -64,10 +64,15 @@ A bare 500 (or a swallowed 200) on saturation invites immediate retries that amp
 - ✅ **pg_trgm migration** — `prisma/add-trgm-indexes.ts` upgraded (CONCURRENTLY + description/address; operator runs it) (`1698d30`).
 - ✅ **Correctness/perf/UX batch** (`c7ca906`): rbac canonicalize, open-redirect, TEST_REFERRAL_CODES gated, moderation rank-check + karma, post id validation, getConnectionUserIds cache, cocktails/random, empty-feed state, share/comment error states, fake-"46" removed, error boundaries.
 
-## Still remaining (medium/low — careful hand-work or judgment, not auto-edit)
-- **Data-integrity (transactions):** vote score atomicity (concurrent double-click drift), RSVP write-after-check race → 404, signup/otp uniqueness P2002 → 409. Hot mutation paths — do by hand.
-- **a11y:** shared `role="alert"`/`aria-live` form-message primitive, modal Escape + focus-trap (daily-vibe, bell `aria-expanded`), bar cards as real buttons + `aria-pressed`.
-- **Larger refactors:** drink-detail SSR (kill the client-fetch waterfall), recommend-rail `unstable_cache`, drop blanket `force-dynamic` on `(main)`, denormalized popularity counter for `sort=popular`.
+## Done since (more commits on the branch)
+- ✅ **Data-integrity transactions** (`5787cdd`): vote score recomputed from `SUM(votes)` in one tx (no drift) + idempotent on P2002/P2025; RSVP scoped `updateMany`→404; signup/otp uniqueness race→409.
+- ✅ **a11y** (`aa16bc0`): aria-live error/status, keyboard-operable bar cards + `aria-pressed`, bell `aria-expanded`/Escape, daily-vibe Escape + focus restore, OTP resend feedback.
+- ✅ **drink-detail SSR** (`78a1514`): `getDrinkBySlug` + SSR seed, killed the client-fetch waterfall (verified: API 200, abv coerced, logs clean).
+
+## Truly remaining (optional)
+- **recommend-rail `unstable_cache`** (medium perf) — per-user short-TTL cache on the discovery/drink rails.
+- **`sort=popular` denormalized counter** (medium perf) — replace correlated `_count` orderBy.
+- **drop blanket `force-dynamic`** — ASSESSED LOW VALUE: the `(main)` layout calls `getCurrentUser()` (reads cookies) so the group is dynamic regardless; removing the flag won't make auth-gated pages static. Skip unless the static legal/help pages are moved out of the group.
 - **Infra (operator):** distributed limiter (Upstash) behind `rateLimit()`, Vercel WAF.
 
 ## Ship gate before merging PR #23 to main (operator)
