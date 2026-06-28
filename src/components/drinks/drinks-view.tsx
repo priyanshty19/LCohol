@@ -44,7 +44,6 @@ export function DrinksView({
   // Seeded from the server render — no mount fetch (filters + first page).
   const [drinks, setDrinks] = useState<any[]>(initialDrinks.data);
   const [loading, setLoading] = useState(false);
-  const [filtersLoading, setFiltersLoading] = useState(false);
   const [filters, setFilters] = useState<FilterData | null>(initialFilters);
   const [hasMore, setHasMore] = useState(initialDrinks.hasMore);
   const [cursor, setCursor] = useState<string | undefined>(initialDrinks.nextCursor);
@@ -122,8 +121,7 @@ export function DrinksView({
           Discover Drinks
         </h1>
         <p className="text-sm text-muted-foreground">
-          Search across {filtersLoading ? "..." : "46"} spirits, beers & wines
-          in the Indian market
+          Search across spirits, beers & wines in the Indian market
         </p>
       </div>
 

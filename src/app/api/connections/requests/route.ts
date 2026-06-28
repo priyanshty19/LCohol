@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
-import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { areConnected } from "@/lib/connections";
 
 const withProfile = {
@@ -50,9 +51,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const guard = await requireRole("USER");
   if (!guard.ok) return guard.response;
+  const me = guard.user.id;
 
-  if (!rateLimit(`conn-request:${clientIp(request)}`, 30, 60_000)) {
-    return NextResponse.json({ error: "Too many requests. Please wait a minute." }, { status: 429 });
+  if (!rateLimit(`conn-request:${me}`, 30, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please wait a minute." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
   }
 
   const body = await request.json().catch(() => ({}));
@@ -61,9 +66,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Username is required." }, { status: 400 });
   }
 
-  const me = guard.user.id;
-
   try {
+    const pending = await prisma.connectionRequest.count({
+      where: { fromUserId: me, status: "PENDING" },
+    });
+    if (pending >= 100) {
+      return NextResponse.json(
+        { error: "You have too many pending requests. Wait for some to resolve." },
+        { status: 409 },
+      );
+    }
+
     const target = await prisma.profile.findUnique({
       where: { username },
       select: { userId: true },
@@ -99,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { ok: true } }, { status: 201 });
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[api/connections/requests POST]", err);
     return NextResponse.json({ error: "Couldn't send request." }, { status: 500 });
   }

@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getPartyMembership } from "@/lib/parties";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // POST /api/parties/[id]/games/vote  { gameId }  → toggle this member's upvote.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+
+  if (!rateLimit(`game-vote:${me.id}`, 30, 60_000)) {
+    return NextResponse.json(
+      { error: "You're voting too fast. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const { isMember } = await getPartyMembership(id, me.id);
   if (!isMember) return NextResponse.json({ error: "Not a member of this party" }, { status: 403 });

@@ -56,6 +56,15 @@ export function NotificationBell() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   async function openPanel() {
     setOpen(true);
     if (unread > 0) {
@@ -74,6 +83,8 @@ export function NotificationBell() {
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
         aria-label="Notifications"
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="relative flex h-8 w-8 items-center justify-center rounded-full text-foreground/80 transition hover:bg-accent hover:text-foreground"
       >
         <Bell className="h-5 w-5" />

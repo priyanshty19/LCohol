@@ -33,8 +33,10 @@ export async function updateSession(request: NextRequest) {
     API_AUTH_ROUTES.some((r) => pathname.startsWith(r));
 
   // Resolve session once (Web Crypto only — no DB; Prisma can't run on edge).
+  // Edge verifies the HMAC + self-expiry; per-user epoch revocation is enforced
+  // in getCurrentUser (needs the DB).
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const email = token ? await verifySessionToken(token) : null;
+  const email = (token ? await verifySessionToken(token) : null)?.email ?? null;
 
   if (isPublic) {
     // Logged-in users shouldn't see the auth screens.

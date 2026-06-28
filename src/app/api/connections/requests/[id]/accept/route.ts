@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
 import { createConnectionTx } from "@/lib/connections";
 import { recomputeKarma } from "@/lib/karma";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // POST /api/connections/requests/[id]/accept — recipient accepts → forms the
 // mutual connection. Atomic: claim the PENDING request, then create the link.
@@ -14,6 +16,13 @@ export async function POST(
   if (!guard.ok) return guard.response;
   const me = guard.user.id;
   const { id } = await params;
+
+  if (!rateLimit(`conn-accept:${me}`, 20, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   try {
     const req = await prisma.connectionRequest.findUnique({
@@ -41,6 +50,7 @@ export async function POST(
 
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[api/connections/requests accept]", err);
     return NextResponse.json({ error: "Couldn't accept request." }, { status: 500 });
   }

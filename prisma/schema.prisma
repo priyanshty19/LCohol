@@ -20,6 +20,7 @@ model User {
   isBanned  Boolean  @default(false) @map("is_banned")
   role         Role      @default(USER)
   passwordHash String?   @map("password_hash")
+  tokenEpoch   Int       @default(0) @map("token_epoch")
   referralCode String?   @unique @map("referral_code")
   invitedById  String?   @map("invited_by_id") @db.Uuid
   consentedAt  DateTime? @map("consented_at")

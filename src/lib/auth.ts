@@ -18,13 +18,20 @@ export const getCurrentUser = cache(async () => {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const email = await verifySessionToken(token);
-  if (!email) return null;
+  const payload = await verifySessionToken(token);
+  if (!payload) return null;
 
   // Canonicalize so sessions minted before the email backfill (raw, possibly
   // dotted Gmail) still resolve to the now-canonical user row.
-  return prisma.user.findFirst({
-    where: { email: canonicalizeEmail(email) },
+  const user = await prisma.user.findFirst({
+    where: { email: canonicalizeEmail(payload.email) },
     include: { profile: true },
   });
+  if (!user) return null;
+
+  // Per-user revocation: a bumped User.tokenEpoch invalidates all older tokens
+  // (logout-everywhere / compromise) without rotating the global secret.
+  if (user.tokenEpoch !== payload.epoch) return null;
+
+  return user;
 });

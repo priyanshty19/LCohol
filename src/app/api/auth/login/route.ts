@@ -4,6 +4,7 @@ import { verifyPassword } from "@/lib/password";
 import { canonicalizeEmail } from "@/lib/email-normalize";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import {
   createSessionToken,
   SESSION_COOKIE,
@@ -19,8 +20,11 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const email = canonicalizeEmail(body.email);
-    const password = body.password ?? "";
+    const email = canonicalizeEmail(
+      typeof body.email === "string" ? body.email.slice(0, 320) : body.email
+    );
+    // Cap password length: an oversized input makes the hash verify CPU-bound.
+    const password = typeof body.password === "string" ? body.password.slice(0, 200) : "";
 
     if (!email || !password) {
       return NextResponse.json(
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const token = await createSessionToken(email);
+    const token = await createSessionToken(email, user.tokenEpoch);
     const response = NextResponse.json({
       ok: true,
       user: { email, username: user.profile?.username ?? null },
@@ -64,6 +68,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[auth/login]", err);
     return NextResponse.json(
       { error: "Login failed. Please try again." },

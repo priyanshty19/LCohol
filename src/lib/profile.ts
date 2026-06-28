@@ -50,5 +50,22 @@ export async function getProfileWithViewer(username: string, viewerId?: string |
     relationship = "none";
   }
 
-  return { ...profile, viewer: { relationship, requestId } };
+  // Pseudonymity: only the owner sees their private fields. Strip emergency
+  // phone, taste prefs and notification settings for every other viewer — this
+  // object is embedded in the profile page's SSR/RSC payload.
+  const isOwner = !!viewerId && viewerId === profile.userId;
+  const safe = isOwner
+    ? profile
+    : {
+        ...profile,
+        emergencyPhone: null,
+        preferredSpirits: [] as string[],
+        preferredFlavours: [] as string[],
+        intensity: null,
+        intent: null,
+        emailNotifications: false,
+        geoDismissedAt: null,
+      };
+
+  return { ...safe, viewer: { relationship, requestId } };
 }

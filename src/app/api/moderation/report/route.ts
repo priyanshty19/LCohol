@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 export async function POST(request: Request) {
   const dbUser = await getCurrentUser();
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   if (!rateLimit(`report:${dbUser.id}`, 15, 60_000)) {
     return NextResponse.json(
       { error: "You're reporting too fast — give it a moment." },
-      { status: 429 }
+      { status: 429, headers: { "Retry-After": "60" } }
     );
   }
 
@@ -27,6 +28,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Reason is required" }, { status: 400 });
   }
 
+  // `reason` is a ReportReason enum (Prisma validates it at write); only the
+  // free-text `details` needs a length cap.
+  const cappedDetails = details ? String(details).slice(0, 2000) : null;
+
   // Exactly one target — not both, not neither.
   if (!postId === !commentId) {
     return NextResponse.json(
@@ -35,15 +40,36 @@ export async function POST(request: Request) {
     );
   }
 
-  const report = await prisma.report.create({
-    data: {
-      reporterId: dbUser.id,
-      postId: postId || null,
-      commentId: commentId || null,
-      reason,
-      details: details || null,
-    },
-  });
+  try {
+    // Hard ceiling per account so the moderation queue can't be row-spammed
+    // even if the rate limiter is bypassed across instances.
+    const reportCount = await prisma.report.count({
+      where: { reporterId: dbUser.id },
+    });
+    if (reportCount >= 200) {
+      return NextResponse.json(
+        { error: "You've filed too many reports. Please contact support." },
+        { status: 409 }
+      );
+    }
 
-  return NextResponse.json({ data: { id: report.id } }, { status: 201 });
+    const report = await prisma.report.create({
+      data: {
+        reporterId: dbUser.id,
+        postId: postId || null,
+        commentId: commentId || null,
+        reason,
+        details: cappedDetails,
+      },
+    });
+
+    return NextResponse.json({ data: { id: report.id } }, { status: 201 });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/moderation/report] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/moderation/report]", err);
+    return NextResponse.json({ error: "Couldn't file your report." }, { status: 500 });
+  }
 }

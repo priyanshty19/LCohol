@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
-// Supabase's session pooler caps at pool_size=15. When every slot is held,
-// Postgres returns FATAL "(EMAXCONNSESSION) max clients reached in session
-// mode". That's transient (a slot frees in seconds), so the right response is a
-// 503 with Retry-After — telling browsers, CDNs and crawlers to back off — NOT a
+// Pool saturation surfaces several ways depending on which Supabase pooler is
+// in front and how it fails:
+//   - session pooler full:     "(EMAXCONNSESSION) max clients reached in session mode"
+//   - transaction pooler full: "(EMAXCONN) max client connections" (a real flood)
+//   - node-postgres can't get a slot in time: "timeout exceeded when trying to connect"
+// All are transient (a slot frees in seconds), so the right response is a 503
+// with Retry-After — telling browsers, CDNs and attackers to back off — NOT a
 // 500 that invites an immediate retry and amplifies the storm.
 export function isPoolExhausted(err: unknown): boolean {
   const msg =
@@ -20,8 +23,11 @@ export function isPoolExhausted(err: unknown): boolean {
           })();
   return (
     msg.includes("EMAXCONNSESSION") ||
+    msg.includes("EMAXCONN") ||
     msg.includes("max clients reached") ||
-    msg.includes("too many clients")
+    msg.includes("max client connections") ||
+    msg.includes("too many clients") ||
+    msg.includes("timeout exceeded when trying to connect")
   );
 }
 

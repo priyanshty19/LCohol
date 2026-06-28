@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
 import { canModerate } from "@/lib/rbac";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // Ban or unban a user. Moderators+ only; mods cannot touch admins/other mods.
 export async function POST(request: NextRequest) {
   const guard = await requireRole("MODERATOR");
   if (!guard.ok) return guard.response;
+
+  if (!rateLimit(`mod-ban:${guard.user.id}`, 20, 60000)) {
+    return NextResponse.json(
+      { error: "Too many moderation actions. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   try {
     const { userId, ban, reason } = await request.json();
@@ -37,12 +46,13 @@ export async function POST(request: NextRequest) {
         action: shouldBan ? "BAN_USER" : "UNBAN_USER",
         targetType: "PROFILE",
         targetId: userId,
-        reason: reason ?? null,
+        reason: typeof reason === "string" ? reason.slice(0, 500) : null,
       },
     });
 
     return NextResponse.json({ ok: true, isBanned: shouldBan });
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[moderation/ban]", err);
     return NextResponse.json({ error: "Could not update ban status." }, { status: 500 });
   }

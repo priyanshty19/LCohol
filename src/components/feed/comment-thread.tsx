@@ -51,11 +51,13 @@ function CommentInput({
 }) {
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!body.trim()) return;
     setLoading(true);
+    setError(false);
 
     try {
       const res = await fetch(`/api/posts/${postId}/comments`, {
@@ -67,7 +69,11 @@ function CommentInput({
       if (res.ok) {
         setBody("");
         onSubmit();
+      } else {
+        setError(true);
       }
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -82,6 +88,11 @@ function CommentInput({
         rows={parentId ? 2 : 3}
         maxLength={5000}
       />
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          Couldn&apos;t post — try again
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         {onCancel && (
           <Button type="button" variant="ghost" size="sm" onClick={onCancel}>

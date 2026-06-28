@@ -6,6 +6,7 @@ import { logInteraction } from "@/lib/interactions";
 import { getTasteProfile } from "@/lib/behavior";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { retrieveDrinks } from "@/lib/james/retriever";
 import { buildSystemPrompt } from "@/lib/james/persona";
 import { searchCatalog, type CatalogSearch } from "@/lib/james/search";
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ reply, actions, cards });
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[james/agent]", err);
     return NextResponse.json(
       { reply: "James got pulled away for a second. Try me again.", actions: [], cards: null },

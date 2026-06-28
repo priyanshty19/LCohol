@@ -4,6 +4,7 @@ import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { retrieveDrinks } from "@/lib/james/retriever";
 import { buildSystemPrompt } from "@/lib/james/persona";
 
@@ -24,19 +25,33 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const incoming: ChatMsg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  const incoming: ChatMsg[] = Array.isArray(body.messages)
+    ? body.messages.slice(-12).map((m: ChatMsg) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content.slice(0, 2000) : "",
+      }))
+    : [];
   const lastUser = [...incoming].reverse().find((m) => m.role === "user")?.content ?? "";
 
   let favoriteDrink: string | null = null;
-  if (user.profile?.favoriteDrinkId) {
-    const fav = await prisma.drink.findUnique({
-      where: { id: user.profile.favoriteDrinkId },
-      select: { name: true },
-    });
-    favoriteDrink = fav?.name ?? null;
-  }
+  let drinks: Awaited<ReturnType<typeof retrieveDrinks>>;
+  try {
+    if (user.profile?.favoriteDrinkId) {
+      const fav = await prisma.drink.findUnique({
+        where: { id: user.profile.favoriteDrinkId },
+        select: { name: true },
+      });
+      favoriteDrink = fav?.name ?? null;
+    }
 
-  const drinks = await retrieveDrinks(lastUser);
+    drinks = await retrieveDrinks(lastUser);
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/james/chat] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    throw err;
+  }
   const system = buildSystemPrompt(
     {
       username: user.profile?.username,

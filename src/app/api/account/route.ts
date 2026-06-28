@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 import { clerkBackend } from "@/lib/clerk";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // Permanently delete the current user and ALL their data. Irreversible.
 //
@@ -15,6 +17,13 @@ import { clerkBackend } from "@/lib/clerk";
 export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!rateLimit(`account-delete:${user.id}`, 3, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many delete attempts. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const feedback = typeof body.feedback === "string" ? body.feedback.trim().slice(0, 2000) : null;
@@ -51,7 +60,16 @@ export async function DELETE(request: Request) {
     }
   }
 
-  await prisma.user.delete({ where: { id: user.id } });
+  try {
+    await prisma.user.delete({ where: { id: user.id } });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/account] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/account]", err);
+    return NextResponse.json({ error: "Couldn't delete your account." }, { status: 500 });
+  }
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(0), maxAge: 0 });

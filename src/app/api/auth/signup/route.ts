@@ -10,6 +10,7 @@ import {
 import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import {
   createSessionToken,
   SESSION_COOKIE,
@@ -36,7 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const email = canonicalizeEmail(body.email);
+    const email = canonicalizeEmail(
+      typeof body.email === "string" ? body.email.slice(0, 254) : body.email
+    );
     const password: string = body.password ?? "";
     const username = (body.username ?? "").trim();
     const dobStr: string = body.dob ?? "";
@@ -195,6 +198,16 @@ export async function POST(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    // Lost a uniqueness race (two near-simultaneous signups both passed the
+    // pre-check) → friendly 409, not a generic 500.
+    const e = err as { code?: string; meta?: { target?: string[] | string } };
+    if (e.code === "P2002") {
+      const target = Array.isArray(e.meta?.target) ? e.meta.target.join(",") : String(e.meta?.target ?? "");
+      return /username/i.test(target)
+        ? NextResponse.json({ error: "That username is taken." }, { status: 409 })
+        : NextResponse.json({ error: "An account with that email already exists." }, { status: 409 });
+    }
     console.error("[auth/signup]", err);
     return NextResponse.json(
       { error: "Signup failed. Please try again." },
