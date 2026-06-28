@@ -7,7 +7,20 @@ export const SESSION_COOKIE = "ss_auth";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
 
 function getSecret(): string {
-  return process.env.SESSION_SECRET ?? "sipstories-dev-secret-change-in-prod";
+  const secret = process.env.SESSION_SECRET;
+  if (secret && secret.length > 0) return secret;
+  // FAIL CLOSED in production. An unset secret would make the HMAC key a public
+  // repo constant — anyone could forge a valid ss_auth cookie for any email,
+  // including an ADMIN_EMAILS address (full admin takeover, no credentials).
+  // Refuse to run rather than authenticate forgeable tokens.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "SESSION_SECRET is not set — refusing to start to avoid forgeable sessions. " +
+        "Set a long random value in the environment.",
+    );
+  }
+  // Dev only: a fixed key so local logins survive restarts. Never reached in prod.
+  return "sipstories-dev-only-insecure-secret";
 }
 
 function bufToBase64url(buf: ArrayBuffer): string {
