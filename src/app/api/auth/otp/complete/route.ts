@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
         .catch(() => {});
     }
 
-    const mintFor = (username: string | null, status = 200) =>
-      createSessionToken(email).then((token) => {
+    const mintFor = (username: string | null, epoch = 0, status = 200) =>
+      createSessionToken(email, epoch).then((token) => {
         const res = NextResponse.json({ ok: true, user: { email, username } }, { status });
         res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
         return res;
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
           data: { role: "ADMIN" },
         });
       }
-      return mintFor(existing.profile?.username ?? null);
+      return mintFor(existing.profile?.username ?? null, existing.tokenEpoch);
     }
 
     // No account yet → this must be a signup with the required fields.
@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
       throw e;
     }
 
-    return mintFor(username, 201);
+    return mintFor(username, 0, 201);
   } catch (err) {
     if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[auth/otp/complete]", err);

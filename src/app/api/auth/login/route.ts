@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const token = await createSessionToken(email);
+    const token = await createSessionToken(email, user.tokenEpoch);
     const response = NextResponse.json({
       ok: true,
       user: { email, username: user.profile?.username ?? null },
