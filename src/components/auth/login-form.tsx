@@ -173,7 +173,9 @@ export function LoginForm() {
     setResending(true);
     try {
       if (flow === "signin") {
-        const factor = signIn.supportedFirstFactors?.find(
+        // Re-create the SignIn attempt so supportedFirstFactors is freshly populated.
+        const si = await signIn.create({ identifier: email });
+        const factor = si.supportedFirstFactors?.find(
           (f) => f.strategy === "email_code",
         ) as { emailAddressId: string } | undefined;
         if (!factor) throw new Error("Email code factor not available. Please restart sign-in.");
@@ -182,7 +184,8 @@ export function LoginForm() {
           emailAddressId: factor.emailAddressId,
         });
       } else {
-        await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
+        if (!signUp) throw new Error("Sign-up session lost. Please go back and try again.");
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
       setResent(true);
       // Brief cooldown so the success message lands and the button isn't spammed.
