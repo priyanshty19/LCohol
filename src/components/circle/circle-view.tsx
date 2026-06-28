@@ -297,7 +297,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
                   invite expire (3 days) to make a new one.
                 </p>
               )}
-              {error && <p className="text-xs text-[var(--ml-sos)]">{error}</p>}
+              {error && <p role="alert" className="text-xs text-[var(--ml-sos)]">{error}</p>}
             </CardContent>
           </Card>
 
@@ -380,7 +380,7 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
         </div>
       ) : (
         <div className="space-y-5">
-          {error && <p className="text-xs text-[var(--ml-sos)]">{error}</p>}
+          {error && <p role="alert" className="text-xs text-[var(--ml-sos)]">{error}</p>}
 
           {/* Find a member already on the app and request to connect */}
           <Card variant="glass">

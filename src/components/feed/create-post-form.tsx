@@ -223,7 +223,10 @@ export function CreatePostForm() {
           </div>
 
           {error && (
-            <div className="rounded-lg bg-[var(--ml-sos)]/10 p-3 text-sm text-[var(--ml-sos)] glow-danger">
+            <div
+              role="alert"
+              className="rounded-lg bg-[var(--ml-sos)]/10 p-3 text-sm text-[var(--ml-sos)] glow-danger"
+            >
               {error}
             </div>
           )}
@@ -238,7 +241,7 @@ export function CreatePostForm() {
               Cancel
             </Button>
             <Button type="submit" variant="gold" size="lg" disabled={loading}>
-              {loading ? "Posting..." : "Post"}
+              <span aria-live="polite">{loading ? "Posting..." : "Post"}</span>
             </Button>
           </div>
         </form>

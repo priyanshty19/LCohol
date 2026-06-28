@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { THEMES, applyTheme, type ThemeId } from "@/lib/theme";
@@ -27,6 +27,9 @@ function todayKey(): string {
  */
 export function DailyVibe() {
   const [open, setOpen] = useState(false);
+  // Remember what had focus before the interrupt so we can hand it back on close.
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const firstVibeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const today = todayKey();
@@ -73,6 +76,25 @@ export function DailyVibe() {
     setOpen(false);
   }
 
+  // While open: Escape closes; focus the primary action; restore focus on close.
+  useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    firstVibeRef.current?.focus();
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        dismiss();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      (restoreFocusRef.current ?? document.body).focus?.();
+    };
+  }, [open]);
+
   function pick(id: ThemeId) {
     applyTheme(id, { persist: true });
     dismiss();
@@ -95,11 +117,14 @@ export function DailyVibe() {
             exit={{ y: 28, opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="daily-vibe-title"
             className="glass-panel-elevated w-full max-w-lg rounded-t-3xl p-6 shadow-2xl sm:rounded-3xl"
           >
             <div className="mb-1 flex items-start justify-between">
               <div>
-                <h2 className="font-display text-xl font-bold text-primary">
+                <h2 id="daily-vibe-title" className="font-display text-xl font-bold text-primary">
                   What&apos;s the vibe today?
                 </h2>
                 <p className="text-sm text-muted-foreground">
@@ -117,9 +142,10 @@ export function DailyVibe() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-              {VIBES.map((v) => (
+              {VIBES.map((v, i) => (
                 <button
                   key={v.id}
+                  ref={i === 0 ? firstVibeRef : undefined}
                   type="button"
                   data-theme={v.id}
                   onClick={() => pick(v.id)}

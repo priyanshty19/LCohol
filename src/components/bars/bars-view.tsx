@@ -60,7 +60,15 @@ function BarCard({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
       className={cn(
         "glass-panel cursor-pointer rounded-xl p-3 transition-[border-color,box-shadow]",
         active ? "glow-active" : "hover:border-primary/20"
@@ -258,6 +266,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
         {CITIES.map((c) => (
           <button
             key={c}
+            aria-pressed={!nearby && c === city}
             onClick={() => {
               const wasNearby = nearby;
               setNearby(false);
@@ -295,6 +304,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
         />
         <div className="hide-scrollbar flex gap-1 overflow-x-auto">
           <button
+            aria-pressed={!type}
             onClick={() => setType(null)}
             className={cn(
               "shrink-0 rounded-full px-2.5 py-1 text-xs",
@@ -306,6 +316,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
           {TYPES.map((t) => (
             <button
               key={t}
+              aria-pressed={t === type}
               onClick={() => setType(t === type ? null : t)}
               className={cn(
                 "shrink-0 rounded-full px-2.5 py-1 text-xs",

@@ -35,6 +35,8 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
 
   // Restore an in-flight OTP step across a refresh (Clerk rehydrates its own
   // verification attempt; we just bring the step + email back).
@@ -166,8 +168,9 @@ export function LoginForm() {
   }
 
   async function resend() {
-    if (!isLoaded || !signIn) return;
+    if (!isLoaded || !signIn || resending) return;
     setError(null);
+    setResending(true);
     try {
       if (flow === "signin") {
         const factor = signIn.supportedFirstFactors?.find(
@@ -181,8 +184,15 @@ export function LoginForm() {
       } else {
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
       }
+      setResent(true);
+      // Brief cooldown so the success message lands and the button isn't spammed.
+      setTimeout(() => {
+        setResent(false);
+        setResending(false);
+      }, 4000);
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
+      setResending(false);
     }
   }
 
@@ -216,7 +226,7 @@ export function LoginForm() {
             </div>
 
             {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <div role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -233,7 +243,12 @@ export function LoginForm() {
               {loading ? "Verifying…" : "Log in"}
             </Button>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <button type="button" onClick={resend} className="hover:text-primary">
+              <button
+                type="button"
+                onClick={resend}
+                disabled={resending}
+                className="hover:text-primary disabled:opacity-50"
+              >
                 Resend code
               </button>
               <span>·</span>
@@ -254,6 +269,9 @@ export function LoginForm() {
                 Wrong email?
               </button>
             </div>
+            <p aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground">
+              {resent ? "A new code is on its way" : ""}
+            </p>
           </CardFooter>
         </form>
       </Card>
