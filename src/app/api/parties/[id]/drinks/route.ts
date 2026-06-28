@@ -85,20 +85,33 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+  if (!rateLimit(`party-drink-delete:${me.id}`, 30, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const suggestionId = typeof body.suggestionId === "string" ? body.suggestionId : null;
   if (!suggestionId) return NextResponse.json({ error: "suggestionId required" }, { status: 400 });
 
-  const suggestion = await prisma.partyDrinkSuggestion.findFirst({
-    where: { id: suggestionId, partyPlanId: id },
-    select: { id: true, suggestedById: true, partyPlan: { select: { authorId: true } } },
-  });
-  if (!suggestion) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const suggestion = await prisma.partyDrinkSuggestion.findFirst({
+      where: { id: suggestionId, partyPlanId: id },
+      select: { id: true, suggestedById: true, partyPlan: { select: { authorId: true } } },
+    });
+    if (!suggestion) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const canDelete = suggestion.suggestedById === me.id || suggestion.partyPlan.authorId === me.id;
-  if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const canDelete = suggestion.suggestedById === me.id || suggestion.partyPlan.authorId === me.id;
+    if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await prisma.partyDrinkSuggestion.delete({ where: { id: suggestion.id } });
-  return NextResponse.json({ data: { removed: suggestion.id } });
+    await prisma.partyDrinkSuggestion.delete({ where: { id: suggestion.id } });
+    return NextResponse.json({ data: { removed: suggestion.id } });
+  } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    console.error("[api/parties/[id]/drinks DELETE]", err);
+    return NextResponse.json({ error: "Couldn't remove suggestion." }, { status: 500 });
+  }
 }

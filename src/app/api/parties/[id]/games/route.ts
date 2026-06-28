@@ -60,20 +60,33 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+  if (!rateLimit(`party-game-delete:${me.id}`, 30, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const gameId = typeof body.gameId === "string" ? body.gameId : null;
   if (!gameId) return NextResponse.json({ error: "gameId required" }, { status: 400 });
 
-  const game = await prisma.partyGameSuggestion.findFirst({
-    where: { id: gameId, partyPlanId: id },
-    select: { id: true, suggestedById: true, partyPlan: { select: { authorId: true } } },
-  });
-  if (!game) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const game = await prisma.partyGameSuggestion.findFirst({
+      where: { id: gameId, partyPlanId: id },
+      select: { id: true, suggestedById: true, partyPlan: { select: { authorId: true } } },
+    });
+    if (!game) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const canDelete = game.suggestedById === me.id || game.partyPlan.authorId === me.id;
-  if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const canDelete = game.suggestedById === me.id || game.partyPlan.authorId === me.id;
+    if (!canDelete) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  await prisma.partyGameSuggestion.delete({ where: { id: game.id } });
-  return NextResponse.json({ data: { removed: game.id } });
+    await prisma.partyGameSuggestion.delete({ where: { id: game.id } });
+    return NextResponse.json({ data: { removed: game.id } });
+  } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    console.error("[api/parties/[id]/games DELETE]", err);
+    return NextResponse.json({ error: "Couldn't remove suggestion." }, { status: 500 });
+  }
 }

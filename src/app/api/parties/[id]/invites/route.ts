@@ -103,31 +103,44 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const party = await requireHost(id, me.id);
-  if (!party) return NextResponse.json({ error: "Party not found" }, { status: 404 });
-
-  const body = await request.json().catch(() => ({}));
-  const inviteId = typeof body.inviteId === "string" ? body.inviteId : null;
-  if (!inviteId) return NextResponse.json({ error: "inviteId required" }, { status: 400 });
-
-  // Scope the lookup to this party so a host can't delete another party's invite.
-  const invite = await prisma.partyInvite.findFirst({
-    where: { id: inviteId, partyPlanId: id },
-    select: { id: true, code: true },
-  });
-  if (!invite) return NextResponse.json({ error: "Invite not found" }, { status: 404 });
-
-  // A link invite's `code` is also a Referral row (created together in POST), so
-  // revoke must remove both — otherwise the code stays redeemable at signup.
-  if (invite.code) {
-    await prisma.$transaction([
-      prisma.partyInvite.delete({ where: { id: invite.id } }),
-      prisma.referral.deleteMany({ where: { code: invite.code } }),
-    ]);
-  } else {
-    await prisma.partyInvite.delete({ where: { id: invite.id } });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
+  if (!rateLimit(`party-invite-revoke:${me.id}`, 20, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
   }
 
-  return NextResponse.json({ data: { revoked: invite.id } });
+  try {
+    const party = await requireHost(id, me.id);
+    if (!party) return NextResponse.json({ error: "Party not found" }, { status: 404 });
+
+    const body = await request.json().catch(() => ({}));
+    const inviteId = typeof body.inviteId === "string" ? body.inviteId : null;
+    if (!inviteId) return NextResponse.json({ error: "inviteId required" }, { status: 400 });
+
+    // Scope the lookup to this party so a host can't delete another party's invite.
+    const invite = await prisma.partyInvite.findFirst({
+      where: { id: inviteId, partyPlanId: id },
+      select: { id: true, code: true },
+    });
+    if (!invite) return NextResponse.json({ error: "Invite not found" }, { status: 404 });
+
+    // A link invite's `code` is also a Referral row (created together in POST), so
+    // revoke must remove both — otherwise the code stays redeemable at signup.
+    if (invite.code) {
+      await prisma.$transaction([
+        prisma.partyInvite.delete({ where: { id: invite.id } }),
+        prisma.referral.deleteMany({ where: { code: invite.code } }),
+      ]);
+    } else {
+      await prisma.partyInvite.delete({ where: { id: invite.id } });
+    }
+
+    return NextResponse.json({ data: { revoked: invite.id } });
+  } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    console.error("[api/parties/[id]/invites DELETE]", err);
+    return NextResponse.json({ error: "Couldn't revoke invite." }, { status: 500 });
+  }
 }
