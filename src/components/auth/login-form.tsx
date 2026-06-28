@@ -176,11 +176,11 @@ export function LoginForm() {
         const factor = signIn.supportedFirstFactors?.find(
           (f) => f.strategy === "email_code",
         ) as { emailAddressId: string } | undefined;
-        if (factor)
-          await signIn.prepareFirstFactor({
-            strategy: "email_code",
-            emailAddressId: factor.emailAddressId,
-          });
+        if (!factor) throw new Error("Email code factor not available. Please restart sign-in.");
+        await signIn.prepareFirstFactor({
+          strategy: "email_code",
+          emailAddressId: factor.emailAddressId,
+        });
       } else {
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
       }
