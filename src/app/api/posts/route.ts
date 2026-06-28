@@ -8,7 +8,7 @@ import { recomputeKarma } from "@/lib/karma";
 import { persistMentions } from "@/lib/mentions";
 import { notifyMany } from "@/lib/notifications";
 import { logInteraction } from "@/lib/interactions";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
@@ -35,19 +35,34 @@ function sanitizeImageUrl(value: unknown): string | null {
 }
 
 export async function GET(request: Request) {
+  // Public hot path: a 500-row include + JS ranking per call. Throttle per IP so
+  // a ?sort=hot loop can't exhaust the pool for everyone. (WAF is the real backstop.)
+  if (!rateLimit(`posts-feed:${clientIp(request)}`, 60, 60_000)) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      { status: 429, headers: { "Retry-After": "30" } },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
-  const me = await getCurrentUser();
-  const connectionIds = me ? await getConnectionUserIds(me.id) : [];
+  try {
+    const me = await getCurrentUser();
+    const connectionIds = me ? await getConnectionUserIds(me.id) : [];
 
-  const result = await getPostsFeed({
-    sort: searchParams.get("sort") || "new",
-    cursor: searchParams.get("cursor"),
-    postType: searchParams.get("type"),
-    viewerId: me?.id ?? null,
-    connectionIds,
-  });
+    const result = await getPostsFeed({
+      sort: searchParams.get("sort") || "new",
+      cursor: searchParams.get("cursor"),
+      postType: searchParams.get("type"),
+      viewerId: me?.id ?? null,
+      connectionIds,
+    });
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
+    console.error("[api/posts GET]", err);
+    return NextResponse.json({ error: "Couldn't load the feed." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
