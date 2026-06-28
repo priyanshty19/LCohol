@@ -10,6 +10,7 @@ import {
 import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import {
   createSessionToken,
   SESSION_COOKIE,
@@ -36,7 +37,9 @@ export async function POST(request: NextRequest) {
       );
     }
     const body = await request.json();
-    const email = canonicalizeEmail(body.email);
+    const email = canonicalizeEmail(
+      typeof body.email === "string" ? body.email.slice(0, 254) : body.email
+    );
     const password: string = body.password ?? "";
     const username = (body.username ?? "").trim();
     const dobStr: string = body.dob ?? "";
@@ -195,6 +198,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return response;
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[auth/signup]", err);
     return NextResponse.json(
       { error: "Signup failed. Please try again." },

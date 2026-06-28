@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
-import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import {
   REFERRAL_MAX_ACTIVE,
   countActiveReferrals,
@@ -55,10 +56,10 @@ export async function POST(request: NextRequest) {
   const guard = await requireRole("USER");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`referral-create:${clientIp(request)}`, 20, 60_000)) {
+  if (!rateLimit(`referral-create:${guard.user.id}`, 20, 60_000)) {
     return NextResponse.json(
       { error: "Too many invites. Please wait a minute." },
-      { status: 429 },
+      { status: 429, headers: { "Retry-After": "60" } },
     );
   }
 
@@ -66,27 +67,39 @@ export async function POST(request: NextRequest) {
   const rawLabel = typeof body.label === "string" ? body.label.trim() : "";
   const label = rawLabel ? rawLabel.slice(0, 50) : null;
 
-  await expireStaleReferrals(guard.user.id);
-  const active = await countActiveReferrals(guard.user.id);
-  if (active >= REFERRAL_MAX_ACTIVE) {
-    return NextResponse.json(
-      {
-        error: `You have ${REFERRAL_MAX_ACTIVE} active invites. Revoke one or let it expire to make a new one.`,
+  try {
+    await expireStaleReferrals(guard.user.id);
+    const active = await countActiveReferrals(guard.user.id);
+    if (active >= REFERRAL_MAX_ACTIVE) {
+      return NextResponse.json(
+        {
+          error: `You have ${REFERRAL_MAX_ACTIVE} active invites. Revoke one or let it expire to make a new one.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const code = await generateUniqueReferralCode();
+    const referral = await prisma.referral.create({
+      data: {
+        code,
+        label,
+        inviterId: guard.user.id,
+        expiresAt: referralExpiry(),
       },
-      { status: 409 },
+      select: referralSelect,
+    });
+
+    return NextResponse.json({ data: referral }, { status: 201 });
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[api/referrals POST] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[api/referrals POST]", err);
+    return NextResponse.json(
+      { error: "Couldn't create invite." },
+      { status: 500 },
     );
   }
-
-  const code = await generateUniqueReferralCode();
-  const referral = await prisma.referral.create({
-    data: {
-      code,
-      label,
-      inviterId: guard.user.id,
-      expiresAt: referralExpiry(),
-    },
-    select: referralSelect,
-  });
-
-  return NextResponse.json({ data: referral }, { status: 201 });
 }

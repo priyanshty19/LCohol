@@ -8,6 +8,7 @@ import {
 import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { verifiedEmailFromClerkToken, clerkBackend } from "@/lib/clerk";
 import { canonicalizeEmail } from "@/lib/email-normalize";
 import {
@@ -265,6 +266,7 @@ export async function POST(request: NextRequest) {
 
     return mintFor(username, 201);
   } catch (err) {
+    if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[auth/otp/complete]", err);
     return NextResponse.json(
       { error: "Sign-in failed. Please try again." },
