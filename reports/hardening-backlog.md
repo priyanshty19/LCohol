@@ -45,3 +45,27 @@ A bare 500 (or a swallowed 200) on saturation invites immediate retries that amp
 5. **Collapse loops/N+1** (slug/referral-code loops, `recomputeKarma`) and push heavy side-effects into `after()`.
 6. **Edge first:** in-memory limiter is per-instance — a **Vercel WAF/Firewall rate rule** on hot write paths is the real backstop.
 7. **Privileged routes (ban/delete/moderators):** rate limit (threat model = stolen privileged token), not row cap.
+
+---
+
+# Round 2 — Comprehensive audit (2026-06-28)
+
+`attack-proof-audit` re-run produced **52 findings** (1 critical, 18 high, 22 medium, 10 low) across attack-surface, race/data-integrity, performance, experience. Re-run `/attack-proof-audit` for the full enumerated list.
+
+## Fixed this session (committed to PR #23 / `hotfix/prod-stabilization`)
+- ✅ **CRITICAL** `SESSION_SECRET` hardcoded fallback → fail-closed in prod (`b72263e`).
+- ✅ Comments IDOR (CIRCLE reads gated), vote IDOR (existence/visibility gate), comment `parentId` validation, profile PII scrub (`8d4f6d4`).
+- ✅ `bars/nearby` denial-of-wallet (auth + per-user/per-IP limit + coord cache), `clientIp()` un-spoofed (`33822c9`).
+- ✅ All 9 P0 + all P1/P2 mutation routes + party DELETE handlers (earlier commits).
+
+## Remaining (deferred — needs schema, infra, or is medium/low)
+- **HIGH — session revocation / immortality** (`src/lib/session.ts`): tokens sign only the email (no `iat`/epoch) → non-revocable. Needs a `User.tokenEpoch` column (**schema change → `db push` on shared prod, needs approval**) + sign `{email, iat, v}` + reject stale/`v != tokenEpoch`. *Mitigation already in place:* setting a real `SESSION_SECRET` invalidates all old tokens on deploy.
+- **MEDIUM — public-read DoS** (no rate limit + cache-bypass via query variation): `/api/posts` hot feed (500-row include + JS rank), `/api/cocktails?q=` (10k ILIKE per unique q), `/api/drinks` + `/api/drinks/search` (unindexed ILIKE incl. description). Fix: per-IP `rateLimit` (now meaningful post-`clientIp` fix) + min `q` length + ship the **pg_trgm index via a real migration** (currently only in a manual script) + `isPoolExhausted` 503 on these GETs. Edge WAF is the real backstop.
+- **MEDIUM/LOW (22+10)** — performance (indexes, denormalized popularity counters) + experience (empty/error/loading states, a11y, trust/feedback). Enumerated by a fresh audit run.
+
+## Ship gate before merging PR #23 to main (operator)
+1. **Set `SESSION_SECRET`** (long random) in Vercel — app won't boot without it now; forces a clean re-login.
+2. **Rotate the DB password** (exposed earlier).
+3. **Vercel WAF/Firewall** rate rules on `POST /api/*` + `bars/nearby` (the real DoS/denial-of-wallet backstop; app limiter is per-instance).
+4. Run **k6** (`scripts/loadtest/`) against staging → confirm hot endpoints shed (429/409/503), never 500.
+5. Cleanup the attack rows (`scripts/cleanup-attack-cocktails.ts --apply`).
