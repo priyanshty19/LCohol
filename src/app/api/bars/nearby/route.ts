@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
+import { getCurrentUser } from "@/lib/auth";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // GET /api/bars/nearby?lat=..&lng=..&radius=3000
 // Real nearby bars via Google Places API (New) "searchNearby". The API key is
@@ -6,9 +9,10 @@ import { NextResponse } from "next/server";
 // client. Returns the same Bar-ish shape the bars list/card already renders,
 // with `external: true` so the UI knows these aren't our own catalog rows.
 //
-// Setup: add GOOGLE_MAPS_API_KEY to the environment (a billing-enabled key with
-// the Places API (New) enabled). Until then this route returns 503 and the UI
-// falls back to the curated city bars.
+// DENIAL-OF-WALLET: this proxies a BILLED upstream call, so it is gated behind
+// auth + per-account AND per-IP rate limits, and results are cached on rounded
+// coordinates so panning the map can't run up the Google bill. Add a Vercel WAF
+// rule on this path too before enabling the key in prod.
 
 export const dynamic = "force-dynamic";
 
@@ -29,24 +33,20 @@ function num(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export async function GET(request: Request) {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) {
-    return NextResponse.json(
-      { error: "Nearby search is not configured yet (missing GOOGLE_MAPS_API_KEY).", data: [] },
-      { status: 503 },
-    );
-  }
+type Place = {
+  id: string;
+  displayName?: { text?: string };
+  formattedAddress?: string;
+  location?: { latitude: number; longitude: number };
+  rating?: number;
+  primaryTypeDisplayName?: { text?: string };
+  types?: string[];
+};
 
-  const { searchParams } = new URL(request.url);
-  const lat = num(searchParams.get("lat"));
-  const lng = num(searchParams.get("lng"));
-  const radius = Math.min(Math.max(num(searchParams.get("radius")) ?? 3000, 200), 50000);
-  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    return NextResponse.json({ error: "Valid lat & lng required", data: [] }, { status: 400 });
-  }
-
-  try {
+// Only SUCCESSFUL lookups are cached: the function throws on upstream failure so
+// errors aren't memoized for 10 minutes. Key = rounded lat/lng/radius (the args).
+const fetchNearbyCached = unstable_cache(
+  async (lat: number, lng: number, radius: number, key: string) => {
     const res = await fetch(PLACES_URL, {
       method: "POST",
       headers: {
@@ -61,26 +61,9 @@ export async function GET(request: Request) {
         locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
       }),
     });
-
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      return NextResponse.json(
-        { error: "Places lookup failed", detail: detail.slice(0, 200), data: [] },
-        { status: 502 },
-      );
-    }
-
-    type Place = {
-      id: string;
-      displayName?: { text?: string };
-      formattedAddress?: string;
-      location?: { latitude: number; longitude: number };
-      rating?: number;
-      primaryTypeDisplayName?: { text?: string };
-      types?: string[];
-    };
+    if (!res.ok) throw new Error(`places ${res.status}`);
     const json = (await res.json()) as { places?: Place[] };
-    const data = (json.places ?? [])
+    return (json.places ?? [])
       .filter((p) => p.location)
       .map((p) => ({
         id: p.id,
@@ -97,7 +80,48 @@ export async function GET(request: Request) {
         description: null as string | null,
         external: true,
       }));
+  },
+  ["bars-nearby"],
+  { revalidate: 600 },
+);
 
+export async function GET(request: Request) {
+  // Auth + throttle BEFORE touching the billed upstream.
+  const me = await getCurrentUser();
+  if (!me) return NextResponse.json({ error: "Unauthorized", data: [] }, { status: 401 });
+  if (me.isBanned) return NextResponse.json({ error: "Account suspended", data: [] }, { status: 403 });
+  if (
+    !rateLimit(`bars-nearby:${me.id}`, 20, 60_000) ||
+    !rateLimit(`bars-nearby-ip:${clientIp(request)}`, 40, 60_000)
+  ) {
+    return NextResponse.json(
+      { error: "Too many nearby searches. Please slow down.", data: [] },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) {
+    return NextResponse.json(
+      { error: "Nearby search is not configured yet (missing GOOGLE_MAPS_API_KEY).", data: [] },
+      { status: 503 },
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const lat = num(searchParams.get("lat"));
+  const lng = num(searchParams.get("lng"));
+  const radius = Math.min(Math.max(num(searchParams.get("radius")) ?? 3000, 200), 50000);
+  if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return NextResponse.json({ error: "Valid lat & lng required", data: [] }, { status: 400 });
+  }
+
+  // Round to ~110m so nearby pans hit the same cache entry.
+  const rLat = Math.round(lat * 1000) / 1000;
+  const rLng = Math.round(lng * 1000) / 1000;
+
+  try {
+    const data = await fetchNearbyCached(rLat, rLng, radius, key);
     return NextResponse.json({ data });
   } catch {
     return NextResponse.json({ error: "Nearby search failed", data: [] }, { status: 502 });

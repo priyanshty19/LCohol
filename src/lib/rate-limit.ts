@@ -19,7 +19,17 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
 }
 
 export function clientIp(request: Request): string {
+  // Prefer x-real-ip: on Vercel the platform sets it to the true client IP and
+  // overwrites any client-supplied value, so it can't be spoofed. Only fall back
+  // to x-forwarded-for, and then to its LAST hop (added by the trusted proxy) —
+  // never the first entry, which the client controls and could randomize to
+  // defeat the limiter. NOTE: still per-instance; a WAF rule is the real backstop.
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const xff = request.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return request.headers.get("x-real-ip") ?? "unknown";
+  if (xff) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length) return hops[hops.length - 1];
+  }
+  return "unknown";
 }
