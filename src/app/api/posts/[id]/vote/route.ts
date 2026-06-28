@@ -56,46 +56,50 @@ export async function POST(
       targetId: postId,
     });
 
-    const existing = await prisma.vote.findUnique({
-      where: { userId_postId: { userId: dbUser.id, postId } },
-    });
-
-    if (existing) {
-      if (existing.value === value) {
-        await prisma.$transaction([
-          prisma.vote.delete({ where: { id: existing.id } }),
-          prisma.post.update({
-            where: { id: postId },
-            data: { score: { decrement: value } },
-          }),
-        ]);
-        await recomputeKarma(dbUser.id);
-        return NextResponse.json({ data: { vote: null } });
-      } else {
-        await prisma.$transaction([
-          prisma.vote.update({ where: { id: existing.id }, data: { value } }),
-          prisma.post.update({
-            where: { id: postId },
-            data: { score: { increment: value * 2 } },
-          }),
-        ]);
-        await recomputeKarma(dbUser.id);
-        return NextResponse.json({ data: { vote: value } });
+    // Atomic vote toggle, then recompute post.score from SUM(votes.value) — the
+    // source of truth — inside the same transaction. Delta-based increments drift
+    // under concurrent clicks (double-decrement / P2002); recomputing from the
+    // aggregate keeps score == SUM(votes) no matter how requests interleave.
+    let voteState: number | null;
+    try {
+      voteState = await prisma.$transaction(async (tx) => {
+        const existing = await tx.vote.findUnique({
+          where: { userId_postId: { userId: dbUser.id, postId } },
+        });
+        let state: number | null;
+        if (!existing) {
+          await tx.vote.create({ data: { userId: dbUser.id, postId, value } });
+          state = value;
+        } else if (existing.value === value) {
+          await tx.vote.delete({ where: { id: existing.id } });
+          state = null;
+        } else {
+          await tx.vote.update({ where: { id: existing.id }, data: { value } });
+          state = value;
+        }
+        const agg = await tx.vote.aggregate({ where: { postId }, _sum: { value: true } });
+        await tx.post.update({ where: { id: postId }, data: { score: agg._sum.value ?? 0 } });
+        return state;
+      });
+    } catch (txErr) {
+      // A concurrent vote raced us (P2002 unique create / P2025 vanished row).
+      // The other request already left a consistent state — return the current
+      // vote idempotently instead of a 500.
+      const code = (txErr as { code?: string }).code;
+      if (code === "P2002" || code === "P2025") {
+        const current = await prisma.vote.findUnique({
+          where: { userId_postId: { userId: dbUser.id, postId } },
+        });
+        return NextResponse.json({ data: { vote: current?.value ?? null } });
       }
+      throw txErr;
     }
 
-    await prisma.$transaction([
-      prisma.vote.create({
-        data: { userId: dbUser.id, postId, value },
-      }),
-      prisma.post.update({
-        where: { id: postId },
-        data: { score: { increment: value } },
-      }),
-    ]);
-
     await recomputeKarma(dbUser.id);
-    return NextResponse.json({ data: { vote: value } }, { status: 201 });
+    return NextResponse.json(
+      { data: { vote: voteState } },
+      { status: voteState === null ? 200 : 201 },
+    );
   } catch (err) {
     if (isPoolExhausted(err)) {
       console.warn("[api/posts/[id]/vote] pool exhausted — 503 backoff");

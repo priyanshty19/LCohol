@@ -199,6 +199,15 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (err) {
     if (isPoolExhausted(err)) return poolBusyResponse();
+    // Lost a uniqueness race (two near-simultaneous signups both passed the
+    // pre-check) → friendly 409, not a generic 500.
+    const e = err as { code?: string; meta?: { target?: string[] | string } };
+    if (e.code === "P2002") {
+      const target = Array.isArray(e.meta?.target) ? e.meta.target.join(",") : String(e.meta?.target ?? "");
+      return /username/i.test(target)
+        ? NextResponse.json({ error: "That username is taken." }, { status: 409 })
+        : NextResponse.json({ error: "An account with that email already exists." }, { status: 409 });
+    }
     console.error("[auth/signup]", err);
     return NextResponse.json(
       { error: "Signup failed. Please try again." },

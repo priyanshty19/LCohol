@@ -33,18 +33,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "As host, you're already in." }, { status: 400 });
     }
 
-    const invite = await prisma.partyInvite.findFirst({
+    // Scoped updateMany (not find-then-update-by-id): if the host revokes the
+    // invite between a read and the write, this cleanly affects 0 rows → 404,
+    // instead of a P2025 → 500 on a vanished id.
+    const updated = await prisma.partyInvite.updateMany({
       where: { partyPlanId: id, invitedUserId: me.id },
-      select: { id: true },
-    });
-    if (!invite) {
-      return NextResponse.json({ error: "You're not invited to this party." }, { status: 404 });
-    }
-
-    await prisma.partyInvite.update({
-      where: { id: invite.id },
       data: { rsvp: body.status, respondedAt: new Date() },
     });
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "You're not invited to this party." }, { status: 404 });
+    }
 
     await notify({ userId: party.authorId, actorId: me.id, type: "RSVP", partyId: id });
 
