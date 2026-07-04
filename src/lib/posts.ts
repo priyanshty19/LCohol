@@ -31,6 +31,38 @@ const include = {
   _count: { select: { comments: true, votes: true } },
 } as const;
 
+/**
+ * Overlay always-fresh, viewer-specific state onto a (possibly cached) page of
+ * posts. The 500-row ranking window is cached with a TTL, so `score` inside it
+ * can lag — and it never carries the viewer's own vote. A user who votes and
+ * refreshes must see their vote held (score + arrow), or the vote looks lost.
+ * Two tiny indexed queries on just the page slice (~20 rows) keep the cache win
+ * while making the visible page authoritative.
+ */
+async function overlayViewerState<T extends { id: string; score: number }>(
+  posts: T[],
+  viewerId?: string | null,
+): Promise<(T & { userVote: number | null })[]> {
+  if (!posts.length) return posts.map((p) => ({ ...p, userVote: null }));
+  const ids = posts.map((p) => p.id);
+  const [freshScores, myVotes] = await Promise.all([
+    prisma.post.findMany({ where: { id: { in: ids } }, select: { id: true, score: true } }),
+    viewerId
+      ? prisma.vote.findMany({
+          where: { userId: viewerId, postId: { in: ids } },
+          select: { postId: true, value: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const scoreById = new Map(freshScores.map((s) => [s.id, s.score]));
+  const voteById = new Map(myVotes.map((v) => [v.postId, v.value]));
+  return posts.map((p) => ({
+    ...p,
+    score: scoreById.get(p.id) ?? p.score,
+    userVote: voteById.get(p.id) ?? null,
+  }));
+}
+
 /** PUBLIC for everyone; CIRCLE posts only for the viewer + their connections. */
 function audienceWhere(viewerId?: string | null, connectionIds: string[] = []): Prisma.PostWhereInput {
   if (!viewerId) return { visibility: "PUBLIC" };
@@ -109,7 +141,7 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     const last = shown[shown.length - 1];
 
     return {
-      data: shown.map((x) => x.p),
+      data: await overlayViewerState(shown.map((x) => x.p), opts.viewerId),
       hasMore,
       nextCursor: hasMore && last ? `${last.fy}_${last.p.id}` : undefined,
     };
@@ -188,7 +220,7 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     const last = shown[shown.length - 1];
 
     return {
-      data: shown.map((x) => x.p),
+      data: await overlayViewerState(shown.map((x) => x.p), opts.viewerId),
       hasMore,
       nextCursor: hasMore && last ? `${last.hot}_${last.p.id}` : undefined,
     };
@@ -209,7 +241,7 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
   const data = hasMore ? posts.slice(0, FEED_PAGE_SIZE) : posts;
 
   return {
-    data,
+    data: await overlayViewerState(data, opts.viewerId),
     hasMore,
     nextCursor: hasMore ? data[data.length - 1]?.id : undefined,
   };
