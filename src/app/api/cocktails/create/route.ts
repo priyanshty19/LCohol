@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { logInteraction } from "@/lib/interactions";
 import { rateLimit } from "@/lib/rate-limit";
+import { containsProfanity } from "@/lib/profanity";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // POST /api/cocktails/create
@@ -42,6 +43,14 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 200) : "";
   if (!name) return NextResponse.json({ error: "Name your mix first" }, { status: 400 });
+  // Names surface publicly (shared posts, "Loved by your circle", recipe pages),
+  // so block blatant profanity/slurs at the door.
+  if (containsProfanity(name)) {
+    return NextResponse.json(
+      { error: "Please pick a cleaner name for your mix." },
+      { status: 400 },
+    );
+  }
 
   const slugs: string[] = Array.isArray(body.ingredientSlugs)
     ? body.ingredientSlugs.filter((s: unknown): s is string => typeof s === "string").slice(0, 16)
