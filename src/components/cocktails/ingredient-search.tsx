@@ -87,14 +87,24 @@ export function IngredientSearch() {
       names.length === 1
         ? names[0]
         : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-    const prompt = `I've got ${list}. What cocktail should I make?`;
+    askJamesFor(list);
+  }
+
+  // Free-text hand-off: type anything (even something not in the ingredient
+  // dictionary, like "mango lassi vibes") and let James riff on it directly from
+  // here, instead of being limited to exact dictionary picks.
+  function askJamesFor(what: string) {
+    const q = what.trim();
+    if (!q) return;
+    const prompt = `I've got ${q}. What cocktail should I make?`;
     window.dispatchEvent(new CustomEvent("ask-james", { detail: { prompt } }));
+    setQuery("");
   }
 
   const hasSelection = selected.size > 0;
 
   return (
-    <Card className="border-primary/20">
+    <Card className="overflow-visible border-primary/20">
       <CardContent className="space-y-4 pt-5">
         <div className="space-y-1">
           <h2 className="font-display text-lg font-semibold">Make something with what you have</h2>
@@ -126,10 +136,18 @@ export function IngredientSearch() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Add an ingredient — gin, lime, mint…"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && query.trim()) {
+                e.preventDefault();
+                // First dictionary match if any, else hand the raw text to James.
+                if (suggestions.length) addIngredient(suggestions[0]);
+                else askJamesFor(query);
+              }
+            }}
+            placeholder="Add an ingredient — gin, lime, mango…"
             className="sm:max-w-md"
           />
-          {suggestions.length > 0 && (
+          {query.trim() && (
             <div className="absolute z-20 mt-1 w-full max-w-md overflow-hidden rounded-lg border border-border/60 bg-popover shadow-xl">
               {suggestions.map((o) => (
                 <button
@@ -144,6 +162,15 @@ export function IngredientSearch() {
                   </span>
                 </button>
               ))}
+              {/* Always offer James on the raw text — so a word that isn't in the
+                  ingredient dictionary still goes somewhere useful. */}
+              <button
+                type="button"
+                onClick={() => askJamesFor(query)}
+                className="flex w-full items-center gap-2 border-t border-border/50 bg-primary/5 px-3 py-2 text-left text-sm text-primary hover:bg-primary/10"
+              >
+                🍸 Ask James about “{query.trim()}”
+              </button>
             </div>
           )}
         </div>
