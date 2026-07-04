@@ -27,6 +27,12 @@ const FEED_TTL_MS = 20_000;
 const feedCache = new Map<string, { page: FeedPage; at: number }>();
 const feedInflight = new Map<string, Promise<FeedPage>>();
 
+/** Drop all cached first pages — call after any action that changes what the
+ * viewer should see (e.g. voting), so a tab switch can't resurrect stale state. */
+export function bustFeedCache() {
+  feedCache.clear();
+}
+
 async function fetchFeedPage(key: string, params: URLSearchParams): Promise<FeedPage> {
   const cached = feedCache.get(key);
   if (cached && Date.now() - cached.at < FEED_TTL_MS) return cached.page;

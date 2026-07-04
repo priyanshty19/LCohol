@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { bustFeedCache } from "./post-list";
 
 interface VoteButtonsProps {
   postId: string;
@@ -30,6 +31,7 @@ export function VoteButtons({
 
   async function handleVote(value: 1 | -1) {
     const mySeq = ++seqRef.current;
+    bustFeedCache(); // a cached first page now holds a stale score/vote for this post
 
     // Optimistic update from the CURRENT state (functional updater so back-to-back
     // clicks compose correctly instead of reading a stale closure).
