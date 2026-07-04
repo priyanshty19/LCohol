@@ -35,6 +35,10 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Exclude Next internals and PUBLIC static assets from auth — otherwise
+    // unauthenticated requests to e.g. /manifest.json get 307'd to /login and the
+    // browser parses the redirect HTML as JSON ("Manifest: Syntax error"). Covers
+    // the PWA manifest, robots/sitemap, and static image/icon files.
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };
