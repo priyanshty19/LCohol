@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,18 @@ import { phrasesFor } from "@/lib/james/loading-phrases";
 type IngredientOption = { name: string; slug: string; category: string };
 type MatchRow = CocktailSelectRow & { matched: number };
 type MatchResponse = { data: { cocktails: MatchRow[]; selectedCount: number } };
+// Subset of James's agent card payload we render inline.
+type JamesItem = {
+  kind: "cocktail" | "drink";
+  name: string;
+  category: string | null;
+  subtitle: string | null;
+  slug: string | null;
+};
+type AgentReply = {
+  reply?: string;
+  cards?: { results?: JamesItem[]; similar?: JamesItem[] } | null;
+};
 
 // "Make something with what you have" — add ingredients, get live cocktail
 // matches ranked by overlap (deterministic). Plus an optional hand-off to James
@@ -25,10 +38,11 @@ export function IngredientSearch() {
   const [results, setResults] = useState<MatchRow[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
   const [loading, setLoading] = useState(false);
-  // Inline James riff — his reply renders right here in the card (not the
-  // floating panel), which is what the search should feel like.
+  // Inline James riff — his reply (and the cocktails he suggests) render right
+  // here in the card, not the floating panel.
   const [jamesAsk, setJamesAsk] = useState<string | null>(null);
   const [jamesReply, setJamesReply] = useState<string | null>(null);
+  const [jamesCards, setJamesCards] = useState<JamesItem[]>([]);
   const [jamesLoading, setJamesLoading] = useState(false);
   const phraseRef = useRef(phrasesFor("cocktails")[0]);
 
@@ -105,6 +119,7 @@ export function IngredientSearch() {
     setQuery("");
     setJamesAsk(q);
     setJamesReply(null);
+    setJamesCards([]);
     setJamesLoading(true);
     try {
       const r = await fetch("/api/james/agent", {
@@ -117,8 +132,17 @@ export function IngredientSearch() {
         }),
       });
       if (!r.ok) throw new Error("agent failed");
-      const data = (await r.json()) as { reply?: string };
+      const data = (await r.json()) as AgentReply;
       setJamesReply(data.reply || "Hmm, nothing came to mind. Try another ingredient?");
+      // Dedupe results + similar by slug/name, keep those we can link to.
+      const seen = new Set<string>();
+      const cards = [...(data.cards?.results ?? []), ...(data.cards?.similar ?? [])].filter((it) => {
+        const key = it.slug ?? it.name;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setJamesCards(cards.slice(0, 6));
     } catch {
       setJamesReply("James stepped away from the bar. Give it another go.");
     } finally {
@@ -212,7 +236,7 @@ export function IngredientSearch() {
                 {jamesReply && (
                   <button
                     type="button"
-                    onClick={() => { setJamesReply(null); setJamesAsk(null); }}
+                    onClick={() => { setJamesReply(null); setJamesAsk(null); setJamesCards([]); }}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     ✕
@@ -222,7 +246,30 @@ export function IngredientSearch() {
               {jamesLoading ? (
                 <p className="text-sm text-muted-foreground">{phraseRef.current}</p>
               ) : (
-                <p className="whitespace-pre-line text-sm leading-relaxed">{jamesReply}</p>
+                <>
+                  <p className="whitespace-pre-line text-sm leading-relaxed">{jamesReply}</p>
+                  {jamesCards.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {jamesCards.map((it, idx) =>
+                        it.slug ? (
+                          <Link
+                            key={`${it.slug}-${idx}`}
+                            href={`/${it.kind === "drink" ? "drinks" : "cocktails"}/${it.slug}`}
+                            className="group inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs transition hover:border-primary/60 hover:bg-primary/10"
+                          >
+                            <span className="font-medium">{it.name}</span>
+                            {it.category && (
+                              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                                {it.category}
+                              </span>
+                            )}
+                            <span className="text-primary/70 group-hover:translate-x-0.5">→</span>
+                          </Link>
+                        ) : null,
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

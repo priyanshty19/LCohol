@@ -70,9 +70,11 @@ function greetingFor(theme: string): Msg {
 export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
-  // Feed/home already shows James at the top (AskJames), so the floating
-  // bottom-right launcher appears on every OTHER screen.
-  const launcherOn = showLauncher && pathname !== "/";
+  // Screens that already surface James inline (feed's AskJames composer, and the
+  // Cocktails ingredient search) don't need the floating bottom-right launcher —
+  // it would double up. Hide it there.
+  const INLINE_JAMES_ROUTES = new Set(["/", "/cocktails"]);
+  const launcherOn = showLauncher && !INLINE_JAMES_ROUTES.has(pathname);
   const greetingRef = useRef<Msg>(greetingFor("light"));
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [greetingRef.current]);
