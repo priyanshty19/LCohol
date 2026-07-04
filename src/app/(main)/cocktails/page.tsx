@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CocktailsView } from "@/components/cocktails/cocktails-view";
+import { CircleLoves } from "@/components/cocktails/circle-loves";
 import { IngredientSearch } from "@/components/cocktails/ingredient-search";
 import { CatalogTabs } from "@/components/catalog/catalog-tabs";
 import { getCocktailsCached } from "@/lib/cocktails";
@@ -17,6 +18,7 @@ export default async function CocktailsPage() {
     <div className="space-y-8">
       <CatalogTabs active="/cocktails" />
       <IngredientSearch />
+      <CircleLoves />
       <CocktailsView initial={initial} />
     </div>
   );

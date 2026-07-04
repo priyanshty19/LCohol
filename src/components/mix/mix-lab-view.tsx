@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { EntryCard } from "@/components/catalog/entry-card";
+import { CircleLoves } from "@/components/cocktails/circle-loves";
 import { MixGame } from "@/components/mix/mix-game";
 import { toCatalogCocktail, type CocktailSelectRow } from "@/lib/catalog";
 
@@ -70,6 +71,8 @@ export function MixLabView() {
           </div>
         </div>
       )}
+
+      <CircleLoves title="🫂 From your circle's lab" />
 
       {myMixes.length > 0 && (
         <div className="space-y-3">
