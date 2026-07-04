@@ -272,13 +272,20 @@ export function MixGame() {
               <h3 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">Add ingredients</h3>
               <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search the shelf…" />
               {!query && (
-                <div className="flex flex-wrap gap-1.5">
+                // Category tabs are a filter control, not selectable ingredients —
+                // render them as a segmented strip (grouped tray, uppercase, squared
+                // tabs) so they read distinctly from the rounded ingredient chips below.
+                <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-[color-mix(in_srgb,var(--foreground)_4%,transparent)] p-1">
                   {CATEGORY_TABS.map((c) => (
                     <button
                       key={c}
                       onClick={() => setActiveCat(c)}
                       aria-pressed={activeCat === c}
-                      className={`rounded-full px-2.5 py-1 text-[11px] capitalize ${activeCat === c ? "pill-active" : "pill-inactive"}`}
+                      className={`rounded-md px-3 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+                        activeCat === c
+                          ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
                     >
                       {c.toLowerCase()}
                     </button>
