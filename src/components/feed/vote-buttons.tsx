@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface VoteButtonsProps {
@@ -14,27 +14,30 @@ export function VoteButtons({
   initialScore,
   initialVote,
 }: VoteButtonsProps) {
-  const [score, setScore] = useState(initialScore);
-  const [userVote, setUserVote] = useState<number | null>(initialVote ?? null);
-  const [loading, setLoading] = useState(false);
+  // Score + the viewer's vote move together, so keep them in one state object and
+  // update atomically in a single pure updater.
+  const [state, setState] = useState<{ score: number; vote: number | null }>({
+    score: initialScore,
+    vote: initialVote ?? null,
+  });
+  const { score, vote: userVote } = state;
+  // Monotonic id of the latest click. Rapid clicks (e.g. upvote then immediately
+  // downvote) must all register — the UI is fully optimistic and the server
+  // recomputes score from SUM(votes) atomically, so no client-side lock is needed.
+  // We only use this to stop a superseded in-flight request from rolling back
+  // the user's newer optimistic state.
+  const seqRef = useRef(0);
 
   async function handleVote(value: 1 | -1) {
-    if (loading) return;
-    setLoading(true);
+    const mySeq = ++seqRef.current;
 
-    const prevScore = score;
-    const prevVote = userVote;
-
-    if (userVote === value) {
-      setScore(score - value);
-      setUserVote(null);
-    } else if (userVote) {
-      setScore(score + value * 2);
-      setUserVote(value);
-    } else {
-      setScore(score + value);
-      setUserVote(value);
-    }
+    // Optimistic update from the CURRENT state (functional updater so back-to-back
+    // clicks compose correctly instead of reading a stale closure).
+    setState((prev) => {
+      if (prev.vote === value) return { score: prev.score - value, vote: null }; // toggle off
+      if (prev.vote) return { score: prev.score + value * 2, vote: value }; // flip up<->down
+      return { score: prev.score + value, vote: value }; // first vote
+    });
 
     try {
       const res = await fetch(`/api/posts/${postId}/vote`, {
@@ -42,16 +45,16 @@ export function VoteButtons({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       });
-
-      if (!res.ok) {
-        setScore(prevScore);
-        setUserVote(prevVote);
+      // Only reconcile if this is still the most recent action — a superseded
+      // request must not clobber the user's newer optimistic state.
+      if (!res.ok && mySeq === seqRef.current) {
+        const data = (await res.json().catch(() => null)) as
+          | { data?: { vote?: number | null } }
+          | null;
+        setState((prev) => ({ ...prev, vote: data?.data?.vote ?? null }));
       }
     } catch {
-      setScore(prevScore);
-      setUserVote(prevVote);
-    } finally {
-      setLoading(false);
+      /* network blip — leave optimistic state; next action or refresh reconciles */
     }
   }
 
@@ -59,7 +62,6 @@ export function VoteButtons({
     <div className="flex flex-col items-center gap-0.5">
       <button
         onClick={() => handleVote(1)}
-        disabled={loading}
         className={cn(
           "rounded p-1 transition-colors hover:bg-accent",
           userVote === 1 && "text-primary"
@@ -88,7 +90,6 @@ export function VoteButtons({
       </span>
       <button
         onClick={() => handleVote(-1)}
-        disabled={loading}
         className={cn(
           "rounded p-1 transition-colors hover:bg-accent",
           userVote === -1 && "text-destructive"
