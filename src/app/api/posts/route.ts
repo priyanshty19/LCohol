@@ -9,6 +9,7 @@ import { persistMentions } from "@/lib/mentions";
 import { notifyMany } from "@/lib/notifications";
 import { logInteraction } from "@/lib/interactions";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { containsProfanity } from "@/lib/profanity";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 /** Accept an image URL only if it is https, on OUR Supabase project host, and
@@ -101,6 +102,14 @@ export async function POST(request: Request) {
 
   if (!VALID_POST_TYPES.has(postType)) {
     return NextResponse.json({ error: "Invalid post type" }, { status: 400 });
+  }
+
+  // Block blatant profanity/slurs in the title or body before it hits the feed.
+  if (containsProfanity(title) || (typeof postBody === "string" && containsProfanity(postBody))) {
+    return NextResponse.json(
+      { error: "Please keep it civil — that title or body isn't allowed." },
+      { status: 400 },
+    );
   }
 
   // Audience: PUBLIC (default, global feed) or CIRCLE (only the author + their
