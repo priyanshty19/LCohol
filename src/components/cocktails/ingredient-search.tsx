@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EntryCard } from "@/components/catalog/entry-card";
+import { JamesAvatar } from "@/components/james/james-avatar";
 import { toCatalogCocktail, type CocktailSelectRow } from "@/lib/catalog";
 import { phrasesFor } from "@/lib/james/loading-phrases";
 
@@ -24,6 +25,11 @@ export function IngredientSearch() {
   const [results, setResults] = useState<MatchRow[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  // Inline James riff — his reply renders right here in the card (not the
+  // floating panel), which is what the search should feel like.
+  const [jamesAsk, setJamesAsk] = useState<string | null>(null);
+  const [jamesReply, setJamesReply] = useState<string | null>(null);
+  const [jamesLoading, setJamesLoading] = useState(false);
   const phraseRef = useRef(phrasesFor("cocktails")[0]);
 
   // Load the ingredient dictionary once.
@@ -91,14 +97,33 @@ export function IngredientSearch() {
   }
 
   // Free-text hand-off: type anything (even something not in the ingredient
-  // dictionary, like "mango lassi vibes") and let James riff on it directly from
-  // here, instead of being limited to exact dictionary picks.
-  function askJamesFor(what: string) {
+  // dictionary, like "mango lassi vibes") and James riffs on it — his reply
+  // renders inline below, right here in the search.
+  async function askJamesFor(what: string) {
     const q = what.trim();
-    if (!q) return;
-    const prompt = `I've got ${q}. What cocktail should I make?`;
-    window.dispatchEvent(new CustomEvent("ask-james", { detail: { prompt } }));
+    if (!q || jamesLoading) return;
     setQuery("");
+    setJamesAsk(q);
+    setJamesReply(null);
+    setJamesLoading(true);
+    try {
+      const r = await fetch("/api/james/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            { role: "user", content: `I've got ${q}. What cocktail should I make?` },
+          ],
+        }),
+      });
+      if (!r.ok) throw new Error("agent failed");
+      const data = (await r.json()) as { reply?: string };
+      setJamesReply(data.reply || "Hmm, nothing came to mind. Try another ingredient?");
+    } catch {
+      setJamesReply("James stepped away from the bar. Give it another go.");
+    } finally {
+      setJamesLoading(false);
+    }
   }
 
   const hasSelection = selected.size > 0;
@@ -174,6 +199,34 @@ export function IngredientSearch() {
             </div>
           )}
         </div>
+
+        {/* Inline James riff — his reply lands right here, not the floating panel. */}
+        {(jamesLoading || jamesReply) && (
+          <div className="flex gap-3 rounded-xl border border-[var(--ml-velvet-bright)]/25 bg-[var(--ml-velvet-bright)]/5 p-3">
+            <JamesAvatar className="h-9 w-9 shrink-0 rounded-full ring-1 ring-[var(--ml-velvet-bright)]/30" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[var(--ml-velvet-bright)]">
+                  James{jamesAsk ? ` · on “${jamesAsk}”` : ""}
+                </span>
+                {jamesReply && (
+                  <button
+                    type="button"
+                    onClick={() => { setJamesReply(null); setJamesAsk(null); }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {jamesLoading ? (
+                <p className="text-sm text-muted-foreground">{phraseRef.current}</p>
+              ) : (
+                <p className="whitespace-pre-line text-sm leading-relaxed">{jamesReply}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {hasSelection && (
           <>
