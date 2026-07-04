@@ -1,59 +1,79 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { CategoryIcon } from "@/components/drinks/category-icons";
+import { ShareCocktailButton } from "@/components/cocktails/share-cocktail-button";
 import type { CatalogCocktailEntry } from "@/types/database";
 
 // Server-rendered cocktail detail (SSR, no client fetch) — the deep-linkable
 // counterpart to /drinks/[slug]. The modal in cocktails-view becomes secondary.
 
 export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
+  const ingredientNames = entry.ingredients.map(
+    (i) => i.ingredient?.name ?? i.drink?.name ?? "Unknown",
+  );
+
   return (
     <article className="mx-auto max-w-2xl space-y-6">
-      <header className="space-y-3">
-        <Link
-          href="/cocktails"
-          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        >
-          ← All cocktails
-        </Link>
-        <div className="flex items-start gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-muted/30">
-            <CategoryIcon category={entry.glass} className="h-9 w-9 text-primary/55" />
+      <Link
+        href="/cocktails"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+      >
+        ← All cocktails
+      </Link>
+
+      {/* Hero */}
+      <header className="glass-panel-subtle relative overflow-hidden rounded-2xl p-5">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/15">
+            <CategoryIcon category={entry.glass} className="h-11 w-11 text-primary/70" />
           </div>
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">{entry.name}</h1>
+          <div className="min-w-0 flex-1 space-y-2">
+            <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight">
+              {entry.name}
+            </h1>
             <div className="flex flex-wrap items-center gap-2">
               {entry.category && (
                 <Badge variant="drink" className="text-[10px] uppercase tracking-wide">
                   {entry.category}
                 </Badge>
               )}
-              {!entry.isCurated && (
-                <Badge variant="outline" className="text-[10px]">
-                  Discover
-                </Badge>
-              )}
+              <Badge variant="outline" className="text-[10px]">
+                {entry.isCurated ? "Editorial pick" : "Community mix"}
+              </Badge>
             </div>
           </div>
         </div>
+        <div className="relative mt-4">
+          <ShareCocktailButton
+            name={entry.name}
+            slug={entry.slug}
+            ingredients={ingredientNames}
+          />
+        </div>
       </header>
 
-      {entry.ingredients.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {ingredientNames.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Ingredients
           </h2>
-          <ul className="space-y-1 text-sm">
-            {entry.ingredients.map((i, idx) => (
-              <li key={idx}>• {i.ingredient?.name ?? i.drink?.name ?? "Unknown"}</li>
+          <div className="flex flex-wrap gap-2">
+            {ingredientNames.map((name, idx) => (
+              <span
+                key={idx}
+                className="rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-sm"
+              >
+                {name}
+              </span>
             ))}
-          </ul>
+          </div>
         </section>
       )}
 
       {entry.instructions && (
-        <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Method
           </h2>
           <p className="whitespace-pre-line text-sm leading-relaxed">{entry.instructions}</p>
@@ -61,28 +81,33 @@ export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
       )}
 
       {entry.garnish && (
-        <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Garnish
           </h2>
-          <p className="text-sm">{entry.garnish}</p>
+          <p className="text-sm">🍊 {entry.garnish}</p>
         </section>
       )}
 
-      <footer className="space-y-1 border-t border-border/40 pt-4 text-xs text-muted-foreground">
-        {entry.glass && <div>Served in: {entry.glass}</div>}
-        <div>
-          Spotted at:{" "}
-          {entry.sourceBar ? (
-            <Link
-              href={`/bars/${entry.sourceBar.slug}`}
-              className="underline-offset-2 hover:underline"
-            >
-              {entry.sourceBar.name}, {entry.sourceBar.city}
-            </Link>
-          ) : (
-            entry.sourceLabel ?? "Unknown"
-          )}
+      <footer className="grid grid-cols-2 gap-3 border-t border-border/40 pt-4 text-xs">
+        <div className="space-y-0.5">
+          <div className="uppercase tracking-wide text-muted-foreground/70">Served in</div>
+          <div className="text-foreground">{entry.glass ?? "—"}</div>
+        </div>
+        <div className="space-y-0.5">
+          <div className="uppercase tracking-wide text-muted-foreground/70">Spotted at</div>
+          <div className="text-foreground">
+            {entry.sourceBar ? (
+              <Link
+                href={`/bars/${entry.sourceBar.slug}`}
+                className="underline-offset-2 hover:underline"
+              >
+                {entry.sourceBar.name}, {entry.sourceBar.city}
+              </Link>
+            ) : (
+              entry.sourceLabel ?? "Unknown"
+            )}
+          </div>
         </div>
       </footer>
     </article>
