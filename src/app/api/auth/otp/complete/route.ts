@@ -40,7 +40,7 @@ class ReferralUnavailableError extends Error {}
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!rateLimit(`otp-complete:${clientIp(request)}`, 10, 60_000)) {
+    if (!(await rateLimit(`otp-complete:${clientIp(request)}`, 10, 60_000))) {
       return NextResponse.json(
         { error: "Too many attempts. Please wait a minute." },
         { status: 429 },

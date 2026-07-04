@@ -64,6 +64,30 @@ export function LoginForm() {
     setError(null);
 
     const addr = email.trim().toLowerCase();
+
+    // Source of truth is OUR DB, not Clerk. Check membership BEFORE asking Clerk
+    // to do anything — otherwise a Clerk-known email (e.g. an abandoned OTP shadow
+    // record) gets a code sent, the user enters it, and only THEN learns there's
+    // no account. Confirm first so non-members are routed to signup with no wasted
+    // OTP and no further Clerk state created.
+    try {
+      const checkRes = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: addr }),
+      });
+      const { exists } = await checkRes.json();
+      if (!exists) {
+        setError("No account for this email yet — please sign up.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Couldn't reach the server. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const si = await signIn.create({ identifier: addr });
       const factor = si.supportedFirstFactors?.find(
@@ -86,8 +110,10 @@ export function LoginForm() {
         /* ignore */
       }
     } catch {
-      // Clerk has no user for this email → verify via signUp; the backend will
-      // tell us whether they're an existing member or need to register.
+      // We already confirmed above that this email IS a member in our DB, so
+      // signIn.create() failing means Clerk simply hasn't seen this address yet
+      // (a legacy/password member). Verify via the signUp shadow-user flow; the
+      // backend still treats them as an existing member on completion.
       try {
         await signUp!.create({ emailAddress: addr });
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });

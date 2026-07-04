@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
 import { canModerate } from "@/lib/rbac";
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireRole("MODERATOR");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`mod-delete:${guard.user.id}`, 30, 60000)) {
+  if (!(await rateLimit(`mod-delete:${guard.user.id}`, 30, 60000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       await prisma.comment.update({ where: { id }, data: { isDeleted: true } });
     }
 
-    await recomputeKarma(target.authorId);
+    after(() => recomputeKarma(target.authorId));
 
     await prisma.moderationAction.create({
       data: {

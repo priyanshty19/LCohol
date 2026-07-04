@@ -32,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`party-patch:${me.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`party-patch:${me.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "You're doing that too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

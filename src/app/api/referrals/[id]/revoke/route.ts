@@ -13,7 +13,7 @@ export async function POST(
   const guard = await requireRole("USER");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`referral-revoke:${guard.user.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`referral-revoke:${guard.user.id}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "You're doing that too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

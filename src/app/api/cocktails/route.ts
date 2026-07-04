@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   // Each distinct ?q= is a cache miss → unindexed ILIKE over ~10k rows. Throttle
   // per IP and ignore sub-2-char queries so a varied-query loop can't seq-scan
   // the table on every request. (pg_trgm index + WAF are the durable fixes.)
-  if (!rateLimit(`cocktails-list:${clientIp(request)}`, 60, 60_000)) {
+  if (!(await rateLimit(`cocktails-list:${clientIp(request)}`, 60, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "30" } },

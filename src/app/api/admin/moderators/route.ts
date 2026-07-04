@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireRole("ADMIN");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`admin-mod:${guard.user.id}`, 20, 60000)) {
+  if (!(await rateLimit(`admin-mod:${guard.user.id}`, 20, 60000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

@@ -10,7 +10,7 @@ export async function POST() {
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`notif-read:${me.id}`, 12, 60_000)) {
+  if (!(await rateLimit(`notif-read:${me.id}`, 12, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

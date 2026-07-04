@@ -18,7 +18,7 @@ export async function DELETE(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!rateLimit(`account-delete:${user.id}`, 3, 60_000)) {
+  if (!(await rateLimit(`account-delete:${user.id}`, 3, 60_000))) {
     return NextResponse.json(
       { error: "Too many delete attempts. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

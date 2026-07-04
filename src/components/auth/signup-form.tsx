@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Dices } from "lucide-react";
-import { useSignUp } from "@clerk/nextjs/legacy";
+import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,9 +37,17 @@ function ageFromDob(dobStr: string): number {
 export function SignupForm() {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
+  // Fallback path: if Clerk already holds this email (a shadow record from an
+  // earlier abandoned OTP) but our DB has no member, signUp.create() fails with
+  // "identifier taken". We then verify the email through the EXISTING Clerk
+  // identity via signIn, and still complete signup (mode=signup) so the DB member
+  // gets created. Without this, a stranded Clerk record permanently blocks signup.
+  const { signIn, setActive: setActiveSignIn } = useSignIn();
   const { getToken } = useAuth();
 
   const [step, setStep] = useState<"details" | "otp">("details");
+  // Which Clerk object holds the in-flight verification for this signup.
+  const [verifyVia, setVerifyVia] = useState<"signup" | "signin">("signup");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [drinks, setDrinks] = useState<DrinkOption[]>([]);
@@ -73,6 +81,7 @@ export function SignupForm() {
         if (s?.step === "otp" && s?.details?.email) {
           setDetails(s.details);
           setUsername(s.username || generateFunkyName());
+          setVerifyVia(s.verifyVia === "signin" ? "signin" : "signup");
           setStep("otp");
           restored = true;
         }
@@ -153,21 +162,55 @@ export function SignupForm() {
     }
 
     // Clerk: create the (shadow) user and email the OTP.
-    try {
-      await signUp.create({ emailAddress: email });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      const captured = { email, dob, referralCode, favoriteDrinkId, consent };
+    const captured = { email, dob, referralCode, favoriteDrinkId, consent };
+    const goToOtp = (via: "signup" | "signin") => {
+      setVerifyVia(via);
       setDetails(captured);
       setStep("otp");
       try {
         sessionStorage.setItem(
           SU_OTP_KEY,
-          JSON.stringify({ step: "otp", details: captured, username: username.trim() }),
+          JSON.stringify({ step: "otp", details: captured, username: username.trim(), verifyVia: via }),
         );
       } catch {
         /* ignore */
       }
+    };
+
+    try {
+      await signUp.create({ emailAddress: email });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      goToOtp("signup");
     } catch (e) {
+      // "Identifier taken" means Clerk already has this email (an abandoned OTP
+      // shadow record) even though our DB may have no member. Don't dead-end —
+      // verify through the existing Clerk identity via signIn and still complete
+      // signup so the DB member is created. If our DB *does* already have them,
+      // otp/complete just logs them in.
+      const code = (e as { errors?: { code?: string }[] })?.errors?.[0]?.code;
+      const identifierTaken =
+        code === "form_identifier_exists" ||
+        /taken|already.*(registered|exists)/i.test(clerkError(e, ""));
+      if (identifierTaken && signIn) {
+        try {
+          const si = await signIn.create({ identifier: email });
+          const factor = si.supportedFirstFactors?.find(
+            (f) => f.strategy === "email_code",
+          ) as { emailAddressId: string } | undefined;
+          if (!factor) throw new Error("no email_code factor");
+          await signIn.prepareFirstFactor({
+            strategy: "email_code",
+            emailAddressId: factor.emailAddressId,
+          });
+          goToOtp("signin");
+          setLoading(false);
+          return;
+        } catch (e2) {
+          setError(clerkError(e2, "Couldn't send a code to that email. Please try again."));
+          setLoading(false);
+          return;
+        }
+      }
       setError(
         clerkError(
           e,
@@ -188,15 +231,28 @@ export function SignupForm() {
 
     try {
       if (!verified) {
-        const res = await signUp.attemptEmailAddressVerification({
-          code: code.trim(),
-        });
-        if (res.status !== "complete" || !res.createdSessionId) {
-          setError("That code didn't verify. Check it and try again.");
-          setLoading(false);
-          return;
+        if (verifyVia === "signin") {
+          const res = await signIn!.attemptFirstFactor({
+            strategy: "email_code",
+            code: code.trim(),
+          });
+          if (res.status !== "complete" || !res.createdSessionId) {
+            setError("That code didn't verify. Check it and try again.");
+            setLoading(false);
+            return;
+          }
+          await setActiveSignIn!({ session: res.createdSessionId });
+        } else {
+          const res = await signUp.attemptEmailAddressVerification({
+            code: code.trim(),
+          });
+          if (res.status !== "complete" || !res.createdSessionId) {
+            setError("That code didn't verify. Check it and try again.");
+            setLoading(false);
+            return;
+          }
+          await setActive({ session: res.createdSessionId });
         }
-        await setActive({ session: res.createdSessionId });
         setVerified(true);
       }
 
@@ -244,7 +300,19 @@ export function SignupForm() {
     if (!isLoaded) return;
     setError(null);
     try {
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      if (verifyVia === "signin") {
+        const si = await signIn!.create({ identifier: details.email });
+        const factor = si.supportedFirstFactors?.find(
+          (f) => f.strategy === "email_code",
+        ) as { emailAddressId: string } | undefined;
+        if (!factor) throw new Error("no email_code factor");
+        await signIn!.prepareFirstFactor({
+          strategy: "email_code",
+          emailAddressId: factor.emailAddressId,
+        });
+      } else {
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      }
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
     }

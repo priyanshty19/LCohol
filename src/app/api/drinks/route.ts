@@ -10,7 +10,7 @@ const CACHE_HEADERS = { "Cache-Control": "public, max-age=300, stale-while-reval
 export async function GET(request: Request) {
   // `?search=` runs unindexed ILIKE; varying it bypasses the CDN cache. Throttle
   // per IP and cap the term length. (pg_trgm index + WAF are the durable fixes.)
-  if (!rateLimit(`drinks-list:${clientIp(request)}`, 60, 60_000)) {
+  if (!(await rateLimit(`drinks-list:${clientIp(request)}`, 60, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "30" } },

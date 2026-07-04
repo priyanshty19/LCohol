@@ -12,7 +12,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.isBanned) return NextResponse.json({ error: "Account suspended." }, { status: 403 });
 
-  if (!rateLimit(`bar-review:${user.id}`, 8, 60_000)) {
+  if (!(await rateLimit(`bar-review:${user.id}`, 8, 60_000))) {
     return NextResponse.json(
       { error: "You're reviewing too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

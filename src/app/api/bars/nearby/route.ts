@@ -91,8 +91,8 @@ export async function GET(request: Request) {
   if (!me) return NextResponse.json({ error: "Unauthorized", data: [] }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended", data: [] }, { status: 403 });
   if (
-    !rateLimit(`bars-nearby:${me.id}`, 20, 60_000) ||
-    !rateLimit(`bars-nearby-ip:${clientIp(request)}`, 40, 60_000)
+    !(await rateLimit(`bars-nearby:${me.id}`, 20, 60_000)) ||
+    !(await rateLimit(`bars-nearby-ip:${clientIp(request)}`, 40, 60_000))
   ) {
     return NextResponse.json(
       { error: "Too many nearby searches. Please slow down.", data: [] },

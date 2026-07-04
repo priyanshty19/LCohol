@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended." }, { status: 403 });
 
-  if (!rateLimit(`post-share:${me.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`post-share:${me.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "You're sharing too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         update: { note },
       });
       await notify({ userId: post.authorId, actorId: me.id, type: "SHARE", postId: id });
-      await recomputeKarma(me.id);
+      after(() => recomputeKarma(me.id));
       return NextResponse.json({ data: { shared: true } }, { status: 201 });
     }
 

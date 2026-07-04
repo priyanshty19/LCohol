@@ -14,7 +14,7 @@ export async function POST(
   if (!guard.ok) return guard.response;
   const me = guard.user.id;
 
-  if (!rateLimit(`conn-decline:${me}`, 20, 60_000)) {
+  if (!(await rateLimit(`conn-decline:${me}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

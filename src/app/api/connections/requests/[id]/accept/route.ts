@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-guard";
 import { createConnectionTx } from "@/lib/connections";
@@ -17,7 +17,7 @@ export async function POST(
   const me = guard.user.id;
   const { id } = await params;
 
-  if (!rateLimit(`conn-accept:${me}`, 20, 60_000)) {
+  if (!(await rateLimit(`conn-accept:${me}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -45,8 +45,8 @@ export async function POST(
       await createConnectionTx(tx, req.fromUserId, req.toUserId);
     });
 
-    // Both sides gained a circle friend — refresh their karma.
-    await Promise.all([recomputeKarma(req.fromUserId), recomputeKarma(req.toUserId)]);
+    // Both sides gained a circle friend — refresh their karma (non-blocking).
+    after(() => Promise.all([recomputeKarma(req.fromUserId), recomputeKarma(req.toUserId)]));
 
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {

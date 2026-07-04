@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.isBanned) return NextResponse.json({ error: "Account suspended." }, { status: 403 });
-  if (!rateLimit(`james:${user.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`james:${user.id}`, 20, 60_000))) {
     return NextResponse.json({ error: "James needs a breather, give him a minute." }, { status: 429 });
   }
   if (!process.env.GROQ_API_KEY) {

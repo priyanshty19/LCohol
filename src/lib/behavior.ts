@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { cachedOrCompute } from "@/lib/feed-cache";
 
 // A compact per-user behavior profile. Mixes cheap lifetime relation counts (always
 // available, even before V3 logging) with UserInteraction-derived signals (browse
@@ -107,7 +108,13 @@ export type TasteProfile = {
   recentDrinks: string[]; // recently viewed drink names (for James colour)
 };
 
+// Taste changes slowly (views trickle in over days) — cache 5 min so the
+// "for-you" feed doesn't re-run these 2-3 queries on every request/tab switch.
 export async function getTasteProfile(userId: string): Promise<TasteProfile> {
+  return cachedOrCompute(`taste:${userId}`, 300, () => computeTasteProfile(userId));
+}
+
+async function computeTasteProfile(userId: string): Promise<TasteProfile> {
   const [profile, views] = await Promise.all([
     prisma.profile.findUnique({
       where: { userId },

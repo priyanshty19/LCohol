@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`push-sub:${user.id}`, SUBSCRIBE_LIMIT_PER_MIN, 60_000)) {
+  if (!(await rateLimit(`push-sub:${user.id}`, SUBSCRIBE_LIMIT_PER_MIN, 60_000))) {
     return NextResponse.json(
       { error: "You're subscribing too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
