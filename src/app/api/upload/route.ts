@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (user.isBanned) return NextResponse.json({ error: "Account suspended." }, { status: 403 });
-  if (!rateLimit(`upload:${user.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`upload:${user.id}`, 20, 60_000))) {
     return NextResponse.json({ error: "Too many uploads — slow down a touch." }, { status: 429 });
   }
 

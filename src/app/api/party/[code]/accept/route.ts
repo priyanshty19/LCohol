@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { createConnectionTx } from "@/lib/connections";
@@ -14,7 +14,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ co
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
-  if (!rateLimit(`party-accept:${me.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`party-accept:${me.id}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -47,7 +47,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ co
       });
     });
 
-    await Promise.all([recomputeKarma(hostId), recomputeKarma(me.id)]);
+    after(() => Promise.all([recomputeKarma(hostId), recomputeKarma(me.id)]));
     await notify({ userId: hostId, actorId: me.id, type: "RSVP", partyId });
 
     return NextResponse.json({ data: { partyId } });

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const guard = await requireRole("USER");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`user-search:${clientIp(request)}`, 30, 60_000)) {
+  if (!(await rateLimit(`user-search:${clientIp(request)}`, 30, 60_000))) {
     return NextResponse.json({ data: [] }, { status: 429 });
   }
 

@@ -5,7 +5,7 @@ import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 export async function GET(request: Request) {
   // Typeahead over unindexed ILIKE — throttle per IP and bound the term.
-  if (!rateLimit(`drinks-search:${clientIp(request)}`, 30, 60_000)) {
+  if (!(await rateLimit(`drinks-search:${clientIp(request)}`, 30, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "30" } },

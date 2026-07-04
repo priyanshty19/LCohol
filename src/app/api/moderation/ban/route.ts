@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireRole("MODERATOR");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`mod-ban:${guard.user.id}`, 20, 60000)) {
+  if (!(await rateLimit(`mod-ban:${guard.user.id}`, 20, 60000))) {
     return NextResponse.json(
       { error: "Too many moderation actions. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

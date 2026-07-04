@@ -2,6 +2,7 @@ import { PostType, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { FEED_PAGE_SIZE } from "@/lib/constants";
 import { getTasteProfile } from "@/lib/behavior";
+import { cachedOrCompute } from "@/lib/feed-cache";
 
 // Shared feed query — used by the API route (client pagination/sort) and the
 // feed page server component (initial render). The audience filter is passed in
@@ -62,12 +63,19 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     const circle = new Set(opts.connectionIds ?? []);
     const FY_WINDOW = 500;
 
-    const candidates = await prisma.post.findMany({
-      where,
-      orderBy: { createdAt: "desc" as const },
-      take: FY_WINDOW,
-      include,
-    });
+    // `where` already scopes CIRCLE visibility to this specific viewer, so keying
+    // the cache by viewerId can never leak one viewer's candidates to another.
+    const candidates = await cachedOrCompute(
+      `feed:foryou:${opts.viewerId}:${opts.postType ?? "all"}`,
+      30,
+      () =>
+        prisma.post.findMany({
+          where,
+          orderBy: { createdAt: "desc" as const },
+          take: FY_WINDOW,
+          include,
+        }),
+    );
 
     const ranked = candidates
       .map((p) => {
@@ -111,12 +119,45 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
   // VALUE-based keyset on the (hotScore, id) tuple. Cursor = `${hot}_${id}`.
   if (sort === "hot") {
     const HOT_WINDOW = 500;
-    const candidates = await prisma.post.findMany({
-      where,
-      orderBy: { createdAt: "desc" as const },
-      take: HOT_WINDOW,
-      include,
-    });
+    const postTypeFilter: Prisma.PostWhereInput = opts.postType
+      ? { postType: opts.postType as PostType }
+      : {};
+
+    // Cache only the PUBLIC candidate window under a global key — safe to share
+    // across every viewer. CIRCLE posts are always fetched fresh, scoped to this
+    // viewer's own connections, and merged in below — never cached, so a CIRCLE
+    // post can never leak to a non-connection through the shared PUBLIC entry.
+    const publicCandidates = await cachedOrCompute(
+      `feed:hot:${opts.postType ?? "all"}`,
+      45,
+      () =>
+        prisma.post.findMany({
+          where: { isDeleted: false, visibility: "PUBLIC", ...postTypeFilter },
+          orderBy: { createdAt: "desc" as const },
+          take: HOT_WINDOW,
+          include,
+        }),
+    );
+
+    let candidates = publicCandidates;
+    const circleAuthorIds = opts.viewerId ? [opts.viewerId, ...(opts.connectionIds ?? [])] : [];
+    if (circleAuthorIds.length) {
+      const circlePosts = await prisma.post.findMany({
+        where: {
+          isDeleted: false,
+          visibility: "CIRCLE",
+          authorId: { in: circleAuthorIds },
+          ...postTypeFilter,
+        },
+        orderBy: { createdAt: "desc" as const },
+        take: HOT_WINDOW,
+        include,
+      });
+      if (circlePosts.length) {
+        const seen = new Set(candidates.map((p) => p.id));
+        candidates = [...candidates, ...circlePosts.filter((p) => !seen.has(p.id))];
+      }
+    }
 
     const ranked = candidates
       .map((p) => {

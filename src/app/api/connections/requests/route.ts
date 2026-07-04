@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
   const me = guard.user.id;
 
-  if (!rateLimit(`conn-request:${me}`, 30, 60_000)) {
+  if (!(await rateLimit(`conn-request:${me}`, 30, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please wait a minute." },
       { status: 429, headers: { "Retry-After": "60" } },

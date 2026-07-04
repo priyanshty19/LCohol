@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
   // Throttle bursts per account before touching the DB at all.
-  if (!rateLimit(`cocktail-create:${me.id}`, CREATE_LIMIT_PER_MIN, 60_000)) {
+  if (!(await rateLimit(`cocktail-create:${me.id}`, CREATE_LIMIT_PER_MIN, 60_000))) {
     return NextResponse.json(
       { error: "You're creating mixes too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

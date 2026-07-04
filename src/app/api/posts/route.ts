@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { PostType, PostVisibility } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
@@ -37,7 +37,7 @@ function sanitizeImageUrl(value: unknown): string | null {
 export async function GET(request: Request) {
   // Public hot path: a 500-row include + JS ranking per call. Throttle per IP so
   // a ?sort=hot loop can't exhaust the pool for everyone. (WAF is the real backstop.)
-  if (!rateLimit(`posts-feed:${clientIp(request)}`, 60, 60_000)) {
+  if (!(await rateLimit(`posts-feed:${clientIp(request)}`, 60, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "30" } },
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   // Throttle bursts per account before touching the DB at all.
-  if (!rateLimit(`post-create:${dbUser.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`post-create:${dbUser.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "You're posting too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -188,7 +188,6 @@ export async function POST(request: Request) {
         postId: post.id,
         notifyType: "TAG",
       }),
-      recomputeKarma(dbUser.id),
       // New post on a private (circle-only) feed → notify the author's circle —
       // i.e. the people they're connected to via referral.
       post.visibility === PostVisibility.CIRCLE
@@ -197,6 +196,7 @@ export async function POST(request: Request) {
           )
         : Promise.resolve(),
     ]);
+    after(() => recomputeKarma(dbUser.id));
 
     logInteraction({
       userId: dbUser.id,

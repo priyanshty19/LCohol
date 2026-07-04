@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (dbUser.isBanned) {
     return NextResponse.json({ error: "Account suspended." }, { status: 403 });
   }
-  if (!rateLimit(`report:${dbUser.id}`, 15, 60_000)) {
+  if (!(await rateLimit(`report:${dbUser.id}`, 15, 60_000))) {
     return NextResponse.json(
       { error: "You're reporting too fast — give it a moment." },
       { status: 429, headers: { "Retry-After": "60" } }

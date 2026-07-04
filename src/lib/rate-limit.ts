@@ -1,12 +1,19 @@
+import { Ratelimit } from "@upstash/ratelimit";
+import { redis } from "@/lib/redis";
+
 /**
- * Lightweight in-memory rate limiter (per process). Good enough to blunt abuse on
- * a single node. For multi-instance production, swap the Map for a shared store
- * (Upstash/Redis) — same interface.
+ * Redis-backed sliding-window rate limiter (via Upstash), shared correctly
+ * across every serverless instance. Falls back to the original in-memory Map
+ * (per-process only) when Redis isn't provisioned yet, so behavior is
+ * unchanged until the Upstash env vars are set — no migration step required.
+ * A Redis error at request time fails OPEN (allows the request) rather than
+ * 500ing every route in the app; an outage should degrade limiting, not
+ * take down the product.
  */
 type Bucket = { count: number; reset: number };
 const buckets = new Map<string, Bucket>();
 
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+function inMemoryRateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   const b = buckets.get(key);
   if (!b || now > b.reset) {
@@ -16,6 +23,34 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
   if (b.count >= limit) return false;
   b.count++;
   return true;
+}
+
+// One Ratelimit instance per distinct (limit, windowMs) pair — Upstash's
+// sliding-window limiter is configured with a fixed limit+window at construction.
+const limiters = new Map<string, Ratelimit>();
+function getLimiter(limit: number, windowMs: number): Ratelimit {
+  const k = `${limit}:${windowMs}`;
+  let rl = limiters.get(k);
+  if (!rl) {
+    rl = new Ratelimit({
+      redis: redis!,
+      limiter: Ratelimit.slidingWindow(limit, `${windowMs} ms`),
+      prefix: "ratelimit",
+    });
+    limiters.set(k, rl);
+  }
+  return rl;
+}
+
+export async function rateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+  if (!redis) return inMemoryRateLimit(key, limit, windowMs);
+  try {
+    const { success } = await getLimiter(limit, windowMs).limit(key);
+    return success;
+  } catch (e) {
+    console.error("[rateLimit] Redis unavailable, failing open", e);
+    return true;
+  }
 }
 
 export function clientIp(request: Request): string {

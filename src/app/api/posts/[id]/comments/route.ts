@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
@@ -82,7 +82,7 @@ export async function POST(
     return NextResponse.json({ error: "Account suspended" }, { status: 403 });
   }
 
-  if (!rateLimit(`comment-create:${dbUser.id}`, COMMENT_LIMIT_PER_MIN, 60_000)) {
+  if (!(await rateLimit(`comment-create:${dbUser.id}`, COMMENT_LIMIT_PER_MIN, 60_000))) {
     return NextResponse.json(
       { error: "You're commenting too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -154,7 +154,7 @@ export async function POST(
       postId,
       notifyType: "MENTION",
     });
-    await recomputeKarma(dbUser.id);
+    after(() => recomputeKarma(dbUser.id));
 
     return NextResponse.json({ data: comment }, { status: 201 });
   } catch (err) {

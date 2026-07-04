@@ -10,7 +10,7 @@ import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
  * not the security boundary.
  */
 export async function POST(request: NextRequest) {
-  if (!rateLimit(`referral:${clientIp(request)}`, 20, 60_000)) {
+  if (!(await rateLimit(`referral:${clientIp(request)}`, 20, 60_000))) {
     return NextResponse.json(
       { valid: false, error: "Too many attempts. Please wait a minute." },
       { status: 429 },

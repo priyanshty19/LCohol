@@ -16,6 +16,37 @@ interface PostListProps {
   initialCursor?: string;
 }
 
+type FeedPage = { data: PostWithRelations[]; hasMore: boolean; nextCursor?: string };
+
+// Module-level cache for the FIRST page of each sort/postType combo — mirrors
+// the pattern in use-auth.ts. Without this, switching tabs (which remounts
+// PostList with a different `sort`) always re-fetches from scratch even if the
+// same tab was open seconds ago; every server-side Redis cache hit still pays a
+// full network round trip. "Load more" pages are never cached (always fresh).
+const FEED_TTL_MS = 20_000;
+const feedCache = new Map<string, { page: FeedPage; at: number }>();
+const feedInflight = new Map<string, Promise<FeedPage>>();
+
+async function fetchFeedPage(key: string, params: URLSearchParams): Promise<FeedPage> {
+  const cached = feedCache.get(key);
+  if (cached && Date.now() - cached.at < FEED_TTL_MS) return cached.page;
+
+  const existing = feedInflight.get(key);
+  if (existing) return existing;
+
+  const p = fetch(`/api/posts?${params}`)
+    .then((r) => r.json())
+    .then((page: FeedPage) => {
+      feedCache.set(key, { page, at: Date.now() });
+      return page;
+    })
+    .finally(() => {
+      feedInflight.delete(key);
+    });
+  feedInflight.set(key, p);
+  return p;
+}
+
 export function PostList({ sort, postType, initialPosts, initialHasMore, initialCursor }: PostListProps) {
   const [posts, setPosts] = useState<PostWithRelations[]>(initialPosts ?? []);
   const [loading, setLoading] = useState(initialPosts == null);
@@ -33,8 +64,9 @@ export function PostList({ sort, postType, initialPosts, initialHasMore, initial
       if (loadMore && cursor) params.set("cursor", cursor);
 
       try {
-        const res = await fetch(`/api/posts?${params}`);
-        const json = await res.json();
+        const json = loadMore
+          ? await fetch(`/api/posts?${params}`).then((r) => r.json())
+          : await fetchFeedPage(`${sort}|${postType ?? ""}`, params);
         if (loadMore) {
           setPosts((prev) => [...prev, ...json.data]);
         } else {

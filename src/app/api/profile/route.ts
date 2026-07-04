@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
   }
   if (dbUser.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`profile-update:${dbUser.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`profile-update:${dbUser.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "You're updating your profile too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

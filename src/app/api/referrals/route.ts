@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   const guard = await requireRole("USER");
   if (!guard.ok) return guard.response;
 
-  if (!rateLimit(`referral-create:${guard.user.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`referral-create:${guard.user.id}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "Too many invites. Please wait a minute." },
       { status: 429, headers: { "Retry-After": "60" } },

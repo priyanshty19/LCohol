@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`game-vote:${me.id}`, 30, 60_000)) {
+  if (!(await rateLimit(`game-vote:${me.id}`, 30, 60_000))) {
     return NextResponse.json(
       { error: "You're voting too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

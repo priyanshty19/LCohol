@@ -14,7 +14,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
-  if (!rateLimit(`rsvp:${me.id}`, 12, 60_000)) {
+  if (!(await rateLimit(`rsvp:${me.id}`, 12, 60_000))) {
     return NextResponse.json(
       { error: "Too many RSVPs. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

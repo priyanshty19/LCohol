@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
 
-  if (!rateLimit(`party-invite:${me.id}`, 10, 60_000)) {
+  if (!(await rateLimit(`party-invite:${me.id}`, 10, 60_000))) {
     return NextResponse.json(
       { error: "You're inviting too fast. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },
@@ -104,7 +104,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (me.isBanned) return NextResponse.json({ error: "Account suspended" }, { status: 403 });
-  if (!rateLimit(`party-invite-revoke:${me.id}`, 20, 60_000)) {
+  if (!(await rateLimit(`party-invite-revoke:${me.id}`, 20, 60_000))) {
     return NextResponse.json(
       { error: "Too many requests. Please slow down." },
       { status: 429, headers: { "Retry-After": "60" } },

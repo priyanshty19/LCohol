@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   // Cap write-amplification: a client could otherwise loop sendBeacon to flood
   // inserts (cost + poisons the signals). 120 events/min/user is generous for
   // genuine page views; excess is dropped silently.
-  if (!rateLimit(`beacon:${user.id}`, 120, 60_000)) {
+  if (!(await rateLimit(`beacon:${user.id}`, 120, 60_000))) {
     return NextResponse.json({ ok: true });
   }
 
