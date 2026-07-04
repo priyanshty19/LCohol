@@ -60,6 +60,11 @@ export function MixGame() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
 
+  // share the saved mix to the feed (PUBLIC or CIRCLE post linking the cocktail)
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState<"PUBLIC" | "CIRCLE" | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+
   useEffect(() => {
     setWebgl(hasWebGL());
     // Pre-warm the WebGL scene chunk while the user reads the glass picker, so
@@ -116,6 +121,8 @@ export function MixGame() {
     setMixName("");
     setSavedSlug(null);
     setSaveError(null);
+    setShared(null);
+    setShareError(null);
   }
 
   async function saveMix() {
@@ -143,6 +150,32 @@ export function MixGame() {
       setSaveError("Couldn't save");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function shareMix(visibility: "PUBLIC" | "CIRCLE") {
+    if (!savedSlug || sharing) return;
+    setSharing(true);
+    setShareError(null);
+    try {
+      const ingredientList = layers.map((l) => l.name).join(", ");
+      const r = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `🍸 I mixed "${mixName.trim()}" in the Mix Lab`,
+          body: `${ingredientList}${glass ? ` · served in a ${glass.name}` : ""}\n\nTry it or remix it: /cocktails/${savedSlug}`,
+          postType: "RECOMMENDATION",
+          visibility,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) setShared(visibility);
+      else setShareError(j.error ?? "Couldn't share");
+    } catch {
+      setShareError("Couldn't share");
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -360,15 +393,34 @@ export function MixGame() {
                 </div>
                 {saveError && <p className="text-xs text-destructive">{saveError}</p>}
                 {savedSlug && (
-                  <motion.p
+                  <motion.div
                     initial={{ opacity: 0, scale: 0.92 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ type: "spring", stiffness: 340, damping: 18 }}
-                    className="text-xs text-[var(--ml-sober)]"
+                    className="space-y-2"
                   >
-                    🥂 Saved to your mixes.{" "}
-                    <Link href={`/cocktails/${savedSlug}`} className="underline underline-offset-2">View it →</Link>
-                  </motion.p>
+                    <p className="text-xs text-[var(--ml-sober)]">
+                      🥂 Saved to your mixes.{" "}
+                      <Link href={`/cocktails/${savedSlug}`} className="underline underline-offset-2">View it →</Link>
+                    </p>
+                    {shared ? (
+                      <p className="text-xs text-[var(--ml-sober)]">
+                        📣 Shared {shared === "CIRCLE" ? "with your circle" : "with everyone"}.{" "}
+                        <Link href="/" className="underline underline-offset-2">See the feed →</Link>
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground">Share it:</span>
+                        <Button variant="outline" size="sm" disabled={sharing} onClick={() => shareMix("PUBLIC")}>
+                          🌍 Everyone
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={sharing} onClick={() => shareMix("CIRCLE")}>
+                          🫂 My circle
+                        </Button>
+                      </div>
+                    )}
+                    {shareError && <p className="text-xs text-destructive">{shareError}</p>}
+                  </motion.div>
                 )}
                 <Button variant="ghost" size="sm" className="w-full" onClick={reset}>
                   Start a new drink
