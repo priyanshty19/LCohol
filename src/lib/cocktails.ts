@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { containsProfanity } from "@/lib/profanity";
 import { prisma } from "@/lib/prisma";
 
 // Shared cocktail-list query. Used by BOTH the API route (client pagination /
@@ -65,7 +66,11 @@ export async function getCocktails(opts: CocktailsQuery = {}) {
     nextCursor = next.id;
   }
 
-  return { cocktails: rows, nextCursor };
+  // Drop pre-guard profane user-mix names (cursor stays valid — it points at a
+  // real row id, we only trim the displayed slice).
+  const cocktails = rows.filter((c) => !containsProfanity(c.name));
+
+  return { cocktails, nextCursor };
 }
 
 // Read-through Data Cache in front of getCocktails. The catalog is slow-changing
@@ -143,7 +148,10 @@ export async function searchByIngredients(
   );
 
   return {
-    cocktails: scored.slice(0, take).map((s) => ({ ...s.c, matched: s.matched })),
+    cocktails: scored
+      .filter((s) => !containsProfanity(s.c.name))
+      .slice(0, take)
+      .map((s) => ({ ...s.c, matched: s.matched })),
     selectedCount: want.length,
   };
 }
