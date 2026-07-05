@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/shared/empty-state";
 import { cn } from "@/lib/utils";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
@@ -333,7 +334,11 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
         <div className="order-2 space-y-2 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
           {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
           {!loading && bars.length === 0 && (
-            <p className="text-sm text-muted-foreground">No bars found here yet.</p>
+            <EmptyState
+              emoji="🍸"
+              title="No bars mapped here yet"
+              subtitle="Try another neighborhood or city — the map's still filling up."
+            />
           )}
           {bars.map((b) => (
             <BarCard

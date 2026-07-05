@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { PostCard } from "@/components/feed/post-card";
 import { DrinkCard } from "@/components/drinks/drink-card";
 import { PickedForYou } from "@/components/discovery/picked-for-you";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 
@@ -160,12 +161,11 @@ export function SearchView() {
       )}
 
       {!loading && searched && !hasAnyResults && (
-        <div className="py-16 text-center">
-          <p className="font-display text-lg font-medium text-foreground">No results found</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try a different search term
-          </p>
-        </div>
+        <EmptyState
+          emoji="🔍"
+          title="Nothing matched that"
+          subtitle="Try a different term, or browse drinks, bars, and stories below."
+        />
       )}
 
       {!loading && hasPosts && (

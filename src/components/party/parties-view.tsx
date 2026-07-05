@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreatePartyFlow } from "./create-party-flow";
@@ -72,9 +73,13 @@ export function PartiesView({ hosting, invited }: { hosting: Party[]; invited: P
       </header>
 
       {hosting.length === 0 && invited.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-          No parties yet. Throw one and invite your circle. 🎉
-        </div>
+        <EmptyState
+          emoji="🎉"
+          title="No parties yet"
+          subtitle="Throw one, pick the drinks, and invite your circle. The night starts here."
+          actionLabel="Throw a party"
+          onAction={() => setCreating(true)}
+        />
       )}
 
       {invited.length > 0 && (
