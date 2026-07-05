@@ -228,8 +228,9 @@ export function MixGame() {
 
   return (
     <div className="space-y-5">
-      {/* Stepper */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      {/* Stepper — must wrap, or the steps + glass label overflow narrow phones
+          and force the whole page horizontally scrollable. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {[
           { k: "glass", n: "1 · Glass" },
           { k: "build", n: "2 · Build" },
@@ -253,7 +254,10 @@ export function MixGame() {
         <span className="ml-auto font-medium text-foreground">{glass.name} glass</span>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* grid-cols-1 is required: without it the mobile grid falls back to an
+          auto (max-content) column that sizes to the 340px stage and overflows
+          narrow phones. minmax(0,…) on lg keeps the stage column from blowing out. */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Stage + layer chips */}
         <div className="space-y-3">
           <div className="glass-panel rounded-xl p-4">{stage}</div>
