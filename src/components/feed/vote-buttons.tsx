@@ -65,8 +65,8 @@ export function VoteButtons({
       <button
         onClick={() => handleVote(1)}
         className={cn(
-          "rounded p-1 transition-colors hover:bg-accent",
-          userVote === 1 && "text-primary"
+          "rounded p-1 transition-transform duration-150 hover:scale-110 hover:bg-accent active:scale-90",
+          userVote === 1 && "scale-110 text-primary"
         )}
         aria-label="Upvote"
       >
@@ -81,9 +81,11 @@ export function VoteButtons({
           <path d="M12 4l-8 8h5v8h6v-8h5z" />
         </svg>
       </button>
+      {/* key={score} remounts on change → a quick pop draws the eye to the update */}
       <span
+        key={score}
         className={cn(
-          "text-sm font-medium tabular-nums",
+          "text-sm font-medium tabular-nums duration-200 animate-in zoom-in-75",
           userVote === 1 && "text-primary",
           userVote === -1 && "text-destructive"
         )}
@@ -93,8 +95,8 @@ export function VoteButtons({
       <button
         onClick={() => handleVote(-1)}
         className={cn(
-          "rounded p-1 transition-colors hover:bg-accent",
-          userVote === -1 && "text-destructive"
+          "rounded p-1 transition-transform duration-150 hover:scale-110 hover:bg-accent active:scale-90",
+          userVote === -1 && "scale-110 text-destructive"
         )}
         aria-label="Downvote"
       >
