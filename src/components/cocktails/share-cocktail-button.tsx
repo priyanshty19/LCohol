@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/lib/toast";
 
 /**
  * Share any cocktail to the feed — mirrors the Mix Lab post-save share, but works
@@ -42,11 +43,19 @@ export function ShareCocktailButton({
         }),
       });
       const j = await r.json().catch(() => ({}));
-      if (r.ok) setShared(visibility);
-      else if (r.status === 401) setError("Sign in to share.");
-      else setError(j.error ?? "Couldn't share.");
+      if (r.ok) {
+        setShared(visibility);
+        toast.success(`Shared with ${visibility === "CIRCLE" ? "your circle" : "everyone"} 🥂`);
+      } else if (r.status === 401) {
+        setError("Sign in to share.");
+        toast.error("Sign in to share.");
+      } else {
+        setError(j.error ?? "Couldn't share.");
+        toast.error(j.error ?? "Couldn't share.");
+      }
     } catch {
       setError("Couldn't share.");
+      toast.error("Couldn't share.");
     } finally {
       setSharing(false);
     }

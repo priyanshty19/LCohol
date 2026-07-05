@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { colorFor } from "@/lib/mix-colors";
+import { toast } from "@/lib/toast";
 import { GLASS_LIST, GLASSES, type GlassDef, type GlassId } from "@/lib/glassware";
 import { GARNISHES, type GarnishId } from "@/lib/garnishes";
 import { CssVessel, hasWebGL, type Layer } from "./mix-vessel";
@@ -144,10 +145,16 @@ export function MixGame() {
         }),
       });
       const j = await r.json();
-      if (r.ok && j.data) setSavedSlug(j.data.slug);
-      else setSaveError(j.error ?? "Couldn't save");
+      if (r.ok && j.data) {
+        setSavedSlug(j.data.slug);
+        toast.success("Saved to your mixes 🥂");
+      } else {
+        setSaveError(j.error ?? "Couldn't save");
+        toast.error(j.error ?? "Couldn't save");
+      }
     } catch {
       setSaveError("Couldn't save");
+      toast.error("Couldn't save");
     } finally {
       setSaving(false);
     }
@@ -170,10 +177,16 @@ export function MixGame() {
         }),
       });
       const j = await r.json().catch(() => ({}));
-      if (r.ok) setShared(visibility);
-      else setShareError(j.error ?? "Couldn't share");
+      if (r.ok) {
+        setShared(visibility);
+        toast.success(`Shared with ${visibility === "CIRCLE" ? "your circle" : "everyone"} 🥂`);
+      } else {
+        setShareError(j.error ?? "Couldn't share");
+        toast.error(j.error ?? "Couldn't share");
+      }
     } catch {
       setShareError("Couldn't share");
+      toast.error("Couldn't share");
     } finally {
       setSharing(false);
     }
