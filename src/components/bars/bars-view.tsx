@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
@@ -330,9 +331,11 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="order-2 space-y-2 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
-          {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {/* grid-cols-1 base: without it, mobile falls back to a max-content column
+          that a wide bar card can push past the viewport (horizontal overflow). */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.2fr]">
+        <div className="order-2 min-w-0 space-y-2 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
+          {loading && <CardListSkeleton count={4} />}
           {!loading && bars.length === 0 && (
             <EmptyState
               emoji="🍸"
