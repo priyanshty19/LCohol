@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getConnectionUserIds } from "@/lib/connections";
 import { cocktailSelect } from "@/lib/cocktails";
+import { containsProfanity } from "@/lib/profanity";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // GET /api/cocktails/circle → mixes invented by the viewer's circle, highest
@@ -18,10 +19,12 @@ export async function GET() {
     const circleIds = await getConnectionUserIds(me.id);
     if (!circleIds.length) return NextResponse.json({ data: { cocktails: [] } });
 
-    const cocktails = await prisma.cocktailCreation.findMany({
+    // Over-fetch, then drop any pre-filter profane names (rows created before the
+    // create-time guard shipped), so old offensive mixes don't resurface publicly.
+    const rows = await prisma.cocktailCreation.findMany({
       where: { authorId: { in: circleIds }, isCurated: false },
       orderBy: [{ score: "desc" }, { createdAt: "desc" }],
-      take: 12,
+      take: 24,
       select: {
         ...cocktailSelect,
         author: {
@@ -29,6 +32,7 @@ export async function GET() {
         },
       },
     });
+    const cocktails = rows.filter((c) => !containsProfanity(c.name)).slice(0, 12);
     return NextResponse.json({ data: { cocktails } });
   } catch (err) {
     if (isPoolExhausted(err)) {
