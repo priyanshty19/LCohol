@@ -7,6 +7,7 @@ import { ReportButton } from "./report-button";
 import { ShareButton } from "./share-button";
 import { CommentModal } from "./comment-modal";
 import { renderMentions } from "@/components/shared/render-mentions";
+import { CocktailPreviewCard, cocktailSlugFromBody } from "./cocktail-preview";
 import type { PostWithRelations } from "@/types/database";
 import { formatDistanceToNow } from "date-fns";
 
@@ -44,6 +45,14 @@ export function PostCard({ post }: PostCardProps) {
     addSuffix: true,
   });
   const initial = (displayName[0] ?? "?").toUpperCase();
+
+  // If the post shares a cocktail, pull the slug for the preview card and hide
+  // the raw "View recipe: /cocktails/…" line from the body text (the card
+  // replaces it) so the drink share reads cleanly.
+  const cocktailSlug = cocktailSlugFromBody(post.body);
+  const displayBody = cocktailSlug
+    ? post.body?.replace(/\n*(?:try it or remix it|view recipe)[^\n]*\/cocktails\/[a-z0-9-]+/i, "").trim()
+    : post.body;
 
   return (
     <Card
@@ -88,11 +97,14 @@ export function PostCard({ post }: PostCardProps) {
               {post.title}
             </h2>
           </Link>
-          {post.body && (
+          {displayBody && (
             <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground/80">
-              {renderMentions(post.body)}
+              {renderMentions(displayBody)}
             </p>
           )}
+
+          {/* Recipe preview card for shared mixes/cocktails */}
+          {cocktailSlug && <CocktailPreviewCard slug={cocktailSlug} />}
 
           {/* Image */}
           {post.imageUrl && (
