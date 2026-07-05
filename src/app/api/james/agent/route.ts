@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     // James didn't emit a find_drinks directive, surface cards anyway — unless
     // the ask is negated ("I don't want to see drinks").
     const wantsCards =
-      /\b(show|see|find|browse|recommend|suggest|pull up|what (should|can) i (drink|order|have)|what to drink)\b/i.test(
+      /\b(show|see|find|browse|recommend|suggest|pull up|what (should|can) i (drink|order|have|make|mix)|what to drink|what cocktail|i'?ve got|i have)\b/i.test(
         lastUser
       );
     const negated = /\b(don'?t|do not|not|no|never|stop|without|isn'?t|aren'?t)\b/i.test(lastUser);
