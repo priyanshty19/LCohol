@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
+import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
@@ -332,7 +333,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="order-2 space-y-2 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
-          {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {loading && <CardListSkeleton count={4} />}
           {!loading && bars.length === 0 && (
             <EmptyState
               emoji="🍸"
