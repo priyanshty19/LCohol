@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { FadeImage } from "@/components/ui/fade-image";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CategoryIcon } from "@/components/drinks/category-icons";
@@ -47,11 +47,11 @@ export function EntryCard({ entry, stateCode = "DL", badge }: EntryCardProps) {
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted/20">
           {entry.imageUrl ? (
             <>
-              <Image
+              <FadeImage
                 src={entry.imageUrl}
                 alt={entry.name}
                 fill
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                className="object-cover transition-[opacity,transform] duration-300 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 unoptimized
               />

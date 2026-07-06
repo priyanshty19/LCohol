@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { FadeImage } from "@/components/ui/fade-image";
 import { Card } from "@/components/ui/card";
 import { VoteButtons } from "./vote-buttons";
 import { ReportButton } from "./report-button";
@@ -110,11 +110,11 @@ export function PostCard({ post }: PostCardProps) {
           {post.imageUrl && (
             <Link href={`/post/${post.id}`} className="mt-3 block">
               <div className="relative h-48 w-full overflow-hidden rounded-lg border border-border/10 sm:h-56">
-                <Image
+                <FadeImage
                   src={post.imageUrl}
                   alt={post.title}
                   fill
-                  className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                  className="object-cover transition-[opacity,transform] duration-300 group-hover:scale-[1.02]"
                   sizes="(max-width: 768px) 100vw, 600px"
                   unoptimized
                 />

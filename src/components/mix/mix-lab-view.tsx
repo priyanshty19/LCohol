@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { EntryCard } from "@/components/catalog/entry-card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CircleLoves } from "@/components/cocktails/circle-loves";
 import { MixGame } from "@/components/mix/mix-game";
 import { toCatalogCocktail, type CocktailSelectRow } from "@/lib/catalog";
@@ -20,12 +21,14 @@ type EditorialPick = {
 export function MixLabView() {
   const [editorialPicks, setEditorialPicks] = useState<EditorialPick[]>([]);
   const [myMixes, setMyMixes] = useState<CocktailSelectRow[]>([]);
+  const [loadingPicks, setLoadingPicks] = useState(true);
 
   useEffect(() => {
     fetch("/api/cocktails?take=12")
       .then((r) => r.json())
       .then((d) => setEditorialPicks(d?.data?.cocktails ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingPicks(false));
     fetch("/api/cocktails/mine")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setMyMixes(d?.data?.cocktails ?? []))
@@ -45,6 +48,17 @@ export function MixLabView() {
       </div>
 
       <MixGame />
+
+      {loadingPicks && editorialPicks.length === 0 && (
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-48" />
+          <div className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 w-56 shrink-0 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      )}
 
       {editorialPicks.length > 0 && (
         <div className="space-y-3">

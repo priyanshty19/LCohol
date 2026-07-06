@@ -8,6 +8,7 @@ import {
 } from "next/font/google";
 import { AgeGateOverlay } from "@/components/shared/age-gate-overlay";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
 import { getCurrentUser } from "@/lib/auth";
 import { THEME_COOKIE, isThemeId, type ThemeId } from "@/lib/theme";
 import "./globals.css";
@@ -92,6 +93,7 @@ export default async function RootLayout({
         <ThemeProvider />
         <AgeGateOverlay />
         {children}
+        <Toaster />
       </body>
     </html>
   );

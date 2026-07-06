@@ -3,6 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { FEED_PAGE_SIZE } from "@/lib/constants";
 import { getTasteProfile } from "@/lib/behavior";
 import { cachedOrCompute } from "@/lib/feed-cache";
+import { containsProfanity } from "@/lib/profanity";
+
+// Hide posts with blatant profanity/slurs in the title or body. The create-time
+// guard (POST /api/posts) blocks new ones; this also filters pre-guard posts at
+// read time so leftover offensive posts don't surface in the feed.
+function isCleanPost(p: { title: string; body: string | null }): boolean {
+  return !containsProfanity(p.title) && !containsProfanity(p.body);
+}
 
 // Shared feed query — used by the API route (client pagination/sort) and the
 // feed page server component (initial render). The audience filter is passed in
@@ -110,6 +118,7 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     );
 
     const ranked = candidates
+      .filter(isCleanPost)
       .map((p) => {
         const eng = p.score + 2 * p._count.comments;
         const sign = eng > 0 ? 1 : eng < 0 ? -1 : 0;
@@ -192,6 +201,7 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
     }
 
     const ranked = candidates
+      .filter(isCleanPost)
       .map((p) => {
         const eng = p.score + 2 * p._count.comments;
         const sign = eng > 0 ? 1 : eng < 0 ? -1 : 0;
@@ -229,13 +239,15 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
   const orderBy =
     sort === "top" ? [{ score: "desc" as const }] : [{ createdAt: "desc" as const }];
 
-  const posts = await prisma.post.findMany({
-    where,
-    orderBy,
-    take: FEED_PAGE_SIZE + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include,
-  });
+  const posts = (
+    await prisma.post.findMany({
+      where,
+      orderBy,
+      take: FEED_PAGE_SIZE + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      include,
+    })
+  ).filter(isCleanPost);
 
   const hasMore = posts.length > FEED_PAGE_SIZE;
   const data = hasMore ? posts.slice(0, FEED_PAGE_SIZE) : posts;
