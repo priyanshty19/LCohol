@@ -42,6 +42,13 @@ export function SettingsView() {
   const [state, setState] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [emailNotif, setEmailNotif] = useState(true);
+  // useAuth() returns a client-cached user synchronously, so rendering user.email
+  // directly would differ from the SSR HTML (no user) → hydration mismatch (React
+  // #418), which aborts hydration of this card and leaves the NotificationToggle
+  // stuck on "Checking…". Gate user-dependent text until after mount so SSR and
+  // the first client render agree.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (user?.emergencyPhone) setEmergencyPhone(user.emergencyPhone);
@@ -210,7 +217,7 @@ export function SettingsView() {
             <span>
               <span className="block text-sm font-medium">Email notifications</span>
               <span className="block text-xs text-muted-foreground">
-                Invites, RSVPs &amp; new circle posts to {user?.email ?? "your email"}.
+                Invites, RSVPs &amp; new circle posts to {mounted ? (user?.email ?? "your email") : "your email"}.
               </span>
             </span>
             <input
@@ -229,7 +236,7 @@ export function SettingsView() {
             Account
           </h2>
           <p className="text-sm text-muted-foreground">
-            Email: {user?.email ?? "Not logged in"}
+            Email: {mounted ? (user?.email ?? "Not logged in") : "Not logged in"}
           </p>
           <p className="text-xs text-muted-foreground">
             Your email is private and never shown publicly. Your username is
