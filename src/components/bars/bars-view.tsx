@@ -156,6 +156,13 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   // when the user returns to the initial city from another one — leaving stale
   // pins while the map recenters.
   const firstRun = useRef(true);
+  // Render the Leaflet map only AFTER mount. Even though BarsMap is ssr:false,
+  // mounting react-leaflet during hydration can throw in the production build and
+  // silently abort hydration of the whole BarsView subtree (dead city buttons,
+  // dead search). Gating on `mapReady` keeps the server HTML and first client
+  // render identical (both the placeholder), so hydration always completes.
+  const [mapReady, setMapReady] = useState(false);
+  useEffect(() => setMapReady(true), []);
 
   useEffect(() => {
     if (nearby) return; // nearby results override the curated city list
@@ -363,12 +370,18 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
             up to ~700, controls ~1000) can't escape and render over fixed overlays
             like the James panel (z-50). */}
         <div className="isolate order-1 h-[42vh] overflow-hidden rounded-2xl border border-border/50 lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
-          <BarsMap
-            bars={mapBars}
-            center={center}
-            selectedId={selected}
-            onSelect={setSelected}
-          />
+          {mapReady ? (
+            <BarsMap
+              bars={mapBars}
+              center={center}
+              selectedId={selected}
+              onSelect={setSelected}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[#0c0d12] text-sm text-muted-foreground">
+              Loading map…
+            </div>
+          )}
         </div>
       </div>
     </div>
