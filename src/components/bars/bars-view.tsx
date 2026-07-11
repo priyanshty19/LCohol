@@ -151,13 +151,18 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   const [locating, setLocating] = useState(false);
   const [nearbyMsg, setNearbyMsg] = useState<string | null>(null);
   const [userLoc, setUserLoc] = useState<[number, number] | null>(null);
-  // StrictMode-safe mount guard (see cocktails-view): skip while unchanged.
-  const initialSig = useRef(`${city}|${type}|${q}`);
+  // Skip only the FIRST effect run (server already provided initialBars for the
+  // default city). A persistent signature match would wrongly skip the refetch
+  // when the user returns to the initial city from another one — leaving stale
+  // pins while the map recenters.
+  const firstRun = useRef(true);
 
   useEffect(() => {
     if (nearby) return; // nearby results override the curated city list
-    const sig = `${city}|${type}|${q}`;
-    if (sig === initialSig.current) return; // unchanged from server render
+    if (firstRun.current) {
+      firstRun.current = false;
+      return; // initial render already has server bars for the default city
+    }
     setLoading(true);
     const params = new URLSearchParams({ city });
     if (type) params.set("type", type);

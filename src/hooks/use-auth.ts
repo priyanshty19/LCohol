@@ -44,9 +44,17 @@ export function bustAuthCache() {
 }
 
 export function useAuth() {
-  // Seed from cache so a re-mount within the TTL paints instantly (no flash).
-  const [user, setUser] = useState<SipUser | null>(cache?.user ?? null);
-  const [loading, setLoading] = useState(cache == null);
+  // IMPORTANT: always start null on the FIRST render — do NOT seed from the
+  // module cache here. With React's concurrent hydration, the Header hydrates
+  // first and its effect populates `cache` mid-hydration; a later component
+  // reading a now-warm cache on its first render would then differ from the
+  // server HTML (which had no user) → hydration mismatch (React #418), which
+  // silently aborts hydration of that subtree (dead buttons, unmounted map on
+  // Settings/Bars, etc.). Starting null keeps SSR and every client first render
+  // in agreement. The cache still short-circuits the fetch below, so a warm
+  // cache repaints on the very next tick (imperceptible).
+  const [user, setUser] = useState<SipUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
