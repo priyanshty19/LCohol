@@ -6,8 +6,7 @@ import { CategoryIcon } from "@/components/drinks/category-icons";
 import { calculateStatePrice, formatPriceINR } from "@/lib/state-pricing";
 import type { CatalogEntry } from "@/types/database";
 
-// ONE card for the whole catalog. Replaces DrinkCard's drink-only shape, the
-// inline cocktail card in cocktails-view, and (eventually) RecipeCard's summary.
+// ONE card for the whole catalog. Replaces drink-only and cocktail-only cards.
 // Branches on entry.kind: drinks link to /drinks/[slug] and show price/abv;
 // cocktails link to /cocktails/[slug] and show glass/source + a Discover badge.
 

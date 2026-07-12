@@ -1,10 +1,9 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
 
-// The 4 global admins. Default password: JAMUN. They can log in immediately and
-// their referral codes are the root invites for the whole platform.
+// The 4 global admins. They sign in through OTP; their referral codes are the
+// root invites for the whole platform.
 const ADMINS = [
   { email: "priyansht1999@gmail.com", username: "priyansh", displayName: "Priyansh" },
   { email: "shauryashivam38@gmail.com", username: "shivam", displayName: "Shivam" },
@@ -26,8 +25,7 @@ function code(): string {
 }
 
 async function main() {
-  const hash = await bcrypt.hash("JAMUN", 10);
-  console.log("👑 Seeding admins (password: JAMUN)...\n");
+  console.log("👑 Seeding admins...\n");
 
   for (const a of ADMINS) {
     const email = a.email.toLowerCase();
@@ -41,7 +39,6 @@ async function main() {
         where: { id: existing.id },
         data: {
           role: "ADMIN",
-          passwordHash: hash,
           isVerified: true,
           consentedAt: existing.consentedAt ?? new Date(),
           referralCode: existing.referralCode ?? code(),
@@ -60,7 +57,6 @@ async function main() {
           isVerified: true,
           consentedAt: new Date(),
           role: "ADMIN",
-          passwordHash: hash,
           referralCode: code(),
           profile: { create: { username: a.username, displayName: a.displayName } },
         },

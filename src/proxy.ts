@@ -1,4 +1,4 @@
-import { updateSession } from "@/lib/supabase/middleware";
+import { updateSession } from "@/lib/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Paths that must never be reachable, regardless of auth state.
