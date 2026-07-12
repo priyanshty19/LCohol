@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { DrinkCard } from "./drink-card";
+import { EntryCard } from "@/components/catalog/entry-card";
 import { CategoryIcon } from "./category-icons";
 import { StateSelector, useStateSelection } from "./state-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toCatalogDrink } from "@/lib/catalog";
 import {
   Select,
   SelectContent,
@@ -293,9 +294,9 @@ export function DrinksView({
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {drinks.map((drink) => (
-              <DrinkCard
+              <EntryCard
                 key={drink.id}
-                drink={drink}
+                entry={toCatalogDrink(drink)}
                 stateCode={stateCode}
               />
             ))}

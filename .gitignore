@@ -40,6 +40,7 @@ yarn-error.log*
 # local-only backups & reference material (not part of the app)
 .backup_pregraphics/
 references/
+.claude/worktrees/
 
 # typescript
 *.tsbuildinfo

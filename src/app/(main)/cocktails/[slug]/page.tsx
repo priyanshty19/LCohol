@@ -5,6 +5,16 @@ import { TrackView } from "@/components/track-view";
 import { getCocktailBySlug } from "@/lib/cocktails";
 import { toCatalogCocktail } from "@/lib/catalog";
 import { getCurrentUser } from "@/lib/auth";
+import { areConnected } from "@/lib/connections";
+
+type CocktailForGate = NonNullable<Awaited<ReturnType<typeof getCocktailBySlug>>>;
+
+async function canViewCocktail(cocktail: CocktailForGate) {
+  if (cocktail.isPublic) return true;
+  const me = await getCurrentUser();
+  if (!me) return false;
+  return cocktail.authorId === me.id || areConnected(cocktail.authorId, me.id);
+}
 
 export async function generateMetadata({
   params,
@@ -14,11 +24,8 @@ export async function generateMetadata({
   const { slug } = await params;
   const cocktail = await getCocktailBySlug(slug);
   if (!cocktail) return { title: "Cocktail not found" };
-  // Don't leak a private mix's name in metadata to non-owners (mirrors the page gate).
-  if (!cocktail.isPublic) {
-    const me = await getCurrentUser();
-    if (cocktail.authorId !== me?.id) return { title: "Cocktail not found" };
-  }
+  // Don't leak a private mix's name in metadata to non-viewers (mirrors the page gate).
+  if (!(await canViewCocktail(cocktail))) return { title: "Cocktail not found" };
   return {
     title: cocktail.name,
     description: cocktail.instructions?.slice(0, 150) ?? `How to make a ${cocktail.name}.`,
@@ -34,11 +41,8 @@ export default async function CocktailDetailPage({
   const cocktail = await getCocktailBySlug(slug);
   if (!cocktail) notFound();
 
-  // Private mixes are visible only to their author.
-  if (!cocktail.isPublic) {
-    const me = await getCurrentUser();
-    if (cocktail.authorId !== me?.id) notFound();
-  }
+  // Private mixes are visible to the author and their circle.
+  if (!(await canViewCocktail(cocktail))) notFound();
 
   return (
     <>

@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { PostCard } from "@/components/feed/post-card";
-import { DrinkCard } from "@/components/drinks/drink-card";
-import { PickedForYou } from "@/components/discovery/picked-for-you";
+import { EntryCard } from "@/components/catalog/entry-card";
+import { DrinkRail } from "@/components/discovery/drink-rail";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { toCatalogDrink } from "@/lib/catalog";
 import Link from "next/link";
 
 type SearchType = "all" | "posts" | "drinks" | "users";
@@ -123,7 +124,7 @@ export function SearchView() {
         <div className="space-y-6">
           {/* Personalized rail — drinks picked from the user's behavior. Hides
               itself when there's nothing to show (logged-out / no data). */}
-          <PickedForYou />
+          <DrinkRail title="Picked for you" endpoint="/api/recommendations" />
           <div className="space-y-3">
           <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Browse
@@ -186,7 +187,7 @@ export function SearchView() {
           </h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {results.drinks!.map((drink: any) => (
-              <DrinkCard key={drink.id} drink={drink} />
+              <EntryCard key={drink.id} entry={toCatalogDrink(drink)} />
             ))}
           </div>
         </div>

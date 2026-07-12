@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 
 /**
- * Login is handled client-side via /api/auth/login (POST).
+ * Login is handled client-side via Clerk OTP + /api/auth/otp/complete.
  * This server action is kept for the logout button in the header.
  */
 export async function logout() {

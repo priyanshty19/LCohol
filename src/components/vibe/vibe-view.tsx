@@ -6,8 +6,9 @@ import { VIBES, BUDGET_RANGES } from "@/lib/vibe-config";
 import { calculateStatePrice, formatPriceINR } from "@/lib/state-pricing";
 import { useStateSelection } from "@/components/drinks/state-selector";
 import { StateSelector } from "@/components/drinks/state-selector";
-import { DrinkCard } from "@/components/drinks/drink-card";
+import { EntryCard } from "@/components/catalog/entry-card";
 import { getRecipesByVibe } from "@/lib/cocktail-recipes";
+import { toCatalogDrink } from "@/lib/catalog";
 import { RecipeCard } from "@/components/mix/recipe-card";
 import { Button } from "@/components/ui/button";
 import { applyTheme, vibeToTheme } from "@/lib/theme";
@@ -200,7 +201,7 @@ export function VibeView() {
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {drinks.map((drink) => (
-                  <DrinkCard key={drink.id} drink={drink} stateCode={stateCode} />
+                  <EntryCard key={drink.id} entry={toCatalogDrink(drink)} stateCode={stateCode} />
                 ))}
               </div>
             )}
