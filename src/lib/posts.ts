@@ -33,7 +33,7 @@ const include = {
   tags: { include: { tag: true } },
   drinks: {
     include: {
-      drink: { select: { id: true, name: true, slug: true, imageUrl: true } },
+      drink: { select: { id: true, name: true, slug: true, imageUrl: true, category: { select: { name: true } } } },
     },
   },
   _count: { select: { comments: true, votes: true } },
@@ -130,6 +130,18 @@ export async function getPostsFeed(opts: PostsFeedQuery = {}) {
         let bonus = 0;
         if (circle.has(p.authorId)) bonus += 3;
         if (p.drinks.some((d) => recentDrinks.has(d.drink.name))) bonus += 2;
+        const postTokens = [
+          ...p.drinks.flatMap((d) => d.drink.category ? [`cat:${d.drink.category.name}`] : []),
+          ...p.tags.flatMap(({ tag }) => {
+            if (tag.slug === "chill-vibes") return ["mood:RELAXED"];
+            if (tag.slug === "party-mode") return ["mood:ENERGETIC", "mood:CELEBRATORY"];
+            if (tag.slug === "romantic-mood") return ["mood:ROMANTIC"];
+            if (tag.slug === "adventurous-mood") return ["mood:ADVENTUROUS"];
+            return [];
+          }),
+        ];
+        const tasteBonus = postTokens.reduce((sum, token) => sum + Math.min(taste.vector[token] ?? 0, 4), 0);
+        bonus += Math.min(3, tasteBonus / 2);
         return { p, fy: hot + bonus };
       })
       .sort((a, b) => b.fy - a.fy || (a.p.id < b.p.id ? 1 : -1));

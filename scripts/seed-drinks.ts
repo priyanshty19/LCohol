@@ -26,6 +26,40 @@ type DrinkSeed = {
 };
 
 export const DRINKS: DrinkSeed[] = [
+  // ============ SOFT DRINKS ============
+  {
+    name: "Coke",
+    slug: "coke",
+    brand: "Coca-Cola",
+    variant: "Original Taste",
+    categorySlug: "soft-drinks",
+    subcategorySlug: "cola-soft-drinks",
+    country: "India",
+    abv: 0,
+    priceRange: "BUDGET",
+    description: "Classic cola, served chilled.",
+    taste: { sweetness: 8, bitterness: 1, sourness: 1, smokiness: 0, spiciness: 0, fruitiness: 0, floral: 0, body: 3, finish: 3 },
+    occasions: ["CASUAL_HANGOUT", "HOUSE_PARTY", "CELEBRATION"],
+    moods: ["RELAXED", "ENERGETIC"],
+    foodPairings: ["Burgers", "Pizza", "Nachos"],
+  },
+  {
+    name: "Diet Coke",
+    slug: "diet-coke",
+    brand: "Coca-Cola",
+    variant: "Diet",
+    categorySlug: "soft-drinks",
+    subcategorySlug: "cola-soft-drinks",
+    country: "India",
+    abv: 0,
+    priceRange: "BUDGET",
+    description: "A lighter cola option, served chilled.",
+    taste: { sweetness: 5, bitterness: 2, sourness: 1, smokiness: 0, spiciness: 0, fruitiness: 0, floral: 0, body: 2, finish: 2 },
+    occasions: ["CASUAL_HANGOUT", "HOUSE_PARTY", "CELEBRATION"],
+    moods: ["RELAXED", "ENERGETIC"],
+    foodPairings: ["Burgers", "Pizza", "Nachos"],
+  },
+
   // ============ INDIAN WHISKY ============
   {
     name: "Royal Stag",

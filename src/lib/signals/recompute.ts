@@ -7,6 +7,7 @@ import {
   FAVORITE_WEIGHT,
   type Vector,
 } from "@/lib/signals/content";
+import { profileTasteVector } from "@/lib/taste";
 
 // Bounds — keep the whole recompute inside a serverless function. At larger scale
 // this becomes a chunked/queued job, but these caps hold for the current corpus.
@@ -40,7 +41,7 @@ export async function recomputeSignals(): Promise<{
   }
 
   // 2) Engagement matrix: Map<userId, Map<drinkId, weight>>.
-  const [reviews, views, favorites] = await Promise.all([
+  const [reviews, views, profiles] = await Promise.all([
     prisma.drinkReview.findMany({ select: { authorId: true, drinkId: true, rating: true } }),
     prisma.userInteraction.findMany({
       where: { interactionType: "CLICK_DRINK", targetType: "DRINK" },
@@ -49,8 +50,14 @@ export async function recomputeSignals(): Promise<{
       select: { userId: true, context: true },
     }),
     prisma.profile.findMany({
-      where: { favoriteDrinkId: { not: null } },
-      select: { userId: true, favoriteDrinkId: true },
+      select: {
+        userId: true,
+        favoriteDrinkId: true,
+        preferredSpirits: true,
+        preferredFlavours: true,
+        intensity: true,
+        intent: true,
+      },
     }),
   ]);
 
@@ -69,12 +76,15 @@ export async function recomputeSignals(): Promise<{
     const slug = (v.context as { slug?: unknown } | null)?.slug;
     if (typeof slug === "string") add(v.userId, slugToId.get(slug), CLICK_DRINK_WEIGHT);
   }
-  for (const f of favorites) add(f.userId, f.favoriteDrinkId, FAVORITE_WEIGHT);
+  for (const profile of profiles) add(profile.userId, profile.favoriteDrinkId, FAVORITE_WEIGHT);
 
-  // 3) UserTasteVector — weighted sum of engaged drinks' feature tokens.
+  // 3) UserTasteVector — stated onboarding taste plus demonstrated preference.
   let userCount = 0;
-  for (const [userId, items] of userItems) {
-    const vec: Vector = {};
+  const profileByUser = new Map(profiles.map((profile) => [profile.userId, profile]));
+  const userIds = new Set([...profileByUser.keys(), ...userItems.keys()]);
+  for (const userId of userIds) {
+    const vec: Vector = profileTasteVector(profileByUser.get(userId));
+    const items = userItems.get(userId) ?? new Map<string, number>();
     for (const [drinkId, w] of items) {
       for (const tok of drinkTokens.get(drinkId) ?? []) vec[tok] = (vec[tok] ?? 0) + w;
     }

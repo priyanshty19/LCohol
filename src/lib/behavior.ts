@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cachedOrCompute } from "@/lib/feed-cache";
+import { profileTasteVector, topTasteKeywords } from "@/lib/taste";
+import type { Vector } from "@/lib/signals/content";
 
 // A compact per-user behavior profile. Mixes cheap lifetime relation counts (always
 // available, even before V3 logging) with UserInteraction-derived signals (browse
@@ -106,6 +108,8 @@ export type TasteProfile = {
   favoriteDrink: string | null;
   topCategories: string[]; // behavioral — most-viewed drink categories
   recentDrinks: string[]; // recently viewed drink names (for James colour)
+  keywords: string[];
+  vector: Vector;
 };
 
 // Taste changes slowly (views trickle in over days) — cache 5 min so the
@@ -115,7 +119,7 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile> {
 }
 
 async function computeTasteProfile(userId: string): Promise<TasteProfile> {
-  const [profile, views] = await Promise.all([
+  const [profile, views, tasteRow] = await Promise.all([
     prisma.profile.findUnique({
       where: { userId },
       select: {
@@ -133,6 +137,7 @@ async function computeTasteProfile(userId: string): Promise<TasteProfile> {
       take: 40,
       select: { context: true },
     }),
+    prisma.userTasteVector.findUnique({ where: { userId }, select: { vector: true } }),
   ]);
 
   const slugs = Array.from(
@@ -168,6 +173,7 @@ async function computeTasteProfile(userId: string): Promise<TasteProfile> {
       .slice(0, 4);
   }
 
+  const vector = (tasteRow?.vector as Vector | undefined) ?? profileTasteVector(profile);
   return {
     spirits: profile?.preferredSpirits ?? [],
     flavours: profile?.preferredFlavours ?? [],
@@ -177,6 +183,8 @@ async function computeTasteProfile(userId: string): Promise<TasteProfile> {
     favoriteDrink: profile?.favoriteDrink?.name ?? null,
     topCategories,
     recentDrinks,
+    keywords: topTasteKeywords(vector),
+    vector,
   };
 }
 

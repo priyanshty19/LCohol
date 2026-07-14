@@ -30,6 +30,17 @@ export const DRINK_FEATURE_SELECT = {
   subcategory: { select: { name: true } },
   moods: { select: { mood: true } },
   occasions: { select: { occasion: true } },
+  tasteProfile: {
+    select: {
+      sweetness: true,
+      bitterness: true,
+      sourness: true,
+      smokiness: true,
+      spiciness: true,
+      fruitiness: true,
+      floral: true,
+    },
+  },
   priceRange: true,
   country: true,
 } as const;
@@ -39,6 +50,15 @@ type DrinkFeatureShape = {
   subcategory?: { name: string } | null;
   moods?: { mood: string }[];
   occasions?: { occasion: string }[];
+  tasteProfile?: {
+    sweetness: number;
+    bitterness: number;
+    sourness: number;
+    smokiness: number;
+    spiciness: number;
+    fruitiness: number;
+    floral: number;
+  } | null;
   priceRange?: string | null;
   country?: string | null;
 };
@@ -49,6 +69,13 @@ export function drinkFeatureTokens(d: DrinkFeatureShape): string[] {
   if (d.subcategory?.name) t.push(`sub:${d.subcategory.name}`);
   for (const m of d.moods ?? []) t.push(`mood:${m.mood}`);
   for (const o of d.occasions ?? []) t.push(`occ:${o.occasion}`);
+  if ((d.tasteProfile?.sweetness ?? 0) >= 5) t.push("flavour:sweet");
+  if ((d.tasteProfile?.bitterness ?? 0) >= 5) t.push("flavour:bitter");
+  if ((d.tasteProfile?.sourness ?? 0) >= 5) t.push("flavour:sour");
+  if ((d.tasteProfile?.smokiness ?? 0) >= 5) t.push("flavour:smoky");
+  if ((d.tasteProfile?.spiciness ?? 0) >= 5) t.push("flavour:spicy");
+  if ((d.tasteProfile?.fruitiness ?? 0) >= 5) t.push("flavour:fruity");
+  if ((d.tasteProfile?.floral ?? 0) >= 5) t.push("flavour:floral");
   if (d.priceRange) t.push(`price:${d.priceRange}`);
   if (d.country) t.push(`country:${d.country}`);
   return t;

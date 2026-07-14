@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getProfileWithViewer } from "@/lib/profile";
 import { rateLimit } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+import { profileTasteVector } from "@/lib/taste";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -101,6 +102,14 @@ export async function PATCH(request: Request) {
         ...(geoDismissed ? { geoDismissedAt: new Date() } : {}),
       },
     });
+
+    if (preferredSpirits !== undefined || preferredFlavours !== undefined || intensity !== undefined || intent !== undefined) {
+      await prisma.userTasteVector.upsert({
+        where: { userId: dbUser.id },
+        create: { userId: dbUser.id, vector: profileTasteVector(updated) },
+        update: { vector: profileTasteVector(updated) },
+      });
+    }
 
     return NextResponse.json({ data: updated });
   } catch (err) {

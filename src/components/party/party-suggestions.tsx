@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,20 +49,34 @@ export function PartyDrinks({
   const [results, setResults] = useState<CatalogResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-  async function runSearch(q: string) {
-    setQuery(q);
-    if (q.trim().length < 2) {
-      setResults([]);
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
       return;
     }
-    setSearching(true);
-    try {
-      const r = await fetch(`/api/catalog/search?q=${encodeURIComponent(q.trim())}`);
-      const j = await r.json();
-      setResults(j.data?.results ?? []);
-    } catch {
+    let active = true;
+    const timeout = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const r = await fetch(`/api/catalog/search?q=${encodeURIComponent(term)}`);
+        const j = await r.json();
+        if (active) setResults(j.data?.results ?? []);
+      } catch {
+        if (active) setResults([]);
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [query]);
+
+  function updateQuery(value: string) {
+    setQuery(value);
+    if (value.trim().length < 2) {
       setResults([]);
-    } finally {
       setSearching(false);
     }
   }
@@ -122,8 +136,8 @@ export function PartyDrinks({
         <div className="relative">
           <Input
             value={query}
-            onChange={(e) => runSearch(e.target.value)}
-            placeholder="Suggest a cocktail or bottle…"
+            onChange={(e) => updateQuery(e.target.value)}
+            placeholder="Add a drink or cocktail…"
             className="sm:max-w-md"
           />
           {results.length > 0 && (
@@ -145,6 +159,9 @@ export function PartyDrinks({
           )}
           {searching && query.length >= 2 && results.length === 0 && (
             <p className="mt-1 text-xs text-muted-foreground">Searching…</p>
+          )}
+          {!searching && query.trim().length >= 2 && results.length === 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">No match yet. Try the drink name or a close spelling.</p>
           )}
         </div>
 

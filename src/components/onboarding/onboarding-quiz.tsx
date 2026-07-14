@@ -6,18 +6,24 @@ import { motion, AnimatePresence } from "motion/react";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { THEMES, applyTheme, vibeToTheme } from "@/lib/theme";
 
-// Real spirit categories (mirrors scripts/seed-categories.ts).
-const SPIRITS = [
+const DRINKS = [
   { id: "whisky", label: "Whisky", emoji: "🥃" },
-  { id: "rum", label: "Rum", emoji: "🏴‍☠️" },
-  { id: "vodka", label: "Vodka", emoji: "🍸" },
-  { id: "gin", label: "Gin", emoji: "🌿" },
+  { id: "rum", label: "Rum drinks", emoji: "🥤" },
+  { id: "gin-tonic", label: "Gin & tonic", emoji: "🍋" },
+  { id: "vodka-cocktails", label: "Vodka cocktails", emoji: "🍸" },
+  { id: "tequila", label: "Tequila", emoji: "🌵" },
   { id: "beer", label: "Beer", emoji: "🍺" },
   { id: "wine", label: "Wine", emoji: "🍷" },
-  { id: "brandy", label: "Brandy", emoji: "🥂" },
-  { id: "tequila", label: "Tequila", emoji: "🌵" },
-  { id: "liqueur", label: "Liqueur", emoji: "🍶" },
+  { id: "cocktails", label: "Classic cocktails", emoji: "🍹" },
+];
+
+const ALCOHOL_FREE = [
+  { id: "mocktails", label: "Mocktails", emoji: "🍹" },
+  { id: "coke", label: "Coke", emoji: "🥤" },
+  { id: "diet-coke", label: "Diet Coke", emoji: "🥤" },
+  { id: "fresh-juice", label: "Fresh juices", emoji: "🧃" },
 ];
 
 const FLAVOURS = [
@@ -34,19 +40,15 @@ const FLAVOURS = [
   "Minty",
 ];
 
-const INTENSITY = [
-  { id: "taste", label: "Just a taste", desc: "One nice pour, that's the evening" },
-  { id: "couple", label: "A couple", desc: "Settle in, take it slow" },
-  { id: "all-in", label: "Making a night of it", desc: "A proper night out, at your pace" },
+const DISCOVERY = [
+  { id: "familiar", label: "Familiar favourites", desc: "I know what I like" },
+  { id: "balanced", label: "A mix of both", desc: "A classic with the occasional curveball" },
+  { id: "adventurous", label: "Surprise me", desc: "I enjoy trying something new" },
 ];
 
-const INTENT = [
-  { id: "chill", label: "Just chilling", desc: "Wind down, easy vibes" },
-  { id: "buzz", label: "A nice buzz", desc: "Loosen up a little" },
-  { id: "zone", label: "Proper unwind", desc: "Fully switch off for a while" },
-];
+const VIBES = THEMES.filter((theme) => theme.group === "vibe");
 
-const STEPS = ["Your taste", "The night"] as const;
+const STEPS = ["Your taste", "Your style"] as const;
 
 function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -55,10 +57,10 @@ function toggle(list: string[], value: string): string[] {
 export function OnboardingQuiz({ username }: { username: string }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [spirits, setSpirits] = useState<string[]>([]);
+  const [drinks, setDrinks] = useState<string[]>([]);
   const [flavours, setFlavours] = useState<string[]>([]);
-  const [intensity, setIntensity] = useState<string | null>(null);
-  const [intent, setIntent] = useState<string | null>(null);
+  const [discovery, setDiscovery] = useState<string | null>(null);
+  const [vibe, setVibe] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function persist(body: Record<string, unknown>) {
@@ -79,16 +81,21 @@ export function OnboardingQuiz({ username }: { username: string }) {
 
   function finish() {
     persist({
-      preferredSpirits: spirits,
+      preferredSpirits: drinks,
       preferredFlavours: flavours,
-      intensity,
-      intent,
+      intensity: discovery,
+      intent: vibe,
+      ...(vibe ? { theme: vibeToTheme(vibe) } : {}),
       onboarded: true,
     });
   }
 
   function skip() {
     persist({ onboarded: true });
+  }
+
+  function toggleDrink(id: string) {
+    setDrinks((current) => toggle(current, id));
   }
 
   const isLast = step === STEPS.length - 1;
@@ -102,7 +109,7 @@ export function OnboardingQuiz({ username }: { username: string }) {
             Welcome, {username}
           </p>
           <p className="text-sm text-muted-foreground">
-            Two quick steps so James pours you the right things.
+            Two quick steps so James gets to know your taste.
           </p>
         </div>
         <button
@@ -139,18 +146,29 @@ export function OnboardingQuiz({ username }: { username: string }) {
           {step === 0 && (
             <div className="space-y-6">
               <Question
-                title="What's on your mind to drink?"
-                hint="Pick all that tempt you — or none, your call."
+                title="What do you enjoy sipping?"
+                hint="Pick the things you genuinely reach for."
               >
                 <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 md:grid-cols-3">
-                  {SPIRITS.map((s) => (
+                  {DRINKS.map((s) => (
                     <Chip
                       key={s.id}
-                      active={spirits.includes(s.id)}
-                      onClick={() => setSpirits((p) => toggle(p, s.id))}
+                      active={drinks.includes(s.id)}
+                      onClick={() => toggleDrink(s.id)}
                     >
                       <span className="text-lg">{s.emoji}</span>
                       <span>{s.label}</span>
+                    </Chip>
+                  ))}
+                </div>
+              </Question>
+
+              <Question title="Alcohol-free favourites" hint="Great drinks do not need alcohol.">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  {ALCOHOL_FREE.map((drink) => (
+                    <Chip key={drink.id} active={drinks.includes(drink.id)} onClick={() => toggleDrink(drink.id)}>
+                      <span className="text-lg">{drink.emoji}</span>
+                      <span>{drink.label}</span>
                     </Chip>
                   ))}
                 </div>
@@ -178,29 +196,32 @@ export function OnboardingQuiz({ username }: { username: string }) {
 
           {step === 1 && (
             <div className="grid gap-6 md:grid-cols-2">
-              <Question title="What's the pace tonight?" hint="No judgement, just calibration.">
+              <Question title="How do you like to choose?" hint="James can keep it familiar or shake things up.">
                 <div className="space-y-2.5">
-                  {INTENSITY.map((o) => (
+                  {DISCOVERY.map((o) => (
                     <Row
                       key={o.id}
                       label={o.label}
                       desc={o.desc}
-                      active={intensity === o.id}
-                      onClick={() => setIntensity(o.id)}
+                      active={discovery === o.id}
+                      onClick={() => setDiscovery(o.id)}
                     />
                   ))}
                 </div>
               </Question>
 
-              <Question title="What's the plan?" hint="So James reads the room right.">
+              <Question title="What&apos;s your vibe?" hint="Pick a look for SipStories. You can change it anytime.">
                 <div className="space-y-2.5">
-                  {INTENT.map((o) => (
+                  {VIBES.map((o) => (
                     <Row
                       key={o.id}
                       label={o.label}
-                      desc={o.desc}
-                      active={intent === o.id}
-                      onClick={() => setIntent(o.id)}
+                      desc={`Use the ${o.label.toLowerCase()} look`}
+                      active={vibe === o.id}
+                      onClick={() => {
+                        setVibe(o.id);
+                        applyTheme(vibeToTheme(o.id));
+                      }}
                     />
                   ))}
                 </div>
@@ -222,7 +243,7 @@ export function OnboardingQuiz({ username }: { username: string }) {
 
         {isLast ? (
           <Button variant="gold" onClick={finish} disabled={busy}>
-            {busy ? "Setting your table…" : "Pour me in"}
+            {busy ? "Saving your taste…" : "Let's go"}
           </Button>
         ) : (
           <Button

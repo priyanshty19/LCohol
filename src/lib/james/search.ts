@@ -21,6 +21,7 @@ const MAX_RESULTS = 8;
 const cocktailSelect = {
   id: true,
   name: true,
+  slug: true,
   category: true,
   glass: true,
   sourceLabel: true,
@@ -46,6 +47,33 @@ function queryWords(q: string): string[] {
     .slice(0, 6);
 }
 
+async function fuzzyIds(table: "cocktail" | "drink", terms: string[]): Promise<string[]> {
+  try {
+    const matches = await Promise.all(
+      terms.slice(0, 3).map((term) =>
+        table === "cocktail"
+          ? prisma.$queryRaw<{ id: string }[]>`
+              SELECT id FROM cocktail_creations
+              WHERE is_public = true AND name % ${term}
+              ORDER BY similarity(name, ${term}) DESC, is_curated DESC, score DESC, name ASC
+              LIMIT ${TAKE}
+            `
+          : prisma.$queryRaw<{ id: string }[]>`
+              SELECT id FROM drinks
+              WHERE name % ${term}
+              ORDER BY similarity(name, ${term}) DESC, is_verified DESC, name ASC
+              LIMIT ${TAKE}
+            `,
+      ),
+    );
+    return Array.from(new Set(matches.flat().map((match) => match.id)));
+  } catch {
+    // Search still works with the regular indexed substring query while pg_trgm
+    // is being enabled on an older environment.
+    return [];
+  }
+}
+
 export async function searchCatalog(rawQuery: string): Promise<CatalogSearch> {
   const q = rawQuery?.trim() ?? "";
   if (q.length < 2) return { results: [], similar: [] };
@@ -63,7 +91,7 @@ export async function searchCatalog(rawQuery: string): Promise<CatalogSearch> {
     { description: { contains: w, mode: "insensitive" as const } },
   ]);
 
-  const [cocktails, drinks] = await Promise.all([
+  const [cocktails, drinks, fuzzyCocktailIds, fuzzyDrinkIds] = await Promise.all([
     prisma.cocktailCreation.findMany({
       where: { isPublic: true, OR: cocktailOr },
       take: TAKE,
@@ -82,18 +110,56 @@ export async function searchCatalog(rawQuery: string): Promise<CatalogSearch> {
         category: { select: { name: true } },
       },
     }),
+    fuzzyIds("cocktail", terms),
+    fuzzyIds("drink", terms),
   ]);
 
+  const [fuzzyCocktails, fuzzyDrinks] = await Promise.all([
+    fuzzyCocktailIds.length
+      ? prisma.cocktailCreation.findMany({
+          where: { id: { in: fuzzyCocktailIds }, isPublic: true },
+          select: cocktailSelect,
+        })
+      : Promise.resolve([]),
+    fuzzyDrinkIds.length
+      ? prisma.drink.findMany({
+          where: { id: { in: fuzzyDrinkIds } },
+          select: {
+            id: true,
+            name: true,
+            brand: true,
+            slug: true,
+            category: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const cocktailById = new Map([...cocktails, ...fuzzyCocktails].map((cocktail) => [cocktail.id, cocktail]));
+  const drinkById = new Map([...drinks, ...fuzzyDrinks].map((drink) => [drink.id, drink]));
+  const fuzzyCocktailMatches = fuzzyCocktailIds
+    .map((id) => cocktailById.get(id))
+    .filter((cocktail): cocktail is (typeof cocktails)[number] => cocktail !== undefined);
+  const fuzzyDrinkMatches = fuzzyDrinkIds
+    .map((id) => drinkById.get(id))
+    .filter((drink): drink is (typeof drinks)[number] => drink !== undefined);
+  const orderedCocktails = [...cocktails, ...fuzzyCocktailMatches].filter(
+    (cocktail, index, all) => all.findIndex((item) => item.id === cocktail.id) === index,
+  );
+  const orderedDrinks = [...drinks, ...fuzzyDrinkMatches].filter(
+    (drink, index, all) => all.findIndex((item) => item.id === drink.id) === index,
+  );
+
   const results: CatalogItem[] = [
-    ...cocktails.map((c) => ({
+    ...orderedCocktails.map((c) => ({
       kind: "cocktail" as const,
       id: c.id,
       name: c.name,
       category: c.category,
       subtitle: cocktailSubtitle(c),
-      slug: null,
+      slug: c.slug,
     })),
-    ...drinks.map((d) => ({
+    ...orderedDrinks.map((d) => ({
       kind: "drink" as const,
       id: d.id,
       name: d.name,
@@ -123,7 +189,7 @@ export async function searchCatalog(rawQuery: string): Promise<CatalogSearch> {
       name: c.name,
       category: c.category,
       subtitle: cocktailSubtitle(c),
-      slug: null,
+      slug: c.slug,
     }));
   }
 
