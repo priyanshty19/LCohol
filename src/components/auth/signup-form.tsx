@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Dices } from "lucide-react";
+import { Dices, X } from "lucide-react";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { generateFunkyName } from "@/lib/funky-names";
 import { bustAuthCache } from "@/hooks/use-auth";
 
@@ -51,6 +52,8 @@ export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [drinks, setDrinks] = useState<DrinkOption[]>([]);
+  const [favoriteDrinkId, setFavoriteDrinkId] = useState("");
+  const [drinkQuery, setDrinkQuery] = useState("");
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
@@ -73,25 +76,41 @@ export function SignupForm() {
   // details back (without this, a refresh dropped the user onto a blank form that
   // then errored "email already registered"). Otherwise suggest a funky pseudonym.
   useEffect(() => {
-    let restored = false;
-    try {
-      const raw = sessionStorage.getItem(SU_OTP_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (s?.step === "otp" && s?.details?.email) {
-          setDetails(s.details);
-          setUsername(s.username || generateFunkyName());
-          setVerifyVia(s.verifyVia === "signin" ? "signin" : "signup");
-          setStep("otp");
-          restored = true;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      let restored = false;
+      try {
+        const raw = sessionStorage.getItem(SU_OTP_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s?.step === "otp" && s?.details?.email) {
+            setDetails(s.details);
+            setUsername(s.username || generateFunkyName());
+            setVerifyVia(s.verifyVia === "signin" ? "signin" : "signup");
+            setStep("otp");
+            restored = true;
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!restored) setUsername(generateFunkyName());
+      if (!restored) setUsername(generateFunkyName());
+    });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const favoriteOptions = useMemo(() => {
+    const query = drinkQuery.trim().toLowerCase();
+    const matches = query
+      ? drinks.filter((drink) => `${drink.name} ${drink.brand ?? ""}`.toLowerCase().includes(query))
+      : drinks.slice(0, 12);
+    const selected = drinks.find((drink) => drink.id === favoriteDrinkId);
+    return selected && !matches.some((drink) => drink.id === selected.id) ? [selected, ...matches] : matches;
+  }, [drinkQuery, drinks, favoriteDrinkId]);
+  const selectedFavorite = drinks.find((drink) => drink.id === favoriteDrinkId);
 
   useEffect(() => {
     let alive = true;
@@ -525,20 +544,55 @@ export function SignupForm() {
               Favorite drink{" "}
               <span className="text-muted-foreground">(ice-breaker, optional)</span>
             </Label>
-            <select
-              id="favoriteDrinkId"
-              name="favoriteDrinkId"
-              className="h-9 w-full rounded-lg border border-input bg-input/30 px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              defaultValue=""
-            >
-              <option value="">— what&apos;s your poison? —</option>
-              {drinks.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.brand ? ` · ${d.brand}` : ""}
-                </option>
-              ))}
-            </select>
+            <Input
+              aria-label="Search favorite drinks"
+              value={drinkQuery}
+              onChange={(e) => setDrinkQuery(e.target.value)}
+              placeholder="Search a drink or brand"
+              className="h-10"
+            />
+            <div className="flex gap-2">
+              <Select
+                name="favoriteDrinkId"
+                value={favoriteDrinkId}
+                onValueChange={(value) => setFavoriteDrinkId(value ?? "")}
+              >
+                <SelectTrigger
+                  id="favoriteDrinkId"
+                  className="h-10 w-full bg-input/30 text-sm"
+                  disabled={drinks.length === 0}
+                >
+                  <span className={`min-w-0 flex-1 truncate text-left ${selectedFavorite ? "" : "text-muted-foreground"}`}>
+                    {selectedFavorite
+                      ? `${selectedFavorite.name}${selectedFavorite.brand ? ` · ${selectedFavorite.brand}` : ""}`
+                      : drinks.length
+                        ? "Choose a favourite"
+                        : "Loading drinks…"}
+                  </span>
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {favoriteOptions.length ? (
+                    favoriteOptions.map((drink) => (
+                      <SelectItem key={drink.id} value={drink.id} className="text-sm">
+                        {drink.name}{drink.brand ? ` · ${drink.brand}` : ""}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-3 text-sm text-muted-foreground">No drinks match that search.</div>
+                  )}
+                </SelectContent>
+              </Select>
+              {favoriteDrinkId && (
+                <button
+                  type="button"
+                  aria-label="Clear favorite drink"
+                  onClick={() => setFavoriteDrinkId("")}
+                  className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           <label className="flex items-start gap-2.5 text-sm text-muted-foreground">

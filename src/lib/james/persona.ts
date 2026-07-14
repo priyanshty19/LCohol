@@ -14,18 +14,49 @@ export type JamesUserContext = {
   // Demonstrated taste (from behavior), not just stated prefs.
   recentDrinks?: string[] | null;
   topCategories?: string[] | null;
+  tasteKeywords?: string[] | null;
 };
 
 const INTENSITY_LABELS: Record<string, string> = {
-  taste: "just having a taste tonight",
-  couple: "good for a couple",
-  "all-in": "making a proper night of it",
+  familiar: "usually sticking with familiar favourites",
+  balanced: "liking a mix of familiar and new",
+  adventurous: "enjoying something new",
+  taste: "usually keeping it light",
+  couple: "usually taking it slow",
+  "all-in": "liking lively plans",
 };
 
 const INTENT_LABELS: Record<string, string> = {
-  chill: "just chilling",
-  buzz: "chasing a nice buzz",
-  zone: "looking to fully unwind",
+  quiet: "preferring quiet, easy plans",
+  social: "usually drinking with friends",
+  out: "enjoying bars, events, and celebrations",
+  party: "in a party mood",
+  chill: "in the mood for a chill session",
+  "date-night": "planning a date night",
+  celebrate: "celebrating something",
+  solo: "winding down solo",
+  budget: "keeping it budget-friendly",
+  buzz: "usually drinking socially",
+  zone: "preferring a quiet unwind",
+};
+
+const PREFERENCE_LABELS: Record<string, string> = {
+  whisky: "Whisky",
+  rum: "Rum-based drinks",
+  gin: "Gin",
+  "gin-tonic": "Gin and tonic",
+  vodka: "Vodka",
+  "vodka-cocktails": "Vodka cocktails",
+  tequila: "Tequila",
+  beer: "Beer",
+  wine: "Wine",
+  brandy: "Brandy",
+  liqueur: "Liqueurs",
+  cocktails: "Classic cocktails",
+  mocktails: "Mocktails",
+  coke: "Coke",
+  "diet-coke": "Diet Coke",
+  "fresh-juice": "Fresh juices",
 };
 
 /**
@@ -36,15 +67,19 @@ export function buildSystemPrompt(
   ctx: JamesUserContext,
   drinks: DrinkContext[]
 ): string {
-  const spirits = (ctx.preferredSpirits ?? []).filter(Boolean);
+  const preferences = (ctx.preferredSpirits ?? []).filter((choice) => choice && choice !== "alcohol-free");
   const flavours = (ctx.preferredFlavours ?? []).filter(Boolean);
+  const choices = ctx.preferredSpirits ?? [];
+  const alcoholFree = choices.length > 0 && choices.every((choice) => ["mocktails", "coke", "diet-coke", "fresh-juice", "alcohol-free"].includes(choice));
 
   const userBits = [
     ctx.username ? `Goes by "${ctx.username}".` : null,
     ctx.favoriteDrink ? `Favorite drink: ${ctx.favoriteDrink}.` : null,
     ctx.drinkingStyle ? `Drinking style: ${ctx.drinkingStyle.toLowerCase()}.` : null,
-    spirits.length ? `Leans toward ${spirits.join(", ")}.` : null,
+    preferences.length ? `Enjoys ${preferences.map((choice) => PREFERENCE_LABELS[choice] ?? choice).join(", ")}.` : null,
+    alcoholFree ? "Prefers alcohol-free options. Do not recommend alcohol unless they explicitly change that preference." : null,
     flavours.length ? `Loves ${flavours.join(", ")} flavours.` : null,
+    ctx.tasteKeywords?.length ? `Taste keywords: ${ctx.tasteKeywords.slice(0, 6).join(", ")}.` : null,
     ctx.topCategories?.length
       ? `Lately browsing a lot of ${ctx.topCategories.slice(0, 3).join(", ")}.`
       : null,
@@ -52,10 +87,10 @@ export function buildSystemPrompt(
       ? `Recently eyed: ${ctx.recentDrinks.slice(0, 4).join(", ")}.`
       : null,
     ctx.intensity && INTENSITY_LABELS[ctx.intensity]
-      ? `Tonight they're ${INTENSITY_LABELS[ctx.intensity]}.`
+      ? `They are ${INTENSITY_LABELS[ctx.intensity]}.`
       : null,
     ctx.intent && INTENT_LABELS[ctx.intent]
-      ? `The plan: ${INTENT_LABELS[ctx.intent]}.`
+      ? `Their usual setting: ${INTENT_LABELS[ctx.intent]}.`
       : null,
     ctx.city || ctx.state
       ? `Based in ${[ctx.city, ctx.state].filter(Boolean).join(", ")}.`
@@ -95,7 +130,7 @@ FORMATTING (your replies are rendered as Markdown):
 
 THE GUEST AT YOUR BAR
 ${userBits || "A new face — make them feel like a regular."}
-When you know their taste (spirits, flavours, how hard they're going, the plan for the night), let it quietly shape your picks. Nod to it naturally ("since you're into smoky and taking it easy tonight…"), never robotically list it back.
+When you know their taste, usual style, and setting, let it quietly shape your picks. Nod to it naturally, never robotically list it back.
 
 CATALOG (recommend from here when you can; these are real and in our app)
 ${drinksContext(drinks)}

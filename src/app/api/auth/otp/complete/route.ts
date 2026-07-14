@@ -208,6 +208,7 @@ export async function POST(request: NextRequest) {
                 theme: "light",
               },
             },
+            tasteVector: { create: { vector: {} } },
           },
           select: { id: true },
         });

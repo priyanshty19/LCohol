@@ -111,6 +111,15 @@ export const CATEGORIES = [
       { name: "Coffee Liqueur", slug: "coffee-liqueur", sortOrder: 4 },
     ],
   },
+  {
+    name: "Soft Drinks",
+    slug: "soft-drinks",
+    description: "Alcohol-free drinks and mixers",
+    sortOrder: 10,
+    subcategories: [
+      { name: "Cola", slug: "cola-soft-drinks", sortOrder: 1 },
+    ],
+  },
 ];
 
 export const TAGS = [

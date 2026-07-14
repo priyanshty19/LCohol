@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { retrieveDrinks } from "@/lib/james/retriever";
 import { buildSystemPrompt } from "@/lib/james/persona";
+import { getTasteProfile } from "@/lib/behavior";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest) {
 
   let favoriteDrink: string | null = null;
   let drinks: Awaited<ReturnType<typeof retrieveDrinks>>;
+  let taste: Awaited<ReturnType<typeof getTasteProfile>>;
   try {
     if (user.profile?.favoriteDrinkId) {
       const fav = await prisma.drink.findUnique({
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
       favoriteDrink = fav?.name ?? null;
     }
 
-    drinks = await retrieveDrinks(lastUser);
+    [drinks, taste] = await Promise.all([retrieveDrinks(lastUser), getTasteProfile(user.id)]);
   } catch (err) {
     if (isPoolExhausted(err)) {
       console.warn("[api/james/chat] pool exhausted — 503 backoff");
@@ -63,6 +65,9 @@ export async function POST(request: NextRequest) {
       preferredFlavours: user.profile?.preferredFlavours,
       intensity: user.profile?.intensity,
       intent: user.profile?.intent,
+      recentDrinks: taste.recentDrinks,
+      topCategories: taste.topCategories,
+      tasteKeywords: taste.keywords,
     },
     drinks
   );

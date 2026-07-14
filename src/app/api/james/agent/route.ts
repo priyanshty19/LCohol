@@ -11,6 +11,7 @@ import { retrieveDrinks } from "@/lib/james/retriever";
 import { buildSystemPrompt } from "@/lib/james/persona";
 import { searchCatalog, type CatalogSearch } from "@/lib/james/search";
 import { NAV_TARGETS, type JamesAction } from "@/lib/james/actions";
+import { jamesKeywords } from "@/lib/james/keywords";
 import { THEMES, isThemeId, type ThemeId } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     interactionType: "ASK_JAMES",
     targetType: "JAMES",
-    context: { q: lastUser.slice(0, 200) },
+    context: { q: lastUser.slice(0, 200), keywords: jamesKeywords(lastUser) },
   });
 
   let favoriteDrink: string | null = null;
@@ -126,6 +127,7 @@ export async function POST(request: NextRequest) {
         intent: user.profile?.intent,
         recentDrinks: taste.recentDrinks,
         topCategories: taste.topCategories,
+        tasteKeywords: taste.keywords,
       },
       groundingDrinks
     ) + ACTION_PROTOCOL;
