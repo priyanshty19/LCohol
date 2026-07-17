@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { bustFeedCache } from "./post-list";
 
@@ -22,19 +22,14 @@ export function VoteButtons({
     vote: initialVote ?? null,
   });
   const { score, vote: userVote } = state;
-  // Monotonic id of the latest click. Rapid clicks (e.g. upvote then immediately
-  // downvote) must all register — the UI is fully optimistic and the server
-  // recomputes score from SUM(votes) atomically, so no client-side lock is needed.
-  // We only use this to stop a superseded in-flight request from rolling back
-  // the user's newer optimistic state.
-  const seqRef = useRef(0);
+  const [pending, setPending] = useState(false);
 
   async function handleVote(value: 1 | -1) {
-    const mySeq = ++seqRef.current;
+    if (pending) return;
+    setPending(true);
     bustFeedCache(); // a cached first page now holds a stale score/vote for this post
 
-    // Optimistic update from the CURRENT state (functional updater so back-to-back
-    // clicks compose correctly instead of reading a stale closure).
+    // Optimistic update first; the server response below is authoritative.
     setState((prev) => {
       if (prev.vote === value) return { score: prev.score - value, vote: null }; // toggle off
       if (prev.vote) return { score: prev.score + value * 2, vote: value }; // flip up<->down
@@ -47,16 +42,18 @@ export function VoteButtons({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       });
-      // Only reconcile if this is still the most recent action — a superseded
-      // request must not clobber the user's newer optimistic state.
-      if (!res.ok && mySeq === seqRef.current) {
-        const data = (await res.json().catch(() => null)) as
-          | { data?: { vote?: number | null } }
-          | null;
-        setState((prev) => ({ ...prev, vote: data?.data?.vote ?? null }));
+      const data = (await res.json().catch(() => null)) as
+        | { data?: { vote?: number | null; score?: number } }
+        | null;
+      if (typeof data?.data?.score === "number") {
+        setState({ score: data.data.score, vote: data.data.vote ?? null });
+      } else if (!res.ok) {
+        setState({ score: initialScore, vote: initialVote ?? null });
       }
     } catch {
-      /* network blip — leave optimistic state; next action or refresh reconciles */
+      setState({ score: initialScore, vote: initialVote ?? null });
+    } finally {
+      setPending(false);
     }
   }
 
@@ -64,6 +61,7 @@ export function VoteButtons({
     <div className="flex flex-col items-center gap-0.5">
       <button
         onClick={() => handleVote(1)}
+        disabled={pending}
         className={cn(
           "rounded p-1 transition-transform duration-150 hover:scale-110 hover:bg-accent active:scale-90",
           userVote === 1 && "scale-110 text-primary"
@@ -94,6 +92,7 @@ export function VoteButtons({
       </span>
       <button
         onClick={() => handleVote(-1)}
+        disabled={pending}
         className={cn(
           "rounded p-1 transition-transform duration-150 hover:scale-110 hover:bg-accent active:scale-90",
           userVote === -1 && "scale-110 text-destructive"

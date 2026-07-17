@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Send, X } from "lucide-react";
 import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
@@ -69,15 +69,11 @@ function greetingFor(theme: string): Msg {
 
 export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean }) {
   const router = useRouter();
-  const pathname = usePathname();
-  // Screens that already surface James inline (feed's AskJames composer, and the
-  // Cocktails ingredient search) don't need the floating bottom-right launcher —
-  // it would double up. Hide it there.
-  const INLINE_JAMES_ROUTES = new Set(["/", "/cocktails"]);
-  const launcherOn = showLauncher && !INLINE_JAMES_ROUTES.has(pathname);
-  const greetingRef = useRef<Msg>(greetingFor("light"));
+  const launcherOn = showLauncher;
+  const initialGreeting = greetingFor("light");
+  const greetingRef = useRef<Msg>(initialGreeting);
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>(() => [greetingRef.current]);
+  const [messages, setMessages] = useState<Msg[]>(() => [initialGreeting]);
   const [chips, setChips] = useState<string[]>(DEFAULT_CHIPS);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,12 +123,6 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   // Clear a pending navigate timer on unmount (e.g. logout leaves the layout).
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
 
-  // On the feed, James already lives at the top (the AskJames composer), so the
-  // floating panel must not linger here if it was opened on another route.
-  useEffect(() => {
-    if (pathname === "/") setOpen(false);
-  }, [pathname]);
-
   async function send(text: string) {
     const content = text.trim();
     if (!content || busy) return;
@@ -175,7 +165,9 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
 
   // Let other surfaces (e.g. a bar card) summon James with a prefilled question.
   const sendRef = useRef(send);
-  sendRef.current = send;
+  useEffect(() => {
+    sendRef.current = send;
+  });
   useEffect(() => {
     function handler(e: Event) {
       const p = (e as CustomEvent).detail?.prompt;
@@ -194,7 +186,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
         <button
           onClick={() => setOpen((v) => !v)}
           aria-label="Ask James, your bartender"
-          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[1200] h-14 w-14 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
+          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[1200] h-16 w-16 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
         >
           {open ? (
             <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">

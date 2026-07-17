@@ -26,7 +26,7 @@ type Props = {
 
 export function ReportButton({ postId, commentId, className }: Props) {
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState<string | null>(null);
+  const [reasons, setReasons] = useState<string[]>([]);
   const [details, setDetails] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
   // Portal to <body> so the fixed overlay can't be trapped by a transformed
@@ -36,19 +36,19 @@ export function ReportButton({ postId, commentId, className }: Props) {
   useEffect(() => setMounted(true), []);
 
   function reset() {
-    setReason(null);
+    setReasons([]);
     setDetails("");
     setState("idle");
   }
 
   async function submit() {
-    if (!reason) return;
+    if (!reasons.length) return;
     setState("sending");
     try {
       const res = await fetch("/api/moderation/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, commentId, reason, details: details.trim() || undefined }),
+        body: JSON.stringify({ postId, commentId, reasons, details: details.trim() || undefined }),
       });
       if (!res.ok) throw new Error();
       setState("done");
@@ -134,24 +134,41 @@ export function ReportButton({ postId, commentId, className }: Props) {
                   </div>
 
                   <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-5">
-                    {REASONS.map((r) => (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setReason(r.value)}
-                        className={cn(
-                          "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-all",
-                          reason === r.value
-                            ? "border-[var(--ml-sos)] bg-[var(--ml-sos)]/10 text-foreground"
-                            : "border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground"
-                        )}
-                      >
-                        {r.label}
-                        {reason === r.value && (
-                          <Check className="h-4 w-4 text-[var(--ml-sos)]" />
-                        )}
-                      </button>
-                    ))}
+                    <p className="pb-1 text-xs text-muted-foreground">
+                      Select up to 3 reasons ({reasons.length}/3)
+                    </p>
+                    {REASONS.map((r) => {
+                      const selected = reasons.includes(r.value);
+                      const disabled = !selected && reasons.length >= 3;
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() =>
+                            setReasons((current) =>
+                              current.includes(r.value)
+                                ? current.filter((value) => value !== r.value)
+                                : current.length < 3
+                                  ? [...current, r.value]
+                                  : current,
+                            )
+                          }
+                          className={cn(
+                            "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm transition-all",
+                            selected
+                              ? "border-[var(--ml-sos)] bg-[var(--ml-sos)]/10 text-foreground"
+                              : "border-border/60 bg-muted/30 text-muted-foreground hover:border-border hover:text-foreground",
+                            disabled && "cursor-not-allowed opacity-45 hover:border-border/60 hover:text-muted-foreground"
+                          )}
+                        >
+                          {r.label}
+                          {selected && (
+                            <Check className="h-4 w-4 text-[var(--ml-sos)]" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <div className="shrink-0 border-t border-border/50 px-5 pb-5 pt-3">
@@ -173,7 +190,7 @@ export function ReportButton({ postId, commentId, className }: Props) {
                     <button
                       type="button"
                       onClick={submit}
-                      disabled={!reason || state === "sending"}
+                      disabled={!reasons.length || state === "sending"}
                       className="btn-velvet mt-3 flex h-10 w-full items-center justify-center rounded-lg font-semibold disabled:opacity-50"
                     >
                       {state === "sending" ? "Sending…" : "Submit report"}
