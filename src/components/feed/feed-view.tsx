@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { AskJames } from "@/components/james/ask-james";
+import { CreatePostForm } from "./create-post-form";
 import { PostList } from "./post-list";
 import type { FeedSortOption, PostWithRelations } from "@/types/database";
 
@@ -19,10 +19,29 @@ export function FeedView({
   initialFeed: { data: PostWithRelations[]; hasMore: boolean; nextCursor?: string };
 }) {
   const [sort, setSort] = useState<FeedSortOption>("for-you");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="space-y-6">
-      <AskJames />
+      {composerOpen ? (
+        <CreatePostForm
+          mode="inline"
+          onMinimize={() => setComposerOpen(false)}
+          onCreated={() => {
+            setComposerOpen(false);
+            setRefreshKey((key) => key + 1);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setComposerOpen(true)}
+          className="glass-panel-subtle flex min-h-14 w-full items-center rounded-2xl px-4 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          Share something with SipStories...
+        </button>
+      )}
 
       <div
         role="tablist"
@@ -50,6 +69,7 @@ export function FeedView({
       </div>
 
       <PostList
+        key={refreshKey}
         sort={sort}
         initialPosts={initialFeed.data}
         initialHasMore={initialFeed.hasMore}

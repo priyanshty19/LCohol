@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { ReportReason, type ReportReason as ReportReasonValue } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+
+const REPORT_REASONS = new Set<string>(Object.values(ReportReason));
+
+function isReportReason(value: unknown): value is ReportReasonValue {
+  return typeof value === "string" && REPORT_REASONS.has(value);
+}
 
 export async function POST(request: Request) {
   const dbUser = await getCurrentUser();
@@ -21,16 +28,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
-  const { postId, commentId, reason, details } = body;
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const postId = typeof body.postId === "string" ? body.postId : null;
+  const commentId = typeof body.commentId === "string" ? body.commentId : null;
+  const reason = typeof body.reason === "string" ? body.reason : null;
+  const details = typeof body.details === "string" ? body.details : null;
+  const rawReasons = Array.isArray(body.reasons) ? body.reasons : reason ? [reason] : [];
+  const reasons = Array.from(new Set(rawReasons.filter(isReportReason)));
 
-  if (!reason) {
-    return NextResponse.json({ error: "Reason is required" }, { status: 400 });
+  if (reasons.length < 1 || reasons.length > 3) {
+    return NextResponse.json({ error: "Choose 1 to 3 valid reasons" }, { status: 400 });
   }
 
   // `reason` is a ReportReason enum (Prisma validates it at write); only the
   // free-text `details` needs a length cap.
-  const cappedDetails = details ? String(details).slice(0, 2000) : null;
+  const cappedDetails = details ? details.slice(0, 2000) : null;
 
   // Exactly one target — not both, not neither.
   if (!postId === !commentId) {
@@ -58,7 +70,8 @@ export async function POST(request: Request) {
         reporterId: dbUser.id,
         postId: postId || null,
         commentId: commentId || null,
-        reason,
+        reason: reasons[0],
+        reasons,
         details: cappedDetails,
       },
     });

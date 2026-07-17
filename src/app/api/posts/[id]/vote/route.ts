@@ -60,9 +60,10 @@ export async function POST(
     // source of truth — inside the same transaction. Delta-based increments drift
     // under concurrent clicks (double-decrement / P2002); recomputing from the
     // aggregate keeps score == SUM(votes) no matter how requests interleave.
-    let voteState: number | null;
+    let voteState: { vote: number | null; score: number };
     try {
       voteState = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM posts WHERE id = ${postId}::uuid FOR UPDATE`;
         const existing = await tx.vote.findUnique({
           where: { userId_postId: { userId: dbUser.id, postId } },
         });
@@ -78,8 +79,9 @@ export async function POST(
           state = value;
         }
         const agg = await tx.vote.aggregate({ where: { postId }, _sum: { value: true } });
-        await tx.post.update({ where: { id: postId }, data: { score: agg._sum.value ?? 0 } });
-        return state;
+        const score = agg._sum.value ?? 0;
+        await tx.post.update({ where: { id: postId }, data: { score } });
+        return { vote: state, score };
       });
     } catch (txErr) {
       // A concurrent vote raced us (P2002 unique create / P2025 vanished row).
@@ -90,7 +92,10 @@ export async function POST(
         const current = await prisma.vote.findUnique({
           where: { userId_postId: { userId: dbUser.id, postId } },
         });
-        return NextResponse.json({ data: { vote: current?.value ?? null } });
+        const agg = await prisma.vote.aggregate({ where: { postId }, _sum: { value: true } });
+        const score = agg._sum.value ?? 0;
+        await prisma.post.update({ where: { id: postId }, data: { score } });
+        return NextResponse.json({ data: { vote: current?.value ?? null, score } });
       }
       throw txErr;
     }
@@ -99,8 +104,8 @@ export async function POST(
     // wait on 4 COUNT queries + an UPDATE before seeing their vote register.
     after(() => recomputeKarma(dbUser.id));
     return NextResponse.json(
-      { data: { vote: voteState } },
-      { status: voteState === null ? 200 : 201 },
+      { data: voteState },
+      { status: voteState.vote === null ? 200 : 201 },
     );
   } catch (err) {
     if (isPoolExhausted(err)) {

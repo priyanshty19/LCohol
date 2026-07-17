@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 type Report = {
   id: string;
   reason: string;
+  reasons?: string[];
   details: string | null;
   status: string;
   createdAt: string;
@@ -26,6 +27,7 @@ export function ModQueue() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -33,10 +35,11 @@ export function ModQueue() {
     setBusy(rep.id);
     const type = rep.post ? "post" : "comment";
     const id = rep.post ? rep.post.id : rep.comment?.id;
+    const reasons = rep.reasons?.length ? rep.reasons : [rep.reason];
     await fetch("/api/moderation/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, id, reason: `report:${rep.reason}` }),
+      body: JSON.stringify({ type, id, reason: `report:${reasons.join(",")}` }),
     });
     await fetch("/api/moderation/reports", {
       method: "PATCH",
@@ -76,7 +79,9 @@ export function ModQueue() {
         return (
           <div key={rep.id} className="glass-panel space-y-2 rounded-xl p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="destructive">{rep.reason}</Badge>
+              {(rep.reasons?.length ? rep.reasons : [rep.reason]).map((reason) => (
+                <Badge key={reason} variant="destructive">{reason}</Badge>
+              ))}
               <Badge variant="topic">{kind}</Badge>
               <span className="text-xs text-muted-foreground">
                 by {rep.reporter?.profile?.username ?? "anon"} ·{" "}

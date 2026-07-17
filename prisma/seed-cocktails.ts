@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PrismaClient, IngredientCategory } from "../src/generated/prisma/client";
@@ -111,6 +112,12 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 110);
+}
+
+function cocktailSlug(name: string, source: string): string {
+  const suffix = createHash("sha1").update(`${name}:${source}`).digest("hex").slice(0, 10);
+  const base = slugify(name).slice(0, 220 - suffix.length - 1) || "cocktail";
+  return `${base}-${suffix}`;
 }
 
 function titleCase(s: string): string {
@@ -324,6 +331,7 @@ async function seedCurated(
       create: {
         authorId,
         name: row.name,
+        slug: cocktailSlug(row.name, row.source),
         category: row.category || null,
         glass: row.glass || null,
         garnish: row.garnish || null,
@@ -394,6 +402,7 @@ async function seedSynthetic(
       data: chunk.map((r) => ({
         authorId,
         name: r.name,
+        slug: cocktailSlug(r.name, r.source),
         category: r.category || null,
         glass: r.glass || null,
         garnish: r.garnish || null,

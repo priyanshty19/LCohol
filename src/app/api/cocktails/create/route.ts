@@ -19,6 +19,20 @@ function slugify(s: string): string {
     .slice(0, 200);
 }
 
+const NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+
+function nanoid(size = 10): string {
+  const bytes = new Uint8Array(size);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => NANOID_ALPHABET[b & 63]).join("");
+}
+
+function mixSlug(name: string): string {
+  const suffix = nanoid().toLowerCase();
+  const base = slugify(name).slice(0, 220 - suffix.length - 1) || "my-mix";
+  return `${base}-${suffix}`;
+}
+
 // A write endpoint is a DoS magnet: each call does several DB round-trips, so a
 // loop of them exhausts the connection pool and floods storage. Two app-level
 // guards (rate per account + a hard ceiling on stored mixes). Note: in-memory
@@ -70,16 +84,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Reject a duplicate name by the same author up front (matches @@unique
-    // [authorId, name, sourceLabel] with sourceLabel null) for a friendly message.
-    const clash = await prisma.cocktailCreation.findFirst({
-      where: { authorId: me.id, name, sourceLabel: null },
-      select: { id: true },
-    });
-    if (clash) {
-      return NextResponse.json({ error: "You already have a mix with that name" }, { status: 409 });
-    }
-
     // Resolve ingredient slugs → ids (preserve the order the user layered them).
     const ingredients = await prisma.ingredient.findMany({
       where: { slug: { in: slugs } },
@@ -90,36 +94,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "None of those ingredients were recognized" }, { status: 400 });
     }
 
-    // Unique-in-practice slug (the column isn't a DB UNIQUE; see catalog memo).
-    // ONE existence check, not a 50-iteration loop: take the clean slug if free,
-    // else fall straight to a uuid suffix. The old loop fired up to 50 queries
-    // per create — a connection-pool killer under write floods.
-    const base = slugify(name) || "my-mix";
-    const baseTaken = await prisma.cocktailCreation.findFirst({
-      where: { slug: base },
-      select: { id: true },
-    });
-    const slug = baseTaken ? `${base}-${crypto.randomUUID().slice(0, 8)}` : base;
-
-    const created = await prisma.cocktailCreation.create({
-      data: {
-        authorId: me.id,
-        name,
-        slug,
-        glass: typeof body.glass === "string" ? body.glass.slice(0, 80) : null,
-        garnish: typeof body.garnish === "string" ? body.garnish.slice(0, 200) : null,
-        category: "My Mix",
-        categorySlug: "my-mix",
-        isCurated: false,
-        isPublic: body.isPublic === true,
-        ingredients: {
-          create: slugs
-            .map((s, idx) => ({ ingredientId: bySlug.get(s), sortOrder: idx }))
-            .filter((row): row is { ingredientId: string; sortOrder: number } => !!row.ingredientId),
-        },
+    const data = {
+      authorId: me.id,
+      name,
+      glass: typeof body.glass === "string" ? body.glass.slice(0, 80) : null,
+      garnish: typeof body.garnish === "string" ? body.garnish.slice(0, 200) : null,
+      category: "My Mix",
+      categorySlug: "my-mix",
+      isCurated: false,
+      isPublic: body.isPublic === true,
+      ingredients: {
+        create: slugs
+          .map((s, idx) => ({ ingredientId: bySlug.get(s), sortOrder: idx }))
+          .filter((row): row is { ingredientId: string; sortOrder: number } => !!row.ingredientId),
       },
-      select: { id: true, slug: true },
-    });
+    };
+
+    let created: { id: string; slug: string | null } | null = null;
+    for (let tries = 0; tries < 2; tries++) {
+      try {
+        created = await prisma.cocktailCreation.create({
+          data: { ...data, slug: mixSlug(name) },
+          select: { id: true, slug: true },
+        });
+        break;
+      } catch (err) {
+        if ((err as { code?: string }).code !== "P2002" || tries === 1) throw err;
+      }
+    }
+    if (!created) throw new Error("Cocktail creation failed");
 
     logInteraction({
       userId: me.id,

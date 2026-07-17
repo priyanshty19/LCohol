@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, Minimize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +20,15 @@ import { compressImage } from "@/lib/image-compress";
 
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 
-export function CreatePostForm() {
+export function CreatePostForm({
+  mode = "page",
+  onCreated,
+  onMinimize,
+}: {
+  mode?: "page" | "inline";
+  onCreated?: () => void;
+  onMinimize?: () => void;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,10 +69,11 @@ export function CreatePostForm() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setLoading(true);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
     const title = formData.get("title") as string;
     const body = formData.get("body") as string;
     const postType = formData.get("postType") as string;
@@ -98,7 +107,13 @@ export function CreatePostForm() {
         return;
       }
 
-      router.push(`/post/${json.data.id}`);
+      if (mode === "inline") {
+        form.reset();
+        clearImage();
+        onCreated?.();
+      } else {
+        router.push(`/post/${json.data.id}`);
+      }
     } catch {
       setError("Something went wrong");
     } finally {
@@ -107,9 +122,23 @@ export function CreatePostForm() {
   }
 
   return (
-    <Card variant="glass">
-      <CardContent className="pt-6">
+    <Card variant="glass" className={mode === "inline" ? "rounded-2xl" : undefined}>
+      <CardContent className={mode === "inline" ? "pt-4" : "pt-6"}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "inline" && onMinimize && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onMinimize}
+                title="Minimize"
+                aria-label="Minimize post creation"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-muted/30 text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              >
+                <Minimize2 className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="postType">Type</Label>
             <Select name="postType" defaultValue="STORY">
@@ -232,14 +261,16 @@ export function CreatePostForm() {
           )}
 
           <div className="flex justify-end gap-3">
-            <Button
-              type="button"
-              variant="glass"
-              size="lg"
-              onClick={() => router.back()}
-            >
-              Cancel
-            </Button>
+            {mode === "page" && (
+              <Button
+                type="button"
+                variant="glass"
+                size="lg"
+                onClick={() => router.back()}
+              >
+                Cancel
+              </Button>
+            )}
             <Button type="submit" variant="gold" size="lg" disabled={loading}>
               <span aria-live="polite">{loading ? "Posting..." : "Post"}</span>
             </Button>

@@ -555,11 +555,7 @@ model CocktailCreation {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   authorId    String   @map("author_id") @db.Uuid
   name        String   @db.VarChar(200)
-  // Plain nullable+indexed (not a DB UNIQUE constraint): the backfill guarantees
-  // uniqueness-in-practice, and adding a formal UNIQUE on prod would trip Prisma's
-  // data-loss gate. Indexed for deep-link lookups (/cocktails/[slug]). Hardening to
-  // a true UNIQUE constraint is a deliberate follow-up once the backfill is verified.
-  slug        String?  @db.VarChar(220)
+  slug        String   @unique @db.VarChar(220)
   description String?
   instructions String?
   imageUrl    String?  @map("image_url")
@@ -592,7 +588,6 @@ model CocktailCreation {
   // and the category filter over the 10k-row table — both unindexed before.
   @@index([isCurated, name])
   @@index([categorySlug])
-  @@index([slug])
   @@map("cocktail_creations")
 }
 
@@ -999,6 +994,7 @@ model Report {
   postId     String?      @map("post_id") @db.Uuid
   commentId  String?      @map("comment_id") @db.Uuid
   reason     ReportReason
+  reasons    ReportReason[] @default([])
   details    String?
   status     ReportStatus @default(PENDING)
   createdAt  DateTime     @default(now()) @map("created_at")
