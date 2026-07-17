@@ -20,8 +20,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const { type, id, reason } = await request.json();
+    const remark = typeof reason === "string" ? reason.trim().slice(0, 500) : "";
     if ((type !== "post" && type !== "comment") || !id) {
       return NextResponse.json({ error: "type ('post'|'comment') and id are required." }, { status: 400 });
+    }
+    if (!remark) {
+      return NextResponse.json({ error: "Moderator remark is required." }, { status: 400 });
     }
 
     const target =
@@ -49,7 +53,7 @@ export async function POST(request: NextRequest) {
         action: type === "post" ? "DELETE_POST" : "DELETE_COMMENT",
         targetType: type === "post" ? "POST" : "COMMENT",
         targetId: id,
-        reason: typeof reason === "string" ? reason.slice(0, 500) : reason ?? null,
+        reason: remark,
       },
     });
 

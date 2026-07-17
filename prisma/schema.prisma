@@ -996,6 +996,7 @@ model Report {
   reason     ReportReason
   reasons    ReportReason[] @default([])
   details    String?
+  moderatorRemark String?    @map("moderator_remark")
   status     ReportStatus @default(PENDING)
   createdAt  DateTime     @default(now()) @map("created_at")
   resolvedAt DateTime?    @map("resolved_at")

@@ -19,11 +19,14 @@ type Report = {
 export function ModQueue() {
   const [reports, setReports] = useState<Report[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [remarks, setRemarks] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch("/api/moderation/reports");
     const d = await r.json();
     setReports(d.data ?? []);
+    setError(r.ok ? null : d.error ?? "Could not load reports.");
   }, []);
 
   useEffect(() => {
@@ -32,6 +35,11 @@ export function ModQueue() {
   }, [load]);
 
   async function del(rep: Report) {
+    const remark = remarks[rep.id]?.trim();
+    if (!remark) {
+      setError("Add a moderator remark before taking action.");
+      return;
+    }
     setBusy(rep.id);
     const type = rep.post ? "post" : "comment";
     const id = rep.post ? rep.post.id : rep.comment?.id;
@@ -39,23 +47,28 @@ export function ModQueue() {
     await fetch("/api/moderation/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, id, reason: `report:${reasons.join(",")}` }),
+      body: JSON.stringify({ type, id, reason: `${remark} | report:${reasons.join(",")}` }),
     });
     await fetch("/api/moderation/reports", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: rep.id, status: "ACTION_TAKEN" }),
+      body: JSON.stringify({ id: rep.id, status: "ACTION_TAKEN", moderatorRemark: remark }),
     });
     await load();
     setBusy(null);
   }
 
   async function resolve(rep: Report, status: string) {
+    const remark = remarks[rep.id]?.trim();
+    if (!remark) {
+      setError("Add a moderator remark before taking action.");
+      return;
+    }
     setBusy(rep.id);
     await fetch("/api/moderation/reports", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: rep.id, status }),
+      body: JSON.stringify({ id: rep.id, status, moderatorRemark: remark }),
     });
     await load();
     setBusy(null);
@@ -70,6 +83,12 @@ export function ModQueue() {
       {reports.length === 0 && (
         <p className="text-sm text-muted-foreground">
           Nothing pending — the bar&apos;s clean. 🧹
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="rounded-lg border border-[var(--ml-sos)]/30 bg-[var(--ml-sos)]/10 p-3 text-sm text-[var(--ml-sos)]">
+          {error}
         </p>
       )}
 
@@ -92,11 +111,22 @@ export function ModQueue() {
             {rep.details && (
               <p className="text-xs text-muted-foreground">“{rep.details}”</p>
             )}
+            <textarea
+              value={remarks[rep.id] ?? ""}
+              onChange={(e) => {
+                setError(null);
+                setRemarks((prev) => ({ ...prev, [rep.id]: e.target.value }));
+              }}
+              placeholder="Moderator remark (required)"
+              rows={2}
+              maxLength={2000}
+              className="w-full resize-none rounded-lg border border-input bg-input/30 px-3 py-2 text-sm outline-none focus-visible:border-ring"
+            />
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="destructive"
-                disabled={busy === rep.id}
+                disabled={busy === rep.id || !remarks[rep.id]?.trim()}
                 onClick={() => del(rep)}
               >
                 Delete content
@@ -104,7 +134,7 @@ export function ModQueue() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={busy === rep.id}
+                disabled={busy === rep.id || !remarks[rep.id]?.trim()}
                 onClick={() => resolve(rep, "DISMISSED")}
               >
                 Dismiss
@@ -112,7 +142,7 @@ export function ModQueue() {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={busy === rep.id}
+                disabled={busy === rep.id || !remarks[rep.id]?.trim()}
                 onClick={() => resolve(rep, "REVIEWED")}
               >
                 Mark reviewed
