@@ -17,9 +17,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { userId, makeMod } = await request.json();
+    const { userId, makeMod, reason } = await request.json();
+    const remark = typeof reason === "string" ? reason.trim().slice(0, 500) : "";
     if (!userId) {
       return NextResponse.json({ error: "userId is required." }, { status: 400 });
+    }
+    if (!remark) {
+      return NextResponse.json({ error: "Admin remark is required." }, { status: 400 });
     }
 
     const target = await prisma.user.findUnique({
@@ -42,6 +46,7 @@ export async function POST(request: NextRequest) {
         action: makeMod ? "PROMOTE_MOD" : "DEMOTE_MOD",
         targetType: "PROFILE",
         targetId: userId,
+        reason: remark,
       },
     });
 
