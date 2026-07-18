@@ -19,8 +19,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const { userId, ban, reason } = await request.json();
+    const remark = typeof reason === "string" ? reason.trim().slice(0, 500) : "";
     if (!userId) {
       return NextResponse.json({ error: "userId is required." }, { status: 400 });
+    }
+    if (!remark) {
+      return NextResponse.json({ error: "Moderator remark is required." }, { status: 400 });
     }
     if (userId === guard.user.id) {
       return NextResponse.json({ error: "You cannot ban yourself." }, { status: 400 });
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
         action: shouldBan ? "BAN_USER" : "UNBAN_USER",
         targetType: "PROFILE",
         targetId: userId,
-        reason: typeof reason === "string" ? reason.slice(0, 500) : null,
+        reason: remark,
       },
     });
 

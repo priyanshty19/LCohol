@@ -52,16 +52,19 @@ export function AdminPanel() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUsers();
     loadAudit();
   }, [loadUsers, loadAudit]);
 
   async function act(url: string, body: object, id: string) {
+    const reason = window.prompt("Required admin/moderator remark");
+    if (!reason?.trim()) return;
     setBusy(id);
     await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, reason: reason.trim() }),
     });
     await Promise.all([loadUsers(q), loadAudit()]);
     setBusy(null);

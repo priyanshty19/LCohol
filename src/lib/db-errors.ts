@@ -27,7 +27,10 @@ export function isPoolExhausted(err: unknown): boolean {
     msg.includes("max clients reached") ||
     msg.includes("max client connections") ||
     msg.includes("too many clients") ||
-    msg.includes("timeout exceeded when trying to connect")
+    msg.includes("timeout exceeded when trying to connect") ||
+    msg.includes("Connection terminated due to connection timeout") ||
+    msg.includes("Can't reach database server") ||
+    msg.includes("DatabaseNotReachable")
   );
 }
 
