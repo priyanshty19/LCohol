@@ -81,6 +81,16 @@ export function HelpView() {
   }, [request]);
 
   const phone = user?.emergencyPhone ?? null;
+  const rideFallback = maps("cab or taxi", coords);
+
+  function getHomeSafe() {
+    const q = encodeURIComponent("cab taxi ride near me");
+    const geo = coords ? `geo:${coords.lat},${coords.lng}?q=${q}` : `geo:0,0?q=${q}`;
+    window.location.href = geo;
+    window.setTimeout(() => {
+      if (document.visibilityState === "visible") window.location.href = rideFallback;
+    }, 900);
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-10">
@@ -102,7 +112,7 @@ export function HelpView() {
           {phone ? (
             <Tile href={`tel:${phone}`} icon={Users} title="Call your person" sub={phone} tone="danger" />
           ) : (
-            <Tile href="/settings" icon={Users} title="Add an emergency contact" sub="Set it in Settings →" />
+            <Tile href="/settings#emergency-contact" icon={Users} title="Add an emergency contact" sub="Set it in Settings →" />
           )}
         </div>
       </section>
@@ -111,11 +121,13 @@ export function HelpView() {
         <h2 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
           Get home safe
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Tile href="https://m.uber.com/ul/?action=setPickup&pickup=my_location" icon={Car} title="Uber" sub="Book a ride" tone="velvet" />
-          <Tile href="https://book.olacabs.com/" icon={Car} title="Ola" sub="Book a ride" tone="velvet" />
-          <Tile href="https://www.rapido.bike/" icon={Car} title="Rapido" sub="Bike · auto" tone="velvet" />
-        </div>
+        <Tile
+          icon={Car}
+          title="Get home safe"
+          sub="Open your device's ride or maps options"
+          tone="velvet"
+          onClick={getHomeSafe}
+        />
       </section>
 
       <section className="space-y-2">

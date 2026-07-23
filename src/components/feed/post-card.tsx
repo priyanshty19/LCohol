@@ -70,25 +70,27 @@ export function PostCard({ post }: PostCardProps) {
         {/* Content */}
         <div className="min-w-0 flex-1">
           {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-start justify-between gap-3 text-xs text-muted-foreground">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
+                  {initial}
+                </div>
+                <Link
+                  href={`/profile/${username}`}
+                  className="font-medium text-foreground/80 transition-colors hover:text-primary"
+                >
+                  {displayName}
+                </Link>
+              </div>
+              <span className="text-muted-foreground/60">{timeAgo}</span>
+            </div>
             <Badge
               variant={POST_TYPE_VARIANTS[post.postType] ?? "topic"}
-              className="text-[10px] font-semibold uppercase tracking-wider"
+              className="shrink-0 text-[10px] font-semibold uppercase tracking-wider"
             >
               {POST_TYPE_LABELS[post.postType] ?? post.postType.toLowerCase()}
             </Badge>
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px] font-bold text-primary">
-                {initial}
-              </div>
-              <Link
-                href={`/profile/${username}`}
-                className="font-medium text-foreground/80 transition-colors hover:text-primary"
-              >
-                {displayName}
-              </Link>
-            </div>
-            <span className="text-muted-foreground/60">{timeAgo}</span>
           </div>
 
           {/* Title (links to post) + body (separate so @mention links don't nest anchors) */}
@@ -157,7 +159,7 @@ export function PostCard({ post }: PostCardProps) {
               postTitle={post.title}
               count={post._count.comments}
             />
-            <ShareButton postId={post.id} />
+            <ShareButton postId={post.id} postTitle={post.title} />
             <ReportButton postId={post.id} className="ml-auto" />
           </div>
         </div>

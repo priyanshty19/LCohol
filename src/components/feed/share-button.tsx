@@ -13,7 +13,7 @@ type Member = {
   avatarUrl: string | null;
 };
 
-export function ShareButton({ postId }: { postId: string }) {
+export function ShareButton({ postId, postTitle }: { postId: string; postTitle: string }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -21,8 +21,15 @@ export function ShareButton({ postId }: { postId: string }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [doneError, setDoneError] = useState(false);
+  const shareUrl = mounted ? `${window.location.origin}/post/${postId}` : "";
+  const shareText = `${postTitle} on SipStories`;
+  const encodedUrl = encodeURIComponent(shareUrl);
+  const encodedText = encodeURIComponent(`${shareText}\n${shareUrl}`);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const t = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +82,29 @@ export function ShareButton({ postId }: { postId: string }) {
     });
   }
 
+  async function copyLink(label = "Link copied") {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setDoneError(false);
+      setDone(label);
+    } catch {
+      setDoneError(true);
+      setDone("Couldn't copy link.");
+    }
+  }
+
+  async function nativeShare() {
+    if (!navigator.share) {
+      await copyLink("Link copied. Paste it anywhere.");
+      return;
+    }
+    try {
+      await navigator.share({ title: shareText, text: shareText, url: shareUrl });
+    } catch {
+      /* user cancelled */
+    }
+  }
+
   return (
     <>
       <button
@@ -119,6 +149,44 @@ export function ShareButton({ postId }: { postId: string }) {
                   </div>
 
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Share outside SipStories
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <a
+                          href={`https://wa.me/?text=${encodedText}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-border/50 px-3 py-2 text-center text-sm transition hover:border-primary/40 hover:bg-muted/40"
+                        >
+                          WhatsApp
+                        </a>
+                        <a
+                          href={`https://www.reddit.com/submit?url=${encodedUrl}&title=${encodeURIComponent(shareText)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-border/50 px-3 py-2 text-center text-sm transition hover:border-primary/40 hover:bg-muted/40"
+                        >
+                          Reddit
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => copyLink("Link copied for Instagram/YouTube.")}
+                          className="rounded-lg border border-border/50 px-3 py-2 text-sm transition hover:border-primary/40 hover:bg-muted/40"
+                        >
+                          Insta / YT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={nativeShare}
+                          className="rounded-lg border border-border/50 px-3 py-2 text-sm transition hover:border-primary/40 hover:bg-muted/40"
+                        >
+                          More apps
+                        </button>
+                      </div>
+                    </div>
+
                     <Button
                       variant="gold"
                       className="w-full font-display"

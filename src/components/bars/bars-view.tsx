@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { locationFromAddress, saveProfileLocation } from "@/lib/client-location";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
   ssr: false,
@@ -162,7 +163,10 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   // dead search). Gating on `mapReady` keeps the server HTML and first client
   // render identical (both the placeholder), so hydration always completes.
   const [mapReady, setMapReady] = useState(false);
-  useEffect(() => setMapReady(true), []);
+  useEffect(() => {
+    const t = window.setTimeout(() => setMapReady(true), 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (nearby) return; // nearby results override the curated city list
@@ -216,6 +220,8 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
             setNearby(true);
             setBars(body.data ?? []);
             setSelected(null);
+            const location = locationFromAddress(body.data?.[0]?.address);
+            if (location) saveProfileLocation(location);
             if (!body.data?.length) setNearbyMsg("No bars found within ~3 km.");
           })
           .catch(() => setNearbyMsg("Couldn't fetch nearby bars."))

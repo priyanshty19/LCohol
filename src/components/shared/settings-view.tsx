@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import {
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { NotificationToggle } from "@/components/settings/notification-toggle";
 import { DeleteAccount } from "@/components/settings/delete-account";
+import { getSavedProfileLocation } from "@/lib/client-location";
 
 const DRINKING_STYLES = [
   { value: "SOCIAL", label: "Social Drinker" },
@@ -30,8 +32,6 @@ const DRINKING_STYLES = [
 
 export function SettingsView() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -42,20 +42,55 @@ export function SettingsView() {
   const [state, setState] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [emailNotif, setEmailNotif] = useState(true);
+  const [highlightEmergency, setHighlightEmergency] = useState(false);
   // useAuth() returns a client-cached user synchronously, so rendering user.email
   // directly would differ from the SSR HTML (no user) → hydration mismatch (React
   // #418), which aborts hydration of this card and leaves the NotificationToggle
   // stuck on "Checking…". Gate user-dependent text until after mount so SSR and
   // the first client render agree.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const t = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
-    if (user?.emergencyPhone) setEmergencyPhone(user.emergencyPhone);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pref = (user as any)?.profile?.emailNotifications;
-    if (typeof pref === "boolean") setEmailNotif(pref);
-    setLoading(false);
+    let t: number | undefined;
+    const highlight = () => {
+      if (window.location.hash !== "#emergency-contact") return;
+      window.setTimeout(() => {
+        document
+          .getElementById("emergency-contact")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightEmergency(true);
+        if (t) window.clearTimeout(t);
+        t = window.setTimeout(() => {
+          setHighlightEmergency(false);
+          if (window.location.hash === "#emergency-contact") {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+        }, 1800);
+      }, 0);
+    };
+    highlight();
+    window.addEventListener("hashchange", highlight);
+    return () => {
+      window.removeEventListener("hashchange", highlight);
+      if (t) window.clearTimeout(t);
+    };
+  }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (user?.emergencyPhone) setEmergencyPhone(user.emergencyPhone);
+      const savedLocation = getSavedProfileLocation();
+      setCity(user?.city ?? savedLocation?.city ?? "");
+      setState(user?.state ?? savedLocation?.state ?? "");
+      const pref = (user as { profile?: { emailNotifications?: boolean } } | null | undefined)
+        ?.profile?.emailNotifications;
+      if (typeof pref === "boolean") setEmailNotif(pref);
+    }, 0);
+    return () => window.clearTimeout(t);
   }, [user]);
 
   async function toggleEmail(value: boolean) {
@@ -150,7 +185,7 @@ export function SettingsView() {
                 id="city"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
-                placeholder="Mumbai"
+                placeholder="Your city (optional)"
                 maxLength={50}
               />
             </div>
@@ -160,24 +195,31 @@ export function SettingsView() {
                 id="state"
                 value={state}
                 onChange={(e) => setState(e.target.value)}
-                placeholder="Maharashtra"
+                placeholder="Your state (optional)"
                 maxLength={50}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div
+            id="emergency-contact"
+            className={`scroll-mt-24 space-y-2 rounded-2xl border p-4 transition-colors ${
+              highlightEmergency
+                ? "border-primary/45 bg-primary/10"
+                : "border-transparent"
+            }`}
+          >
             <Label htmlFor="emergencyPhone">Emergency contact</Label>
             <Input
               id="emergencyPhone"
               type="tel"
               value={emergencyPhone}
               onChange={(e) => setEmergencyPhone(e.target.value)}
-              placeholder="+91 98765 43210"
+              placeholder="Trusted contact number (optional)"
               maxLength={20}
             />
             <p className="text-xs text-muted-foreground">
-              Used by the Help page to call someone you trust. Kept private.
+              Add a real contact only if you want the Help page to call them. Kept private.
             </p>
           </div>
 
@@ -227,6 +269,22 @@ export function SettingsView() {
               className="h-5 w-5 shrink-0 accent-primary"
             />
           </label>
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardContent className="space-y-3 pt-6">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Legal
+          </h2>
+          <div className="flex flex-col divide-y divide-border/30">
+            <Link href="/Terms-and-Condition" className="py-2 text-sm text-foreground/90 hover:text-primary">
+              Terms and Conditions
+            </Link>
+            <Link href="/Privacy-Policy" className="py-2 text-sm text-foreground/90 hover:text-primary">
+              Privacy Policy
+            </Link>
+          </div>
         </CardContent>
       </Card>
 
