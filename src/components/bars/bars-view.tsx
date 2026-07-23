@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/empty-state";
 import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { locationFromAddress, saveProfileLocation } from "@/lib/client-location";
+import { saveProfileLocation } from "@/lib/client-location";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
   ssr: false,
@@ -210,6 +210,12 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserLoc([latitude, longitude]);
+        fetch(`/api/location/reverse?lat=${latitude}&lng=${longitude}`)
+          .then(async (r) => (r.ok ? r.json() : null))
+          .then((body) => {
+            if (body?.data) saveProfileLocation(body.data);
+          })
+          .catch(() => {});
         fetch(`/api/bars/nearby?lat=${latitude}&lng=${longitude}&radius=3000`)
           .then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }))
           .then(({ ok, body }) => {
@@ -220,8 +226,6 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
             setNearby(true);
             setBars(body.data ?? []);
             setSelected(null);
-            const location = locationFromAddress(body.data?.[0]?.address);
-            if (location) saveProfileLocation(location);
             if (!body.data?.length) setNearbyMsg("No bars found within ~3 km.");
           })
           .catch(() => setNearbyMsg("Couldn't fetch nearby bars."))
