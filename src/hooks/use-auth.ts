@@ -9,6 +9,8 @@ export type SipUser = {
   role: "USER" | "MODERATOR" | "ADMIN";
   isBanned: boolean;
   emergencyPhone: string | null;
+  city: string | null;
+  state: string | null;
 };
 
 // Module-level cache shared by every useAuth() consumer (header, profile,

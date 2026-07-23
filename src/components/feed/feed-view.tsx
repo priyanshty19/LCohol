@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CreatePostForm } from "./create-post-form";
 import { PostList } from "./post-list";
 import type { FeedSortOption, PostWithRelations } from "@/types/database";
@@ -24,24 +25,27 @@ export function FeedView({
 
   return (
     <div className="space-y-6">
-      {composerOpen ? (
-        <CreatePostForm
-          mode="inline"
-          onMinimize={() => setComposerOpen(false)}
-          onCreated={() => {
-            setComposerOpen(false);
-            setRefreshKey((key) => key + 1);
-          }}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setComposerOpen(true)}
+      <Dialog open={composerOpen} onOpenChange={setComposerOpen}>
+        <DialogTrigger
           className="glass-panel-subtle flex min-h-14 w-full items-center rounded-2xl px-4 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
         >
           Share something with SipStories...
-        </button>
-      )}
+        </DialogTrigger>
+        <DialogContent
+          showCloseButton={false}
+          className="max-h-[88vh] overflow-y-auto bg-transparent p-0 ring-0 sm:max-w-2xl"
+        >
+          <DialogTitle className="sr-only">Share something with SipStories</DialogTitle>
+          <CreatePostForm
+            mode="inline"
+            onMinimize={() => setComposerOpen(false)}
+            onCreated={() => {
+              setComposerOpen(false);
+              setRefreshKey((key) => key + 1);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       <div
         role="tablist"

@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect } from "react";
 import { getCookie, setCookie } from "@/lib/client-cookies";
 import { GEO_COOKIE } from "./age-gate-overlay";
 
 const MESSAGE =
   "Alcohol laws vary by state in India. Alcohol is prohibited in Gujarat, Bihar, Mizoram, Nagaland, and Lakshadweep. " +
-  "This platform is for informational and community purposes only and does not promote, sell, or deliver alcohol.";
+  "SipStories is informational only and does not promote, sell, or deliver alcohol.";
 
 export function GeoDisclaimer() {
   const [visible, setVisible] = useState(false);
@@ -29,8 +30,15 @@ export function GeoDisclaimer() {
           <div className="flex-1">
             <p className="text-sm text-amber-100/90">{MESSAGE}</p>
             <p className="mt-1 text-xs text-amber-200/60">
-              Drink responsibly. Content on this platform represents user
-              opinions, not professional advice.
+              Drink responsibly. See our{" "}
+              <Link href="/Terms-and-Condition" className="underline underline-offset-2">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link href="/Privacy-Policy" className="underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              .
             </p>
           </div>
           <button

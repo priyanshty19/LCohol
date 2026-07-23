@@ -13,6 +13,7 @@ export async function GET() {
       role: user.role,
       isBanned: user.isBanned,
       emergencyPhone: user.profile?.emergencyPhone ?? null,
+      city: user.profile?.city ?? null,
       theme: user.profile?.theme ?? "light",
       state: user.profile?.state ?? null,
       preferredSpirits: user.profile?.preferredSpirits ?? [],

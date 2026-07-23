@@ -1,23 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Dices, X } from "lucide-react";
+import { Dices } from "lucide-react";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
 import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { generateFunkyName } from "@/lib/funky-names";
 import { bustAuthCache } from "@/hooks/use-auth";
 
-type DrinkOption = { id: string; name: string; brand?: string | null };
-
 // Survives a refresh during the OTP wait — see the restore effect below.
 const SU_OTP_KEY = "ss_signup_otp";
+const DRINK_CHOICES = ["Whiskey", "Rum", "Vodka", "Beer", "Gin", "Tequila", "Brandy"];
 
 function clerkError(e: unknown, fallback: string): string {
   const er = e as { errors?: { longMessage?: string; message?: string }[] };
@@ -33,6 +31,17 @@ function ageFromDob(dobStr: string): number {
   const m = now.getMonth() - dob.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
   return age;
+}
+
+async function resolveDrinkId(choice: string): Promise<string> {
+  if (!choice) return "";
+  try {
+    const res = await fetch(`/api/drinks/search?q=${encodeURIComponent(choice)}`);
+    const data = await res.json();
+    return data.data?.[0]?.id ?? "";
+  } catch {
+    return "";
+  }
 }
 
 export function SignupForm() {
@@ -51,9 +60,7 @@ export function SignupForm() {
   const [verifyVia, setVerifyVia] = useState<"signup" | "signin">("signup");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [drinks, setDrinks] = useState<DrinkOption[]>([]);
-  const [favoriteDrinkId, setFavoriteDrinkId] = useState("");
-  const [drinkQuery, setDrinkQuery] = useState("");
+  const [favoriteDrink, setFavoriteDrink] = useState("");
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
@@ -102,27 +109,6 @@ export function SignupForm() {
     };
   }, []);
 
-  const favoriteOptions = useMemo(() => {
-    const query = drinkQuery.trim().toLowerCase();
-    const matches = query
-      ? drinks.filter((drink) => `${drink.name} ${drink.brand ?? ""}`.toLowerCase().includes(query))
-      : drinks.slice(0, 12);
-    const selected = drinks.find((drink) => drink.id === favoriteDrinkId);
-    return selected && !matches.some((drink) => drink.id === selected.id) ? [selected, ...matches] : matches;
-  }, [drinkQuery, drinks, favoriteDrinkId]);
-  const selectedFavorite = drinks.find((drink) => drink.id === favoriteDrinkId);
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/drinks?sort=popular&limit=60")
-      .then((r) => r.json())
-      .then((d) => alive && setDrinks(d.data ?? []))
-      .catch(() => alive && setDrinks([]));
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   // Step 1 — validate referral, then ask Clerk to email a code.
   async function handleDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -134,7 +120,6 @@ export function SignupForm() {
     const email = String(fd.get("email") ?? "").trim().toLowerCase();
     const dob = String(fd.get("dob") ?? "");
     const referralCode = String(fd.get("referralCode") ?? "").trim().toUpperCase();
-    const favoriteDrinkId = String(fd.get("favoriteDrinkId") ?? "");
     const consent = fd.get("consent") === "on";
 
     if (username.trim().length < 3) {
@@ -160,6 +145,8 @@ export function SignupForm() {
       setLoading(false);
       return;
     }
+
+    const favoriteDrinkId = await resolveDrinkId(favoriteDrink);
 
     // Referral pre-check (re-validated server-side at completion).
     try {
@@ -540,59 +527,23 @@ export function SignupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="favoriteDrinkId">
+            <Label htmlFor="favoriteDrink">
               Favorite drink{" "}
               <span className="text-muted-foreground">(ice-breaker, optional)</span>
             </Label>
-            <Input
-              aria-label="Search favorite drinks"
-              value={drinkQuery}
-              onChange={(e) => setDrinkQuery(e.target.value)}
-              placeholder="Search a drink or brand"
-              className="h-10"
-            />
-            <div className="flex gap-2">
-              <Select
-                name="favoriteDrinkId"
-                value={favoriteDrinkId}
-                onValueChange={(value) => setFavoriteDrinkId(value ?? "")}
-              >
-                <SelectTrigger
-                  id="favoriteDrinkId"
-                  className="h-10 w-full bg-input/30 text-sm"
-                  disabled={drinks.length === 0}
-                >
-                  <span className={`min-w-0 flex-1 truncate text-left ${selectedFavorite ? "" : "text-muted-foreground"}`}>
-                    {selectedFavorite
-                      ? `${selectedFavorite.name}${selectedFavorite.brand ? ` · ${selectedFavorite.brand}` : ""}`
-                      : drinks.length
-                        ? "Choose a favourite"
-                        : "Loading drinks…"}
-                  </span>
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {favoriteOptions.length ? (
-                    favoriteOptions.map((drink) => (
-                      <SelectItem key={drink.id} value={drink.id} className="text-sm">
-                        {drink.name}{drink.brand ? ` · ${drink.brand}` : ""}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="px-2 py-3 text-sm text-muted-foreground">No drinks match that search.</div>
-                  )}
-                </SelectContent>
-              </Select>
-              {favoriteDrinkId && (
-                <button
-                  type="button"
-                  aria-label="Clear favorite drink"
-                  onClick={() => setFavoriteDrinkId("")}
-                  className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-input text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
-                >
-                  <X className="size-4" />
-                </button>
-              )}
-            </div>
+            <select
+              id="favoriteDrink"
+              value={favoriteDrink}
+              onChange={(e) => setFavoriteDrink(e.target.value)}
+              className={dobSelectClass}
+            >
+              <option value="">Choose a favorite</option>
+              {DRINK_CHOICES.map((drink) => (
+                <option key={drink} value={drink}>
+                  {drink}
+                </option>
+              ))}
+            </select>
           </div>
 
           <label className="flex items-start gap-2.5 text-sm text-muted-foreground">
@@ -605,11 +556,11 @@ export function SignupForm() {
             <span>
               I confirm I am <strong className="text-foreground">21 or older</strong>{" "}
               and agree to the{" "}
-              <Link href="/compliance/terms" className="text-primary hover:underline">
+              <Link href="/Terms-and-Condition" className="text-primary hover:underline">
                 Terms
               </Link>{" "}
               and{" "}
-              <Link href="/compliance/privacy" className="text-primary hover:underline">
+              <Link href="/Privacy-Policy" className="text-primary hover:underline">
                 Privacy Policy
               </Link>
               .

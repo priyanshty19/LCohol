@@ -274,10 +274,10 @@ export function ProfileView({ username, initialProfile }: ProfileViewProps) {
                 Legal &amp; Safety
               </h2>
               <div className="flex flex-col divide-y divide-border/30">
-                <Link href="/compliance/terms" className="py-2 text-sm text-foreground/90 hover:text-primary">
+                <Link href="/Terms-and-Condition" className="py-2 text-sm text-foreground/90 hover:text-primary">
                   Terms of Service
                 </Link>
-                <Link href="/compliance/privacy" className="py-2 text-sm text-foreground/90 hover:text-primary">
+                <Link href="/Privacy-Policy" className="py-2 text-sm text-foreground/90 hover:text-primary">
                   Privacy Policy
                 </Link>
                 <Link href="/compliance/grievance" className="py-2 text-sm text-foreground/90 hover:text-primary">

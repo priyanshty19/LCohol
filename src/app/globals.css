@@ -484,6 +484,11 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
+  select,
+  option {
+    background: var(--popover);
+    color: var(--popover-foreground);
+  }
 }
 
 /* ============================================================
@@ -836,4 +841,3 @@
     scroll-behavior: auto !important;
   }
 }
-
