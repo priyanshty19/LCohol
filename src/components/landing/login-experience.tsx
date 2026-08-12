@@ -7,6 +7,7 @@ import { LoginForm } from "@/components/auth/login-form";
 import { SignupForm } from "@/components/auth/signup-form";
 import { JamesTalking } from "@/components/landing/james-talking";
 import { Button } from "@/components/ui/button";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 type Mode = null | "signin" | "signup";
 
@@ -126,6 +127,10 @@ function AuthModal({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    trackAnalyticsEvent("auth_start", { mode });
+  }, [mode]);
 
   const isSignin = mode === "signin";
 

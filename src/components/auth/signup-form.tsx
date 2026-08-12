@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { generateFunkyName } from "@/lib/funky-names";
 import { bustAuthCache } from "@/hooks/use-auth";
+import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const SU_OTP_KEY = "ss_signup_otp";
@@ -109,6 +110,13 @@ export function SignupForm() {
     };
   }, []);
 
+  useEffect(() => {
+    trackVirtualPageView(
+      step === "otp" ? "/signup/otp" : "/signup/details",
+      step === "otp" ? "Account verification" : "Create account",
+    );
+  }, [step]);
+
   // Step 1 — validate referral, then ask Clerk to email a code.
   async function handleDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -170,6 +178,7 @@ export function SignupForm() {
     // Clerk: create the (shadow) user and email the OTP.
     const captured = { email, dob, referralCode, favoriteDrinkId, consent };
     const goToOtp = (via: "signup" | "signin") => {
+      trackAnalyticsEvent("auth_code_requested", { mode: "sign_up" });
       setVerifyVia(via);
       setDetails(captured);
       setStep("otp");
@@ -294,6 +303,7 @@ export function SignupForm() {
         /* ignore */
       }
       bustAuthCache(); // brand-new member — clear any cached null /api/auth/me before the shell loads
+      trackAnalyticsEvent("sign_up", { method: "email_otp" });
       router.push("/onboarding");
       router.refresh();
     } catch (e) {
@@ -319,6 +329,7 @@ export function SignupForm() {
       } else {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
+      trackAnalyticsEvent("auth_code_resent", { mode: "sign_up" });
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
     }

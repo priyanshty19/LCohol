@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
+  description: "How Sip Stories collects, uses, and protects personal and optional analytics data.",
+  alternates: { canonical: "/Privacy-Policy" },
 };
 
 export default function PrivacyPage() {
@@ -9,7 +11,7 @@ export default function PrivacyPage() {
     <div className="prose prose-invert mx-auto max-w-3xl">
       <h1 className="font-display text-2xl font-bold text-primary">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground">
-        Last updated: June 2026
+        Last updated: August 2026
       </p>
 
       <div className="mt-8 space-y-6 text-sm text-foreground/80">
@@ -47,6 +49,13 @@ export default function PrivacyPage() {
             <li>
               <strong>Usage data:</strong> Interactions with the Platform
               (views, searches, clicks) for improving recommendations
+            </li>
+            <li>
+              <strong>Optional analytics data:</strong> If you allow analytics,
+              Google Analytics receives sanitised screen paths, coarse device and
+              browser information, and selected funnel events. We do not send
+              emails, dates of birth, OTPs, usernames, invite codes, search text,
+              posts, or messages to Google Analytics.
             </li>
           </ul>
           <p className="mt-2">
@@ -109,6 +118,10 @@ export default function PrivacyPage() {
               With service providers who assist in operating the Platform
               (under strict data processing agreements)
             </li>
+            <li>
+              With Google Analytics only when you choose to allow optional
+              analytics, for measuring aggregate site and funnel performance
+            </li>
             <li>In anonymized, aggregated form for research or analytics</li>
           </ul>
         </section>
@@ -167,12 +180,24 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="font-display text-lg font-semibold text-foreground">
-            9. Cookies
+            9. Cookies & Optional Analytics
           </h2>
           <p>
-            We use only essential cookies required for authentication and
-            session management. We do not use third-party advertising or
-            tracking cookies.
+            We use essential cookies for authentication, age confirmation,
+            preferences, and session management. With your separate permission,
+            we also use Google Analytics cookies to understand screen usage and
+            signup, login, onboarding, and PWA funnels. Advertising storage,
+            advertising personalisation, and Google Signals remain disabled.
+          </p>
+          <p className="mt-2">
+            You can choose &ldquo;Essential only&rdquo; or &ldquo;Allow
+            analytics&rdquo; in the consent notice and change that decision at any
+            time using the &ldquo;Privacy choices&rdquo; control. Withdrawing
+            analytics consent stops future Analytics events and removes
+            first-party Google Analytics cookies available to this site. Google
+            may process consented analytics data as our service provider under
+            its applicable data-processing terms. We do not use third-party
+            advertising cookies.
           </p>
         </section>
 

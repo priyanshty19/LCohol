@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { THEMES, applyTheme, vibeToTheme } from "@/lib/theme";
+import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 
 const DRINKS = [
   { id: "whisky", label: "Whisky", emoji: "🥃" },
@@ -62,6 +63,18 @@ export function OnboardingQuiz({ username }: { username: string }) {
   const [discovery, setDiscovery] = useState<string | null>(null);
   const [vibe, setVibe] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const hasStartedTracking = useRef(false);
+
+  useEffect(() => {
+    if (!hasStartedTracking.current) {
+      hasStartedTracking.current = true;
+      trackAnalyticsEvent("tutorial_begin");
+    }
+    trackVirtualPageView(
+      step === 0 ? "/onboarding/taste" : "/onboarding/style",
+      step === 0 ? "Onboarding — your taste" : "Onboarding — your style",
+    );
+  }, [step]);
 
   async function persist(body: Record<string, unknown>) {
     setBusy(true);
@@ -71,6 +84,7 @@ export function OnboardingQuiz({ username }: { username: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      trackAnalyticsEvent("tutorial_complete");
       router.push("/");
       router.refresh();
     } catch {
@@ -248,7 +262,13 @@ export function OnboardingQuiz({ username }: { username: string }) {
         ) : (
           <Button
             variant="velvet"
-            onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
+            onClick={() => {
+              trackAnalyticsEvent("onboarding_step_complete", {
+                step_name: "taste",
+                step_number: 1,
+              });
+              setStep((s) => Math.min(STEPS.length - 1, s + 1));
+            }}
             disabled={busy}
           >
             Next <ArrowRight className="ml-1 h-4 w-4" />

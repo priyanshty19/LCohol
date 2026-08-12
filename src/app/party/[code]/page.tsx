@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 import { getPartyByCode } from "@/lib/parties";
 import { getCurrentUser } from "@/lib/auth";
 import { PartyInviteAccept } from "@/components/party/party-invite-accept";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Private party invitation",
+  robots: { index: false, follow: false, noarchive: true },
+};
 
 export default async function PartyInvitePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;

@@ -6,8 +6,12 @@ import { ResponsibleDrinkingBanner } from "@/components/shared/responsible-drink
 import { GeoDisclaimer } from "@/components/shared/geo-disclaimer";
 import { JamesWidget } from "@/components/james/james-widget";
 import { DailyVibe } from "@/components/theme/daily-vibe";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function MainLayout({
   children,
