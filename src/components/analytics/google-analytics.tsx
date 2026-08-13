@@ -45,7 +45,6 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
     : undefined;
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
   const [showChoices, setShowChoices] = useState(false);
-  const [ready, setReady] = useState(false);
   const choicesRef = useRef<HTMLDivElement>(null);
   const focusChoicesRef = useRef(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -111,18 +110,23 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
   }, [validMeasurementId]);
 
   useEffect(() => {
-    if (!ready || consent !== "granted") return;
+    if (!validMeasurementId || consent !== "granted") return;
+    // Queue configuration before the async tag loads, matching Google's
+    // supported snippet. gtag.js consumes this queue when it becomes ready, so
+    // collection does not depend on a script callback after a consent render.
+    configureGoogleAnalytics(validMeasurementId);
     trackPageView(pathname);
-  }, [consent, pathname, ready]);
+  }, [consent, pathname, validMeasurementId]);
 
   useEffect(() => {
-    if (!ready || consent !== "granted") return;
+    if (!validMeasurementId || consent !== "granted") return;
+    configureGoogleAnalytics(validMeasurementId);
 
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     if (standalone) trackAnalyticsEvent("pwa_standalone_launch");
-  }, [consent, ready]);
+  }, [consent, validMeasurementId]);
 
   function choose(next: AnalyticsConsent) {
     setCookie(ANALYTICS_CONSENT_COOKIE, next);
@@ -138,12 +142,6 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
     window.requestAnimationFrame(() => returnFocusRef.current?.focus());
   }
 
-  function onTagReady() {
-    if (!validMeasurementId || consent !== "granted") return;
-    configureGoogleAnalytics(validMeasurementId);
-    setReady(true);
-  }
-
   if (!validMeasurementId) return null;
 
   return (
@@ -153,8 +151,6 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
           id="sipstories-google-analytics"
           src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(validMeasurementId)}`}
           strategy="afterInteractive"
-          onLoad={onTagReady}
-          onReady={onTagReady}
         />
       )}
 

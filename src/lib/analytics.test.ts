@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { safeAnalyticsPageTitle, sanitizeAnalyticsPath } from "./analytics";
+import {
+  configureGoogleAnalytics,
+  safeAnalyticsPageTitle,
+  sanitizeAnalyticsPath,
+} from "./analytics";
 
 test("analytics paths discard query strings and fragments", () => {
   assert.equal(
@@ -25,4 +29,32 @@ test("analytics titles never expose dynamic identifiers", () => {
   assert.equal(safeAnalyticsPageTitle("/profile/FennelRinse"), "Member profile");
   assert.equal(safeAnalyticsPageTitle("/party/SIPSECRET"), "Private party invitation");
   assert.equal(safeAnalyticsPageTitle("/post/ck_private_123"), "Post details");
+});
+
+test("Google Analytics configuration is queued before the async tag is ready", () => {
+  const originalWindow = globalThis.window;
+  const fakeWindow = {
+    location: {
+      origin: "https://staging.mysipstories.com",
+      pathname: "/",
+    },
+  };
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: fakeWindow,
+  });
+
+  try {
+    configureGoogleAnalytics("G-TEST123");
+    const queue = (fakeWindow as typeof fakeWindow & { dataLayer?: unknown[] }).dataLayer;
+    assert.ok(queue);
+    assert.equal(queue.length, 2);
+    assert.deepEqual((queue[1] as unknown[]).slice(0, 2), ["config", "G-TEST123"]);
+  } finally {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  }
 });
