@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import {
   EB_Garamond,
@@ -14,6 +14,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { THEME_COOKIE, isThemeId, type ThemeId } from "@/lib/theme";
 import { isProductionIndexingEnabled, PRODUCTION_SITE_URL } from "@/lib/site";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  interactiveWidget: "resizes-content",
+};
 
 // Resolve the theme on the SERVER so the SSR HTML already carries the right
 // palette — no flash/flip after hydration. Priority: the signed-in user's saved

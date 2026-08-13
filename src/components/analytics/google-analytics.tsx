@@ -1,10 +1,11 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   ANALYTICS_CONSENT_COOKIE,
+  OPEN_ANALYTICS_CHOICES_EVENT,
   configureGoogleAnalytics,
   ensureGoogleTagQueue,
   trackAnalyticsEvent,
@@ -45,6 +46,39 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
   const [showChoices, setShowChoices] = useState(false);
   const [ready, setReady] = useState(false);
+  const choicesRef = useRef<HTMLDivElement>(null);
+  const focusChoicesRef = useRef(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const openChoices = () => {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      focusChoicesRef.current = true;
+      setShowChoices(true);
+    };
+    window.addEventListener(OPEN_ANALYTICS_CHOICES_EVENT, openChoices);
+    return () => window.removeEventListener(OPEN_ANALYTICS_CHOICES_EVENT, openChoices);
+  }, []);
+
+  useEffect(() => {
+    if (!showChoices || !focusChoicesRef.current) return;
+    focusChoicesRef.current = false;
+    const frame = window.requestAnimationFrame(() => choicesRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [showChoices]);
+
+  useEffect(() => {
+    if (!showChoices || consent === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setShowChoices(false);
+      window.requestAnimationFrame(() => returnFocusRef.current?.focus());
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [consent, showChoices]);
 
   useEffect(() => {
     if (!validMeasurementId) return;
@@ -100,6 +134,8 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
       window.__sipAnalyticsPending = [];
       clearGoogleAnalyticsCookies();
     }
+
+    window.requestAnimationFrame(() => returnFocusRef.current?.focus());
   }
 
   function onTagReady() {
@@ -122,16 +158,23 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
         />
       )}
 
-      {showChoices ? (
+      {showChoices && (
         <div
+          ref={choicesRef}
+          tabIndex={-1}
           role="dialog"
           aria-label="Analytics privacy choices"
-          className="fixed inset-x-3 bottom-3 z-[120] mx-auto max-w-2xl rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:p-5"
+          className="fixed inset-x-3 bottom-3 z-[90] mx-auto max-w-2xl rounded-2xl border border-border/70 bg-card/95 p-4 shadow-2xl backdrop-blur-xl sm:p-5"
         >
           <p className="font-display text-base font-semibold text-foreground">Your privacy, your call</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">
             We use optional Google Analytics to understand which screens help people join and use Sip Stories. We never send emails, OTPs, usernames, invite codes, search text, or messages. Advertising tracking stays off.
           </p>
+          {consent !== null && (
+            <p className="mt-2 text-xs font-medium text-foreground/80">
+              Current choice: {consent === "granted" ? "Allow analytics" : "Essential only"}
+            </p>
+          )}
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -149,15 +192,7 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
             </button>
           </div>
         </div>
-      ) : consent !== null ? (
-        <button
-          type="button"
-          onClick={() => setShowChoices(true)}
-          className="fixed bottom-2 left-2 z-[45] rounded-full border border-border/60 bg-card/80 px-3 py-1.5 text-[10px] font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground"
-        >
-          Privacy choices
-        </button>
-      ) : null}
+      )}
     </>
   );
 }

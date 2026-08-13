@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { NotificationToggle } from "@/components/settings/notification-toggle";
+import { PrivacyChoicesButton } from "@/components/settings/privacy-choices-button";
 import { DeleteAccount } from "@/components/settings/delete-account";
 import { getSavedProfileLocation } from "@/lib/client-location";
 
@@ -284,6 +285,7 @@ export function SettingsView() {
             <Link href="/Privacy-Policy" className="py-2 text-sm text-foreground/90 hover:text-primary">
               Privacy Policy
             </Link>
+            <PrivacyChoicesButton className="py-2" />
           </div>
         </CardContent>
       </Card>

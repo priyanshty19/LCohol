@@ -1,6 +1,7 @@
 import { getCookie } from "@/lib/client-cookies";
 
 export const ANALYTICS_CONSENT_COOKIE = "sip_analytics_consent";
+export const OPEN_ANALYTICS_CHOICES_EVENT = "sipstories:open-analytics-choices";
 
 export type AnalyticsConsent = "granted" | "denied";
 export type AnalyticsValue = string | number | boolean;

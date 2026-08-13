@@ -87,8 +87,20 @@ export function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: addr }),
       });
-      const { exists } = await checkRes.json();
-      if (!exists) {
+      const check = (await checkRes.json().catch(() => ({}))) as {
+        exists?: boolean;
+        error?: string;
+      };
+      if (!checkRes.ok) {
+        setError(
+          checkRes.status === 429
+            ? (check.error ?? "Too many attempts. Please wait a minute.")
+            : "We couldn't verify your account right now. Please try again.",
+        );
+        setLoading(false);
+        return;
+      }
+      if (!check.exists) {
         setError("No account for this email yet — please sign up.");
         setLoading(false);
         return;

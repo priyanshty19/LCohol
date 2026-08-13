@@ -77,6 +77,9 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   const [chips, setChips] = useState<string[]>(DEFAULT_CHIPS);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -119,6 +122,27 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
       behavior: "smooth",
     });
   }, [messages, open]);
+
+  useEffect(() => {
+    if (open) {
+      wasOpenRef.current = true;
+      const frame = window.requestAnimationFrame(() => closeRef.current?.focus());
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") setOpen(false);
+      };
+      window.addEventListener("keydown", onKeyDown);
+      return () => {
+        window.cancelAnimationFrame(frame);
+        window.removeEventListener("keydown", onKeyDown);
+      };
+    }
+
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      const frame = window.requestAnimationFrame(() => launcherRef.current?.focus());
+      return () => window.cancelAnimationFrame(frame);
+    }
+  }, [open]);
 
   // Clear a pending navigate timer on unmount (e.g. logout leaves the layout).
   useEffect(() => () => { if (navTimer.current) clearTimeout(navTimer.current); }, []);
@@ -182,19 +206,14 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
 
   return (
     <>
-      {launcherOn && (
+      {launcherOn && !open && (
         <button
+          ref={launcherRef}
           onClick={() => setOpen((v) => !v)}
           aria-label="Ask James, your bartender"
           className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[1200] h-16 w-16 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
         >
-          {open ? (
-            <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
-              <X className="h-6 w-6" />
-            </span>
-          ) : (
-            <JamesAvatar className="h-full w-full" />
-          )}
+          <JamesAvatar className="h-full w-full" />
         </button>
       )}
 
@@ -206,14 +225,20 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
           <button
             type="button"
             aria-label="Close James"
+            tabIndex={-1}
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-[1190] transform-gpu bg-black/60"
           />
-          <div className="fixed right-4 bottom-40 z-[1200] flex h-[60vh] max-h-[560px] w-[min(92vw,400px)] transform-gpu flex-col overflow-hidden rounded-2xl border border-[var(--ml-brass)]/30 bg-popover shadow-2xl md:bottom-24">
-          <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="james-dialog-title"
+            className="fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[1200] flex h-[min(60dvh,560px)] max-h-[calc(100dvh_-_6rem_-_env(safe-area-inset-bottom))] w-[min(92vw,400px)] transform-gpu flex-col overflow-hidden rounded-2xl border border-[var(--ml-brass)]/30 bg-popover shadow-2xl md:bottom-24"
+          >
+          <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3">
             <JamesAvatar className="h-10 w-10 shrink-0 rounded-full" />
             <div className="flex-1">
-              <div className="font-display text-base font-semibold text-[var(--ml-velvet-hover)]">
+              <div id="james-dialog-title" className="font-display text-base font-semibold text-[var(--ml-velvet-hover)]">
                 James
               </div>
               <div className="text-[11px] text-muted-foreground">
@@ -221,16 +246,17 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
               </div>
             </div>
             <button
+              ref={closeRef}
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close"
-              className="rounded-full p-1.5 text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overscroll-contain overflow-y-auto px-4 py-3">
             {messages.map((m, i) => (
               <motion.div
                 key={i}
@@ -282,9 +308,10 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
               e.preventDefault();
               send(input);
             }}
-            className="flex items-center gap-2 border-t border-white/10 p-3"
+            className="flex shrink-0 items-center gap-2 border-t border-white/10 p-3"
           >
             <input
+              aria-label="Ask James"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask James…"
@@ -294,7 +321,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
               type="submit"
               disabled={busy}
               aria-label="Send"
-              className="btn-velvet flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
+              className="btn-velvet flex h-11 w-11 shrink-0 items-center justify-center rounded-full disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
             </button>

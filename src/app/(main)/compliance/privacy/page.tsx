@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PrivacyChoicesButton } from "@/components/settings/privacy-choices-button";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -199,6 +200,7 @@ export default function PrivacyPage() {
             its applicable data-processing terms. We do not use third-party
             advertising cookies.
           </p>
+          <PrivacyChoicesButton className="mt-3 rounded-full border border-border px-4 py-2" />
         </section>
 
         <section>
