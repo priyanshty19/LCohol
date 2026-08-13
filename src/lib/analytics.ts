@@ -119,8 +119,11 @@ export function hasAnalyticsConsent(): boolean {
 export function ensureGoogleTagQueue() {
   if (typeof window === "undefined") return;
   window.dataLayer ??= [];
-  window.gtag ??= (...args: unknown[]) => {
-    window.dataLayer?.push(args);
+  window.gtag ??= function gtag() {
+    // Google documents the command queue as an `arguments` object. Its tag
+    // runtime does not reliably process ordinary arrays as gtag commands.
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer?.push(arguments);
   };
 }
 

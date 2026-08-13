@@ -50,7 +50,11 @@ test("Google Analytics configuration is queued before the async tag is ready", (
     const queue = (fakeWindow as typeof fakeWindow & { dataLayer?: unknown[] }).dataLayer;
     assert.ok(queue);
     assert.equal(queue.length, 2);
-    assert.deepEqual((queue[1] as unknown[]).slice(0, 2), ["config", "G-TEST123"]);
+    assert.equal(Array.isArray(queue[1]), false);
+    assert.deepEqual(Array.from(queue[1] as ArrayLike<unknown>).slice(0, 2), [
+      "config",
+      "G-TEST123",
+    ]);
   } finally {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
