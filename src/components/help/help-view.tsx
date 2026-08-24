@@ -84,6 +84,19 @@ export function HelpView() {
   const rideFallback = maps("cab or taxi", coords);
 
   function getHomeSafe() {
+    // The native iOS shell intercepts this private navigation and presents a
+    // real UIKit action sheet containing the ride/map apps installed on the
+    // device. A web page cannot enumerate arbitrary installed iOS apps.
+    if (/SipStoriesIOS/i.test(navigator.userAgent)) {
+      const nativeRidePicker = new URL("sipstories://get-home-safe");
+      if (coords) {
+        nativeRidePicker.searchParams.set("lat", String(coords.lat));
+        nativeRidePicker.searchParams.set("lng", String(coords.lng));
+      }
+      window.location.assign(nativeRidePicker.toString());
+      return;
+    }
+
     const q = encodeURIComponent("cab taxi ride near me");
     const geo = coords ? `geo:${coords.lat},${coords.lng}?q=${q}` : `geo:0,0?q=${q}`;
     window.location.href = geo;

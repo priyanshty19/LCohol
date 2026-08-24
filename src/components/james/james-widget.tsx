@@ -38,6 +38,13 @@ const MD_COMPONENTS = {
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+type VisualViewportFrame = {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+};
+
 // Conversation starters + greeting shift with the active vibe/theme.
 const CHIPS_BY_THEME: Record<string, string[]> = {
   light: ["Surprise me", "Something refreshing", "Teach me a drinking game", "I need help"],
@@ -77,6 +84,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   const [chips, setChips] = useState<string[]>(DEFAULT_CHIPS);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [keyboardFrame, setKeyboardFrame] = useState<VisualViewportFrame | null>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
@@ -142,6 +150,50 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
       const frame = window.requestAnimationFrame(() => launcherRef.current?.focus());
       return () => window.cancelAnimationFrame(frame);
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !window.visualViewport) return;
+
+    const viewport = window.visualViewport;
+    const updateFrame = () => {
+      // Safari/WKWebView keeps fixed elements tied to the larger layout
+      // viewport while its keyboard shrinks the visual viewport. Anchor James
+      // to the visual viewport only while that keyboard is actually present.
+      const occludedHeight = window.innerHeight - (viewport.height + viewport.offsetTop);
+      if (occludedHeight < 120) {
+        setKeyboardFrame((current) => current ? null : current);
+        return;
+      }
+
+      const gutter = 12;
+      const availableWidth = Math.max(0, viewport.width - gutter * 2);
+      const width = Math.min(400, availableWidth);
+      const nextFrame = {
+        height: Math.max(0, viewport.height - gutter * 2),
+        left: viewport.offsetLeft + Math.max(gutter, (viewport.width - width) / 2),
+        top: viewport.offsetTop + gutter,
+        width,
+      };
+      setKeyboardFrame((current) =>
+        current
+        && current.height === nextFrame.height
+        && current.left === nextFrame.left
+        && current.top === nextFrame.top
+        && current.width === nextFrame.width
+          ? current
+          : nextFrame
+      );
+    };
+
+    const initialFrame = window.requestAnimationFrame(updateFrame);
+    viewport.addEventListener("resize", updateFrame);
+    viewport.addEventListener("scroll", updateFrame, { passive: true });
+    return () => {
+      window.cancelAnimationFrame(initialFrame);
+      viewport.removeEventListener("resize", updateFrame);
+      viewport.removeEventListener("scroll", updateFrame);
+    };
   }, [open]);
 
   // Clear a pending navigate timer on unmount (e.g. logout leaves the layout).
@@ -233,9 +285,13 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
             role="dialog"
             aria-modal="true"
             aria-labelledby="james-dialog-title"
-            className="fixed right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[1200] flex h-[min(60dvh,560px)] max-h-[calc(100dvh_-_6rem_-_env(safe-area-inset-bottom))] w-[min(92vw,400px)] transform-gpu flex-col overflow-hidden rounded-2xl border border-[var(--ml-brass)]/30 bg-popover shadow-2xl md:bottom-24"
+            style={keyboardFrame ?? undefined}
+            className={cn(
+              "fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[1200] ml-auto flex h-[min(60dvh,560px)] max-h-[calc(100dvh_-_6rem_-_env(safe-area-inset-bottom))] max-w-[400px] transform-gpu flex-col overflow-hidden rounded-2xl border border-[var(--ml-brass)]/30 bg-popover shadow-2xl md:right-4 md:left-auto md:bottom-24 md:w-[400px]",
+              keyboardFrame && "bottom-auto max-h-none",
+            )}
           >
-          <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3">
+          <div className="flex min-w-0 shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3">
             <JamesAvatar className="h-10 w-10 shrink-0 rounded-full" />
             <div className="flex-1">
               <div id="james-dialog-title" className="font-display text-base font-semibold text-[var(--ml-velvet-hover)]">
@@ -267,7 +323,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
               >
                 <div
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                    "max-w-[85%] overflow-hidden break-words rounded-2xl px-3 py-2 text-sm leading-relaxed",
                     m.role === "user"
                       ? "bg-primary text-primary-foreground"
                       : "glass-panel-subtle font-display text-[15px] italic text-foreground"
@@ -308,14 +364,14 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
               e.preventDefault();
               send(input);
             }}
-            className="flex shrink-0 items-center gap-2 border-t border-white/10 p-3"
+            className="flex min-w-0 shrink-0 items-center gap-2 border-t border-white/10 p-3"
           >
             <input
               aria-label="Ask James"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask James…"
-              className="h-9 flex-1 rounded-full border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring"
+              className="h-11 min-w-0 flex-1 rounded-full border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring"
             />
             <button
               type="submit"

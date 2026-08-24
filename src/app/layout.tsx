@@ -16,6 +16,7 @@ import { isProductionIndexingEnabled, PRODUCTION_SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 export const viewport: Viewport = {
+  viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };
 
