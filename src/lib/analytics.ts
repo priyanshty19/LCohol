@@ -1,8 +1,8 @@
 import { getCookie } from "@/lib/client-cookies";
+export type { AnalyticsConsent } from "@/lib/analytics-consent";
 
 export const ANALYTICS_CONSENT_COOKIE = "sip_analytics_consent";
 
-export type AnalyticsConsent = "granted" | "denied";
 export type AnalyticsValue = string | number | boolean;
 export type AnalyticsParams = Record<string, AnalyticsValue | undefined>;
 

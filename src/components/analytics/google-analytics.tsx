@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   ANALYTICS_CONSENT_COOKIE,
@@ -9,8 +9,13 @@ import {
   ensureGoogleTagQueue,
   trackAnalyticsEvent,
   trackPageView,
-  type AnalyticsConsent,
 } from "@/lib/analytics";
+import {
+  ANALYTICS_CONSENT_EVENT,
+  normalizeAnalyticsConsent,
+  resolveInitialAnalyticsConsent,
+  type AnalyticsConsent,
+} from "@/lib/analytics-consent";
 import { getCookie, setCookie } from "@/lib/client-cookies";
 
 function updateGoogleConsent(consent: AnalyticsConsent) {
@@ -45,6 +50,10 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
   const [showChoices, setShowChoices] = useState(false);
   const [ready, setReady] = useState(false);
+  const [accountBacked, setAccountBacked] = useState(false);
+  const [savingChoice, setSavingChoice] = useState(false);
+  const [choiceError, setChoiceError] = useState<string | null>(null);
+  const checkedAccount = useRef(false);
 
   useEffect(() => {
     if (!validMeasurementId) return;
@@ -59,22 +68,80 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
     });
     window.gtag?.("set", "ads_data_redaction", true);
 
-    let active = true;
-    queueMicrotask(() => {
-      if (!active) return;
-      const saved = getCookie(ANALYTICS_CONSENT_COOKIE);
-      if (saved === "granted" || saved === "denied") {
-        setConsent(saved);
-        updateGoogleConsent(saved);
-      } else {
-        setShowChoices(true);
-      }
-    });
+  }, [validMeasurementId]);
 
+  // The account is the source of truth once signed in. Until a session exists,
+  // retain the cookie-only fallback; after login, migrate that existing choice
+  // into the account so established users are not asked again.
+  useEffect(() => {
+    if (!validMeasurementId || checkedAccount.current) return;
+    let active = true;
+
+    async function loadPreference() {
+      const cookieConsent = normalizeAnalyticsConsent(getCookie(ANALYTICS_CONSENT_COOKIE));
+      let accountConsent: AnalyticsConsent | null = null;
+      let authenticated = false;
+
+      try {
+        const response = await fetch("/api/privacy/analytics", { cache: "no-store" });
+        const payload = await response.json();
+        authenticated = payload.authenticated === true;
+        accountConsent = normalizeAnalyticsConsent(payload.data?.consent);
+      } catch {
+        // A temporary API failure must never opt the visitor into analytics.
+      }
+
+      const initial = resolveInitialAnalyticsConsent(accountConsent, cookieConsent, authenticated);
+      if (initial.shouldPersistCookieToAccount && initial.consent) {
+        try {
+          const migrated = await fetch("/api/privacy/analytics", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ consent: initial.consent }),
+          });
+          if (migrated.ok) checkedAccount.current = true;
+        } catch {
+          // Retry the one-time migration on the next navigation.
+        }
+      } else if (authenticated) {
+        checkedAccount.current = true;
+      }
+
+      if (!active) return;
+      setAccountBacked(authenticated);
+      setConsent(initial.consent);
+      setShowChoices(initial.shouldPrompt);
+      if (initial.consent) {
+        setCookie(ANALYTICS_CONSENT_COOKIE, initial.consent);
+        updateGoogleConsent(initial.consent);
+        if (initial.consent === "denied") clearGoogleAnalyticsCookies();
+      }
+    }
+
+    void loadPreference();
     return () => {
       active = false;
     };
-  }, [validMeasurementId]);
+  }, [pathname, validMeasurementId]);
+
+  useEffect(() => {
+    function receiveSettingsChoice(event: Event) {
+      const next = normalizeAnalyticsConsent((event as CustomEvent).detail);
+      if (!next) return;
+      setConsent(next);
+      setShowChoices(false);
+      setChoiceError(null);
+      updateGoogleConsent(next);
+      if (next === "denied") {
+        setReady(false);
+        window.__sipAnalyticsPending = [];
+        clearGoogleAnalyticsCookies();
+      }
+    }
+
+    window.addEventListener(ANALYTICS_CONSENT_EVENT, receiveSettingsChoice);
+    return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, receiveSettingsChoice);
+  }, []);
 
   useEffect(() => {
     if (!ready || consent !== "granted") return;
@@ -90,7 +157,27 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
     if (standalone) trackAnalyticsEvent("pwa_standalone_launch");
   }, [consent, ready]);
 
-  function choose(next: AnalyticsConsent) {
+  async function choose(next: AnalyticsConsent) {
+    if (savingChoice) return;
+    setSavingChoice(true);
+    setChoiceError(null);
+
+    if (accountBacked) {
+      try {
+        const response = await fetch("/api/privacy/analytics", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ consent: next }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error ?? "Couldn't save your privacy choice.");
+      } catch (error) {
+        setChoiceError(error instanceof Error ? error.message : "Couldn't save your privacy choice.");
+        setSavingChoice(false);
+        return;
+      }
+    }
+
     setCookie(ANALYTICS_CONSENT_COOKIE, next);
     setConsent(next);
     setShowChoices(false);
@@ -100,6 +187,7 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
       window.__sipAnalyticsPending = [];
       clearGoogleAnalyticsCookies();
     }
+    setSavingChoice(false);
   }
 
   function onTagReady() {
@@ -135,28 +223,23 @@ export function GoogleAnalytics({ measurementId }: { measurementId?: string }) {
           <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={() => choose("denied")}
+              disabled={savingChoice}
+              onClick={() => void choose("denied")}
               className="rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50"
             >
               Essential only
             </button>
             <button
               type="button"
-              onClick={() => choose("granted")}
+              disabled={savingChoice}
+              onClick={() => void choose("granted")}
               className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Allow analytics
             </button>
           </div>
+          {choiceError && <p className="mt-2 text-xs text-destructive">{choiceError}</p>}
         </div>
-      ) : consent !== null ? (
-        <button
-          type="button"
-          onClick={() => setShowChoices(true)}
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 z-[45] rounded-full border border-border/60 bg-card/90 px-3 py-1.5 text-[10px] font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground md:bottom-2"
-        >
-          Privacy choices
-        </button>
       ) : null}
     </>
   );

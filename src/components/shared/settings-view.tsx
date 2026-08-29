@@ -18,6 +18,7 @@ import {
 import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 import { NotificationToggle } from "@/components/settings/notification-toggle";
 import { DeleteAccount } from "@/components/settings/delete-account";
+import { AnalyticsPrivacySetting } from "@/components/settings/analytics-privacy-setting";
 import { getSavedProfileLocation } from "@/lib/client-location";
 
 const DRINKING_STYLES = [
@@ -231,6 +232,15 @@ export function SettingsView() {
               <span className="text-sm text-[var(--ml-sober)]">Changes saved!</span>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card variant="glass">
+        <CardContent className="space-y-4 pt-6">
+          <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Privacy
+          </h2>
+          <AnalyticsPrivacySetting />
         </CardContent>
       </Card>
 

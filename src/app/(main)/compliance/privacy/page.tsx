@@ -191,8 +191,8 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-2">
             You can choose &ldquo;Essential only&rdquo; or &ldquo;Allow
-            analytics&rdquo; in the consent notice and change that decision at any
-            time using the &ldquo;Privacy choices&rdquo; control. Withdrawing
+            analytics&rdquo; in the one-time consent notice and change that decision at any
+            time under Privacy in Settings. Withdrawing
             analytics consent stops future Analytics events and removes
             first-party Google Analytics cookies available to this site. Google
             may process consented analytics data as our service provider under
