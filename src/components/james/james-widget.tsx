@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Send, X } from "lucide-react";
 import { motion } from "motion/react";
@@ -9,6 +9,11 @@ import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { applyTheme, getActiveTheme, isThemeId } from "@/lib/theme";
 import type { JamesAction } from "@/lib/james/actions";
+import {
+  clampJamesPosition,
+  JAMES_LAUNCHER_SIZE,
+  type JamesPosition,
+} from "@/lib/james-position";
 import { JamesAvatar } from "./james-avatar";
 
 type AgentResponse = { reply: string; actions: JamesAction[]; error?: string };
@@ -67,6 +72,15 @@ function greetingFor(theme: string): Msg {
   return { role: "assistant", content: GREETING_BY_THEME[theme] ?? GREETING_BY_THEME.light };
 }
 
+function fitLauncher(position: JamesPosition) {
+  return clampJamesPosition(
+    position,
+    window.innerWidth,
+    window.innerHeight,
+    JAMES_LAUNCHER_SIZE,
+  );
+}
+
 export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean }) {
   const router = useRouter();
   const launcherOn = showLauncher;
@@ -77,8 +91,101 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   const [chips, setChips] = useState<string[]>(DEFAULT_CHIPS);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [launcherPosition, setLauncherPosition] = useState<JamesPosition | null>(null);
+  const [draggingLauncher, setDraggingLauncher] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressLauncherClick = useRef(false);
+  const launcherDrag = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origin: JamesPosition;
+    moved: boolean;
+  } | null>(null);
+
+  function saveLauncherPosition(position: JamesPosition) {
+    const next = fitLauncher(position);
+    setLauncherPosition(next);
+  }
+
+  useEffect(() => {
+    function moveLauncher(event: globalThis.PointerEvent) {
+      const drag = launcherDrag.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - drag.startX;
+      const deltaY = event.clientY - drag.startY;
+      if (!drag.moved && Math.hypot(deltaX, deltaY) < 6) return;
+
+      drag.moved = true;
+      suppressLauncherClick.current = true;
+      setDraggingLauncher(true);
+      setLauncherPosition(fitLauncher({ x: drag.origin.x + deltaX, y: drag.origin.y + deltaY }));
+    }
+
+    function finishLauncherDrag(event: globalThis.PointerEvent) {
+      const drag = launcherDrag.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.moved) {
+        const next = fitLauncher({
+          x: drag.origin.x + event.clientX - drag.startX,
+          y: drag.origin.y + event.clientY - drag.startY,
+        });
+        setLauncherPosition(next);
+      }
+      launcherDrag.current = null;
+      setDraggingLauncher(false);
+    }
+
+    function keepLauncherVisible() {
+      setLauncherPosition((current) => {
+        if (!current) return null;
+        return fitLauncher(current);
+      });
+    }
+
+    window.addEventListener("resize", keepLauncherVisible);
+    window.addEventListener("pointermove", moveLauncher);
+    window.addEventListener("pointerup", finishLauncherDrag);
+    window.addEventListener("pointercancel", finishLauncherDrag);
+    return () => {
+      window.removeEventListener("resize", keepLauncherVisible);
+      window.removeEventListener("pointermove", moveLauncher);
+      window.removeEventListener("pointerup", finishLauncherDrag);
+      window.removeEventListener("pointercancel", finishLauncherDrag);
+    };
+  }, []);
+
+  function startLauncherDrag(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    launcherDrag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      origin: { x: rect.left, y: rect.top },
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveLauncherWithKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
+    const offsets: Record<string, JamesPosition> = {
+      ArrowLeft: { x: -16, y: 0 },
+      ArrowRight: { x: 16, y: 0 },
+      ArrowUp: { x: 0, y: -16 },
+      ArrowDown: { x: 0, y: 16 },
+    };
+    const offset = offsets[event.key];
+    if (!offset) return;
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const multiplier = event.shiftKey ? 2 : 1;
+    saveLauncherPosition({
+      x: rect.left + offset.x * multiplier,
+      y: rect.top + offset.y * multiplier,
+    });
+  }
 
   // James's "hands" on the floating widget: same agentic actions as the feed
   // composer, so "ask James, James takes you there" works on every screen.
@@ -183,19 +290,38 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
   return (
     <>
       {launcherOn && (
-        <button
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Ask James, your bartender"
-          className="glow-velvet fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[1200] h-16 w-16 overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95 md:bottom-6"
-        >
-          {open ? (
-            <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
-              <X className="h-6 w-6" />
-            </span>
-          ) : (
-            <JamesAvatar className="h-full w-full" />
-          )}
-        </button>
+        <>
+          <button
+            onClick={() => {
+              if (suppressLauncherClick.current) {
+                suppressLauncherClick.current = false;
+                return;
+              }
+              setOpen((v) => !v);
+            }}
+            onPointerDown={startLauncherDrag}
+            onKeyDown={moveLauncherWithKeyboard}
+            aria-label="Ask James, your bartender"
+            aria-describedby="james-launcher-hint"
+            style={launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : undefined}
+            className={cn(
+              "glow-velvet fixed z-[1200] h-16 w-16 touch-none select-none overflow-hidden rounded-full border border-[var(--ml-velvet-bright)]/50 transition-transform active:scale-95",
+              launcherPosition ? "" : "right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-6",
+              draggingLauncher ? "cursor-grabbing" : "cursor-grab",
+            )}
+          >
+            {open ? (
+              <span className="btn-velvet flex h-full w-full items-center justify-center text-[#fbefe3]">
+                <X className="h-6 w-6" />
+              </span>
+            ) : (
+              <JamesAvatar className="h-full w-full" />
+            )}
+          </button>
+          <span id="james-launcher-hint" className="sr-only">
+            Drag James to move him. Use the arrow keys to reposition him, or press to open chat.
+          </span>
+        </>
       )}
 
       {launcherOn && open && (
