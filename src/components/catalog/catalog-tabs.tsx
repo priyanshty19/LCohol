@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// Bars and Cocktails are one module, two views: a bar is the *set* (a venue), the
-// cocktails it pours are the *subset*. This segmented control sits atop both pages
-// so they read as a single "where to go / what to order" experience.
+// Bars, Cocktails, and My Drinks are one discovery module: where to go, what to
+// order, and what the signed-in user has made themselves.
 //
 // Server component: which tab is active is fully knowable from the page that
 // renders it, so it takes an `active` prop instead of subscribing to the router
@@ -11,15 +10,24 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/bars", label: "Bars", emoji: "🍻" },
   { href: "/cocktails", label: "Cocktails", emoji: "🍸" },
+  { href: "/cocktails/mine", label: "My Drinks", emoji: "🥂" },
 ] as const;
 
-export function CatalogTabs({ active }: { active: "/bars" | "/cocktails" }) {
+type CatalogTab = (typeof TABS)[number]["href"];
+
+const DESCRIPTIONS: Record<CatalogTab, string> = {
+  "/bars": "Find the right place, then see what to order when you get there.",
+  "/cocktails": "Explore cocktails from the community and India's best bars.",
+  "/cocktails/mine": "Your saved Mix Lab creations, all together and easy to find.",
+};
+
+export function CatalogTabs({ active }: { active: CatalogTab }) {
   return (
     <div className="flex flex-col gap-1">
       <div
         role="tablist"
-        aria-label="Bars and cocktails"
-        className="inline-flex w-fit gap-1 rounded-full border border-border/50 bg-muted/20 p-1"
+        aria-label="Drink discovery"
+        className="inline-flex max-w-full gap-1 overflow-x-auto rounded-full border border-border/50 bg-muted/20 p-1"
       >
         {TABS.map((t) => {
           const on = active === t.href;
@@ -30,7 +38,7 @@ export function CatalogTabs({ active }: { active: "/bars" | "/cocktails" }) {
               role="tab"
               aria-selected={on}
               className={cn(
-                "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors sm:px-4",
                 on
                   ? "bg-primary text-primary-foreground shadow"
                   : "text-muted-foreground hover:text-foreground"
@@ -43,7 +51,7 @@ export function CatalogTabs({ active }: { active: "/bars" | "/cocktails" }) {
         })}
       </div>
       <p className="pl-1 text-xs text-muted-foreground">
-        Bars serve the cocktails — hop between where to go and what to order.
+        {DESCRIPTIONS[active]}
       </p>
     </div>
   );

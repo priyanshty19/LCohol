@@ -66,6 +66,7 @@ export async function POST(request: Request) {
         startsAt: body.startsAt ? new Date(body.startsAt) : null,
         barId,
         locationText,
+        visibility: body.visibility === "PUBLIC" ? "PUBLIC" : "CIRCLE",
       },
       select: { id: true },
     });

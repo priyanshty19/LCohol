@@ -38,6 +38,7 @@ export function PartyDetail({ party, isHost, myRsvp, meId }: { party: Party; isH
   const when = party.startsAt ?? party.eventDate;
   const venue = party.bar ? `${party.bar.name}, ${party.bar.city}` : party.locationText ?? "Venue TBA";
   const going = invites.filter((i: Party) => i.rsvp === "GOING");
+  const canContribute = isHost || (rsvp != null && rsvp !== "DECLINED");
 
   async function setMyRsvp(status: string) {
     setRsvp(status);
@@ -135,7 +136,7 @@ export function PartyDetail({ party, isHost, myRsvp, meId }: { party: Party; isH
       )}
 
       {/* Member suggestions — drinks & games (any member can contribute) */}
-      {party.status !== "CANCELLED" && (
+      {party.status !== "CANCELLED" && canContribute && (
         <>
           <PartyDrinks
             partyId={party.id}

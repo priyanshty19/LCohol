@@ -1,10 +1,30 @@
 import { SipStoriesMark } from "@/components/brand/logo";
 import { SignupForm } from "@/components/auth/signup-form";
+import { safeReturnTo } from "@/lib/safe-return-to";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Sign Up" };
+export const metadata: Metadata = {
+  title: "Create an account",
+  alternates: { canonical: "/" },
+  robots: { index: false, follow: true },
+};
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    ref?: string | string[];
+    returnTo?: string | string[];
+  }>;
+}) {
+  const params = await searchParams;
+  const rawReferral = Array.isArray(params.ref) ? params.ref[0] : params.ref;
+  const referralCode = rawReferral?.trim().toUpperCase().match(/^SIP[A-Z2-9]{4,12}$/)?.[0];
+  const returnTo = safeReturnTo(
+    params.returnTo,
+    referralCode ? `/party/${referralCode}` : "/",
+  );
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
@@ -24,7 +44,7 @@ export default function SignupPage() {
           </p>
         </div>
         <div style={{ filter: "drop-shadow(0 24px 56px rgba(0,0,0,0.20))" }}>
-          <SignupForm />
+          <SignupForm initialReferralCode={referralCode} returnTo={returnTo} />
         </div>
         <p className="text-center text-xs text-muted-foreground">
           This platform is for adults of legal drinking age only.

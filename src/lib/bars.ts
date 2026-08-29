@@ -49,3 +49,62 @@ export async function getBars(opts: BarsQuery = {}) {
   // prop boundary (RSC rejects Prisma.Decimal class instances).
   return bars.map((b) => ({ ...b, rating: b.rating == null ? null : Number(b.rating) }));
 }
+
+/**
+ * Full venue record for the authenticated bar-detail page. Keep this projection
+ * deliberately serializable because it crosses the Server Component boundary.
+ */
+export async function getBarBySlug(slug: string) {
+  const bar = await prisma.bar.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      type: true,
+      city: true,
+      state: true,
+      address: true,
+      lat: true,
+      lng: true,
+      priceRange: true,
+      rating: true,
+      bestsellers: true,
+      description: true,
+      isVerified: true,
+      reviews: {
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          rating: true,
+          body: true,
+          createdAt: true,
+          author: {
+            select: {
+              profile: { select: { username: true, displayName: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!bar) return null;
+
+  const communityRating = bar.reviews.length
+    ? bar.reviews.reduce((sum, review) => sum + review.rating, 0) / bar.reviews.length
+    : null;
+
+  return {
+    ...bar,
+    rating: bar.rating == null ? null : Number(bar.rating),
+    communityRating,
+    reviews: bar.reviews.map((review) => ({
+      ...review,
+      createdAt: review.createdAt.toISOString(),
+    })),
+  };
+}
+
+export type BarDetailData = NonNullable<Awaited<ReturnType<typeof getBarBySlug>>>;

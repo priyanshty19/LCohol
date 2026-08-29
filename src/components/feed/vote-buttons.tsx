@@ -23,18 +23,13 @@ export function VoteButtons({
   });
   const { score, vote: userVote } = state;
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleVote(value: 1 | -1) {
     if (pending) return;
     setPending(true);
+    setError(null);
     bustFeedCache(); // a cached first page now holds a stale score/vote for this post
-
-    // Optimistic update first; the server response below is authoritative.
-    setState((prev) => {
-      if (prev.vote === value) return { score: prev.score - value, vote: null }; // toggle off
-      if (prev.vote) return { score: prev.score + value * 2, vote: value }; // flip up<->down
-      return { score: prev.score + value, vote: value }; // first vote
-    });
 
     try {
       const res = await fetch(`/api/posts/${postId}/vote`, {
@@ -47,11 +42,11 @@ export function VoteButtons({
         | null;
       if (typeof data?.data?.score === "number") {
         setState({ score: data.data.score, vote: data.data.vote ?? null });
-      } else if (!res.ok) {
-        setState({ score: initialScore, vote: initialVote ?? null });
+      } else {
+        setError("Vote was not saved. Please try again.");
       }
     } catch {
-      setState({ score: initialScore, vote: initialVote ?? null });
+      setError("Vote was not saved. Please try again.");
     } finally {
       setPending(false);
     }
@@ -79,14 +74,13 @@ export function VoteButtons({
           <path d="M12 4l-8 8h5v8h6v-8h5z" />
         </svg>
       </button>
-      {/* key={score} remounts on change → a quick pop draws the eye to the update */}
       <span
-        key={score}
         className={cn(
-          "text-sm font-medium tabular-nums duration-200 animate-in zoom-in-75",
+          "text-sm font-medium tabular-nums",
           userVote === 1 && "text-primary",
           userVote === -1 && "text-destructive"
         )}
+        aria-live="polite"
       >
         {score}
       </span>
@@ -110,6 +104,7 @@ export function VoteButtons({
           <path d="M12 20l8-8h-5V4H9v8H4z" />
         </svg>
       </button>
+      {error && <span className="sr-only" role="status">{error}</span>}
     </div>
   );
 }

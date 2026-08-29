@@ -1,17 +1,37 @@
 import type { MetadataRoute } from "next";
+import { isProductionIndexingEnabled, PRODUCTION_SITE_URL } from "@/lib/site";
 
-const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://sipstories-phi.vercel.app";
-
-// Most of the app is auth-gated (crawlers just get redirected to /login), so we
-// only invite indexing of the public marketing/legal surface and explicitly keep
-// bots out of the API and private/admin areas.
 export default function robots(): MetadataRoute.Robots {
+  if (!isProductionIndexingEnabled()) {
+    return {
+      rules: { userAgent: "*", disallow: "/" },
+    };
+  }
+
   return {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/api/", "/admin", "/moderation", "/settings", "/profile"],
+      disallow: [
+        "/api/",
+        "/admin",
+        "/moderation",
+        "/settings",
+        "/profile",
+        "/onboarding",
+        "/party/",
+        "/parties",
+        "/post/",
+        "/create",
+        "/search",
+        "/circle",
+        "/login",
+        "/signup",
+        "/verify-age",
+        "/denied",
+      ],
     },
-    sitemap: `${BASE}/sitemap.xml`,
+    sitemap: `${PRODUCTION_SITE_URL}/sitemap.xml`,
+    host: PRODUCTION_SITE_URL,
   };
 }

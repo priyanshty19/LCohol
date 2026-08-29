@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { generateFunkyName } from "@/lib/funky-names";
 import { bustAuthCache } from "@/hooks/use-auth";
+import { safeReturnTo } from "@/lib/safe-return-to";
+import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const SU_OTP_KEY = "ss_signup_otp";
@@ -44,8 +46,21 @@ async function resolveDrinkId(choice: string): Promise<string> {
   }
 }
 
-export function SignupForm() {
+export function SignupForm({
+  initialReferralCode = "",
+  returnTo = "/",
+}: {
+  initialReferralCode?: string;
+  returnTo?: string;
+}) {
   const router = useRouter();
+  const destination = safeReturnTo(
+    returnTo,
+    initialReferralCode ? `/party/${initialReferralCode}` : "/",
+  );
+  const loginParams = new URLSearchParams({ returnTo: destination });
+  if (initialReferralCode) loginParams.set("ref", initialReferralCode);
+  const loginHref = `/login?${loginParams.toString()}`;
   const { isLoaded, signUp, setActive } = useSignUp();
   // Fallback path: if Clerk already holds this email (a shadow record from an
   // earlier abandoned OTP) but our DB has no member, signUp.create() fails with
@@ -109,6 +124,13 @@ export function SignupForm() {
     };
   }, []);
 
+  useEffect(() => {
+    trackVirtualPageView(
+      step === "otp" ? "/signup/otp" : "/signup/details",
+      step === "otp" ? "Account verification" : "Create account",
+    );
+  }, [step]);
+
   // Step 1 — validate referral, then ask Clerk to email a code.
   async function handleDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -170,6 +192,7 @@ export function SignupForm() {
     // Clerk: create the (shadow) user and email the OTP.
     const captured = { email, dob, referralCode, favoriteDrinkId, consent };
     const goToOtp = (via: "signup" | "signin") => {
+      trackAnalyticsEvent("auth_code_requested", { mode: "sign_up" });
       setVerifyVia(via);
       setDetails(captured);
       setStep("otp");
@@ -293,8 +316,36 @@ export function SignupForm() {
       } catch {
         /* ignore */
       }
-      bustAuthCache(); // brand-new member — clear any cached null /api/auth/me before the shell loads
-      router.push("/onboarding");
+      bustAuthCache(); // new session — clear any cached identity before the shell loads
+      trackAnalyticsEvent("sign_up", { method: "email_otp" });
+      let postOnboardingDestination = destination;
+
+      // A party code doubles as the signup referral. New members were already
+      // RSVP'd in otp/complete; existing members who entered through signup are
+      // accepted here. In both cases this also resolves the private party URL.
+      if (details.referralCode) {
+        try {
+          const partyResponse = await fetch(
+            `/api/party/${encodeURIComponent(details.referralCode)}/accept`,
+            { method: "POST" },
+          );
+          if (partyResponse.ok) {
+            const party = await partyResponse.json();
+            if (typeof party.data?.partyId === "string") {
+              postOnboardingDestination = safeReturnTo(
+                `/parties/${party.data.partyId}`,
+                destination,
+              );
+            }
+          }
+        } catch {
+          // Keep the public invite return target so the user can retry there.
+        }
+      }
+
+      router.push(
+        `/onboarding?returnTo=${encodeURIComponent(postOnboardingDestination)}`,
+      );
       router.refresh();
     } catch (e) {
       setError(clerkError(e, "Verification failed. Request a new code."));
@@ -319,6 +370,7 @@ export function SignupForm() {
       } else {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
+      trackAnalyticsEvent("auth_code_resent", { mode: "sign_up" });
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
     }
@@ -521,6 +573,7 @@ export function SignupForm() {
               name="referralCode"
               type="text"
               placeholder="SIP••••••  (invite-only)"
+              defaultValue={initialReferralCode}
               required
               className="uppercase"
             />
@@ -598,7 +651,7 @@ export function SignupForm() {
 
           <p className="text-center text-xs text-muted-foreground">
             Already a regular?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href={loginHref} className="text-primary hover:underline">
               Log in
             </Link>
           </p>

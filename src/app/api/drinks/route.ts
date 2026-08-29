@@ -24,9 +24,15 @@ export async function GET(request: Request) {
   const take = takeParam ? Number(takeParam) : undefined;
   const searchRaw = searchParams.get("search");
   const search = searchRaw ? searchRaw.slice(0, 100) : null;
+  const slugs = (searchParams.get("slugs") ?? "")
+    .split(",")
+    .map((slug) => slug.trim())
+    .filter((slug) => /^[a-z0-9][a-z0-9-]{0,219}$/.test(slug))
+    .slice(0, 24);
 
   try {
     const result = await getDrinks({
+      slugs,
       category: searchParams.get("category"),
       subcategory: searchParams.get("subcategory"),
       brand: searchParams.get("brand"),

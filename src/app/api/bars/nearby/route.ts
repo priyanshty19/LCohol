@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
+import {
+  googleTypesForCategory,
+  parseNearbyCategory,
+  toOperationalNearbyBars,
+  type GooglePlace,
+  type NearbyCategory,
+} from "@/lib/nearby-places";
 
 // GET /api/bars/nearby?lat=..&lng=..&radius=3000
 // Real nearby bars via Google Places API (New) "searchNearby". The API key is
@@ -23,7 +30,8 @@ const FIELD_MASK = [
   "places.formattedAddress",
   "places.location",
   "places.rating",
-  "places.primaryTypeDisplayName",
+  "places.businessStatus",
+  "places.primaryType",
   "places.types",
 ].join(",");
 
@@ -33,20 +41,11 @@ function num(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-type Place = {
-  id: string;
-  displayName?: { text?: string };
-  formattedAddress?: string;
-  location?: { latitude: number; longitude: number };
-  rating?: number;
-  primaryTypeDisplayName?: { text?: string };
-  types?: string[];
-};
-
 // Only SUCCESSFUL lookups are cached: the function throws on upstream failure so
-// errors aren't memoized for 10 minutes. Key = rounded lat/lng/radius (the args).
+// errors aren't memoized for 10 minutes. The rounded location, radius, and
+// category arguments all participate in the cache key.
 const fetchNearbyCached = unstable_cache(
-  async (lat: number, lng: number, radius: number, key: string) => {
+  async (lat: number, lng: number, radius: number, category: NearbyCategory | null, key: string) => {
     const res = await fetch(PLACES_URL, {
       method: "POST",
       headers: {
@@ -55,31 +54,15 @@ const fetchNearbyCached = unstable_cache(
         "X-Goog-FieldMask": FIELD_MASK,
       },
       body: JSON.stringify({
-        includedTypes: ["bar", "pub", "night_club"],
+        includedTypes: googleTypesForCategory(category),
         maxResultCount: 20,
         rankPreference: "DISTANCE",
         locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
       }),
     });
     if (!res.ok) throw new Error(`places ${res.status}`);
-    const json = (await res.json()) as { places?: Place[] };
-    return (json.places ?? [])
-      .filter((p) => p.location)
-      .map((p) => ({
-        id: p.id,
-        name: p.displayName?.text ?? "Unnamed bar",
-        slug: p.id,
-        type: (p.primaryTypeDisplayName?.text ?? p.types?.[0] ?? "Bar").toUpperCase(),
-        city: "",
-        address: p.formattedAddress ?? null,
-        lat: p.location!.latitude,
-        lng: p.location!.longitude,
-        priceRange: null as string | null,
-        rating: p.rating ?? null,
-        bestsellers: [] as string[],
-        description: null as string | null,
-        external: true,
-      }));
+    const json = (await res.json()) as { places?: GooglePlace[] };
+    return toOperationalNearbyBars(json.places ?? [], category);
   },
   ["bars-nearby"],
   { revalidate: 600 },
@@ -112,8 +95,13 @@ export async function GET(request: Request) {
   const lat = num(searchParams.get("lat"));
   const lng = num(searchParams.get("lng"));
   const radius = Math.min(Math.max(num(searchParams.get("radius")) ?? 3000, 200), 50000);
+  const rawCategory = searchParams.get("type");
+  const category = parseNearbyCategory(rawCategory);
   if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return NextResponse.json({ error: "Valid lat & lng required", data: [] }, { status: 400 });
+  }
+  if (rawCategory && !category) {
+    return NextResponse.json({ error: "Unsupported nearby bar type", data: [] }, { status: 400 });
   }
 
   // Round to ~110m so nearby pans hit the same cache entry.
@@ -121,8 +109,8 @@ export async function GET(request: Request) {
   const rLng = Math.round(lng * 1000) / 1000;
 
   try {
-    const data = await fetchNearbyCached(rLat, rLng, radius, key);
-    return NextResponse.json({ data });
+    const data = await fetchNearbyCached(rLat, rLng, radius, category, key);
+    return NextResponse.json({ data, meta: { category, radius, count: data.length } });
   } catch {
     return NextResponse.json({ error: "Nearby search failed", data: [] }, { status: 502 });
   }

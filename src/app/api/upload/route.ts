@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { imageStorageAdminClient, POST_IMAGE_BUCKET } from "@/lib/image-storage";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const BUCKET = "post-images";
 const MAX_BYTES = 2 * 1024 * 1024; // 2MB — images arrive already compressed
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -31,15 +30,6 @@ function sniffImageType(buf: Buffer): "image/jpeg" | "image/png" | "image/webp" 
   return null;
 }
 
-/** Service-role Supabase client. Server-only — the key is NEVER exposed to the
- *  browser. Returns null if uploads aren't configured. */
-function adminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key || !url.startsWith("http")) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 export async function POST(request: Request) {
   // Auth-gated: only signed-in, non-banned users can upload, rate-limited.
   const user = await getCurrentUser();
@@ -49,7 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many uploads — slow down a touch." }, { status: 429 });
   }
 
-  const supabase = adminClient();
+  const supabase = imageStorageAdminClient();
   if (!supabase) {
     return NextResponse.json(
       { error: "Image uploads aren't configured yet." },
@@ -59,6 +49,8 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const file = form.get("file");
+  const requestedScope = form.get("scope");
+  const scope = requestedScope === "mixes" ? "mixes" : "posts";
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
@@ -79,10 +71,10 @@ export async function POST(request: Request) {
   }
 
   const ext = realType === "image/png" ? "png" : realType === "image/webp" ? "webp" : "jpg";
-  const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${user.id}/${scope}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const upload = () =>
-    supabase.storage.from(BUCKET).upload(path, buffer, {
+    supabase.storage.from(POST_IMAGE_BUCKET).upload(path, buffer, {
       contentType: realType,
       upsert: false,
     });
@@ -90,7 +82,7 @@ export async function POST(request: Request) {
   let { error } = await upload();
   // First run: create the public bucket on demand, then retry once.
   if (error && /bucket not found/i.test(error.message)) {
-    await supabase.storage.createBucket(BUCKET, {
+    await supabase.storage.createBucket(POST_IMAGE_BUCKET, {
       public: true,
       fileSizeLimit: MAX_BYTES,
       allowedMimeTypes: [...ALLOWED],
@@ -102,6 +94,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const { data } = supabase.storage.from(POST_IMAGE_BUCKET).getPublicUrl(path);
   return NextResponse.json({ url: data.publicUrl }, { status: 201 });
 }

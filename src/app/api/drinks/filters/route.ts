@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDrinkFilters } from "@/lib/drinks";
 
-// Categories + brand list change very rarely — cache aggressively (a day),
-// serve stale while revalidating. Query logic in src/lib/drinks.ts.
-export const revalidate = 86400;
+// This database-backed endpoint must execute at request time. Prerendering it
+// makes deployments fail whenever the preview database is intentionally asleep
+// or network-restricted during the build. CDN headers still cache responses.
+export const dynamic = "force-dynamic";
 const CACHE_HEADERS = { "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400" };
 
 export async function GET() {

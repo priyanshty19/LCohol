@@ -7,10 +7,13 @@ import {
   Geist_Mono,
 } from "next/font/google";
 import { AgeGateOverlay } from "@/components/shared/age-gate-overlay";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
+import { PwaRuntime } from "@/components/pwa/pwa-runtime";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { getCurrentUser } from "@/lib/auth";
 import { THEME_COOKIE, isThemeId, type ThemeId } from "@/lib/theme";
+import { isProductionIndexingEnabled, PRODUCTION_SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 // Resolve the theme on the SERVER so the SSR HTML already carries the right
@@ -58,13 +61,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(PRODUCTION_SITE_URL),
   manifest: "/manifest.json",
+  icons: { icon: "/icon-192.png", apple: "/icon-512.png" },
+  applicationName: "Sip Stories",
   title: {
-    default: "SIPSTORIES",
-    template: "%s | SIPSTORIES",
+    default: "Sip Stories — India’s Anonymous Tasting Room",
+    template: "%s | Sip Stories",
   },
   description:
-    "Anonymous social platform for drinking culture, cocktail discovery, and nightlife experiences.",
+    "India’s anonymous community for sip stories, cocktail discovery, bar finds, nightlife, and James, your AI bartender.",
+  authors: [{ name: "Sip Stories", url: PRODUCTION_SITE_URL }],
+  creator: "Sip Stories",
+  publisher: "Sip Stories",
+  category: "Lifestyle",
   keywords: [
     "drinking culture",
     "cocktails",
@@ -72,6 +82,31 @@ export const metadata: Metadata = {
     "drink reviews",
     "anonymous community",
   ],
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    url: PRODUCTION_SITE_URL,
+    siteName: "Sip Stories",
+    title: "Sip Stories — India’s Anonymous Tasting Room",
+    description:
+      "Anonymous sip stories, cocktail discovery, bar finds, nightlife, and James, your AI bartender.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sip Stories — India’s Anonymous Tasting Room",
+    description:
+      "Anonymous sip stories, cocktail discovery, bar finds, nightlife, and James, your AI bartender.",
+  },
+  verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : undefined,
+  robots: isProductionIndexingEnabled()
+    ? undefined
+    : {
+        index: false,
+        follow: false,
+        googleBot: { index: false, follow: false },
+      },
 };
 
 export default async function RootLayout({
@@ -90,6 +125,10 @@ export default async function RootLayout({
       className={`${ebGaramond.variable} ${playfair.variable} ${plusJakartaSans.variable} ${geistMono.variable} h-full antialiased ${isLight ? "light" : "dark"}`}
     >
       <body className="min-h-full flex flex-col">
+        <PwaRuntime />
+        <GoogleAnalytics
+          measurementId={process.env.NEXT_PUBLIC_GOOGLE_ANALYTICS_ID}
+        />
         <ThemeProvider />
         <AgeGateOverlay />
         {children}

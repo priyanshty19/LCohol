@@ -3,16 +3,21 @@ import { notFound } from "next/navigation";
 import { getPartyByCode } from "@/lib/parties";
 import { getCurrentUser } from "@/lib/auth";
 import { PartyInviteAccept } from "@/components/party/party-invite-accept";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Private party invitation",
+  robots: { index: false, follow: false, noarchive: true },
+};
 
 export default async function PartyInvitePage({ params }: { params: Promise<{ code: string }> }) {
+  const currentUser = getCurrentUser();
   const { code } = await params;
-  const invite = await getPartyByCode(code);
+  const [invite, me] = await Promise.all([getPartyByCode(code), currentUser]);
   if (!invite) notFound();
 
   const party = invite.partyPlan;
-  const me = await getCurrentUser();
   const expired = invite.expiresAt && new Date(invite.expiresAt) < new Date();
   const cancelled = party.status === "CANCELLED";
   const when = party.startsAt ?? party.eventDate;
@@ -44,7 +49,10 @@ export default async function PartyInvitePage({ params }: { params: Promise<{ co
             <PartyInviteAccept code={code} />
           ) : (
             <div className="space-y-2">
-              <Link href={`/login?ref=${encodeURIComponent(code)}`} className="block">
+              <Link
+                href={`/login?ref=${encodeURIComponent(code)}&returnTo=${encodeURIComponent(`/party/${code}`)}`}
+                className="block"
+              >
                 <span className="btn-gold inline-flex w-full items-center justify-center rounded-md px-4 py-2.5 font-display font-semibold text-primary-foreground">
                   Join SIPSTORIES to RSVP
                 </span>

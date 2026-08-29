@@ -7,6 +7,8 @@ import { LoginForm } from "@/components/auth/login-form";
 import { SignupForm } from "@/components/auth/signup-form";
 import { JamesTalking } from "@/components/landing/james-talking";
 import { Button } from "@/components/ui/button";
+import { safeReturnTo } from "@/lib/safe-return-to";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 type Mode = null | "signin" | "signup";
 
@@ -108,9 +110,13 @@ function AuthButtons({ setMode }: { setMode: (m: Mode) => void }) {
 function AuthModal({
   mode,
   setMode,
+  referralCode,
+  returnTo,
 }: {
   mode: Exclude<Mode, null>;
   setMode: (m: Mode) => void;
+  referralCode?: string;
+  returnTo: string;
 }) {
   const close = () => setMode(null);
 
@@ -126,6 +132,10 @@ function AuthModal({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    trackAnalyticsEvent("auth_start", { mode });
+  }, [mode]);
 
   const isSignin = mode === "signin";
 
@@ -178,7 +188,11 @@ function AuthModal({
 
         {/* Single form instance — scrolls inside the dialog if tall */}
         <div className="overflow-y-auto">
-          {isSignin ? <LoginForm /> : <SignupForm />}
+          {isSignin ? (
+            <LoginForm returnTo={returnTo} referralCode={referralCode} />
+          ) : (
+            <SignupForm initialReferralCode={referralCode} returnTo={returnTo} />
+          )}
         </div>
       </div>
     </div>
@@ -193,8 +207,18 @@ function ComplianceNote({ className }: { className?: string }) {
   );
 }
 
-export function LoginExperience() {
-  const [mode, setMode] = useState<Mode>(null);
+export function LoginExperience({
+  referralCode,
+  returnTo = "/",
+}: {
+  referralCode?: string;
+  returnTo?: string;
+}) {
+  const [mode, setMode] = useState<Mode>(referralCode ? "signup" : null);
+  const destination = safeReturnTo(
+    returnTo,
+    referralCode ? `/party/${referralCode}` : "/",
+  );
 
   return (
     <>
@@ -293,7 +317,14 @@ export function LoginExperience() {
       </div>
 
       {/* The ONE auth form instance, shared across both layouts. */}
-      {mode && <AuthModal mode={mode} setMode={setMode} />}
+      {mode && (
+        <AuthModal
+          mode={mode}
+          setMode={setMode}
+          referralCode={referralCode}
+          returnTo={destination}
+        />
+      )}
     </>
   );
 }

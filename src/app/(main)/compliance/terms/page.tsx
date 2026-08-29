@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
+  description: "The terms governing use of Sip Stories, an adults-only community platform.",
+  alternates: { canonical: "/Terms-and-Condition" },
 };
 
 export default function TermsPage() {

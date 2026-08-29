@@ -30,17 +30,17 @@ export function VibeView() {
     setLoading(true);
     const vibe = VIBES.find((v) => v.id === selectedVibe)!;
 
-    // Fetch drinks by slugs from the vibe config
-    const params = new URLSearchParams({ sort: "popular" });
+    // Ask the server for this vibe's exact set. Filtering a generic first page
+    // client-side meant most vibe choices never received their own drinks.
+    const params = new URLSearchParams({
+      sort: "popular",
+      slugs: vibe.drinkSlugs.join(","),
+      take: String(vibe.drinkSlugs.length),
+    });
     fetch(`/api/drinks?${params}`)
       .then((r) => r.json())
       .then((data) => {
         let results = (data.data ?? []) as any[];
-
-        // Filter to vibe's preferred drinks
-        results = results.filter((d: any) =>
-          vibe.drinkSlugs.includes(d.slug)
-        );
 
         // Apply budget filter
         if (currentBudget) {

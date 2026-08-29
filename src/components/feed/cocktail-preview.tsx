@@ -5,7 +5,8 @@ import Link from "next/link";
 // text link, surface a small recipe card so drink shares pop in the feed. Pure
 // presentation — the slug is already in the post body, so no extra DB fetch.
 
-const COCKTAIL_LINK_RE = /\/cocktails\/([a-z0-9][a-z0-9-]*)/i;
+// Keep underscore support for links created by the early Mix Lab slugger.
+const COCKTAIL_LINK_RE = /\/cocktails\/([a-z0-9][a-z0-9_-]*)/i;
 
 /** Extract the first cocktail slug referenced in a post body, if any. */
 export function cocktailSlugFromBody(body: string | null | undefined): string | null {

@@ -4,7 +4,9 @@ import { ShaderBackdropLazy } from "@/components/fx/shader-backdrop.lazy";
 // Clerk is scoped to the auth route group only — it powers the email-OTP
 // forms here, but the rest of the app runs on our own ss_auth session.
 // Layout is intentionally thin: backdrop + provider only. Each page owns
-// its own structural layout (split, card, centered, etc.).
+// its own structural layout (split, card, centered, etc.). The dark theme is
+// scoped here so logged-out auth screens stay Midnight Wine without replacing
+// an authenticated user's saved theme or recoloring root-level overlays.
 export default function AuthLayout({
   children,
 }: {
@@ -12,7 +14,10 @@ export default function AuthLayout({
 }) {
   return (
     <ClerkProvider>
-      <div className="relative min-h-[100dvh] overflow-hidden bg-background">
+      <div
+        data-theme="dark"
+        className="dark relative min-h-[100dvh] overflow-hidden bg-background [color-scheme:dark]"
+      >
         <div className="pointer-events-none absolute inset-0 bg-ambient" />
         {/* Shader is decorative only — keep it faint so text stays legible. */}
         <ShaderBackdropLazy className="pointer-events-none absolute inset-0 -z-0 opacity-30" />
@@ -38,8 +43,7 @@ export default function AuthLayout({
             animationDelay: "-6s",
           }}
         />
-        {/* Sparkles intentionally omitted here — on the pale landing surface
-            they read as stray red specks and hurt readability. */}
+        {/* Sparkles stay omitted so the wine-toned surface remains quiet and legible. */}
         <div className="pointer-events-none absolute inset-0 bg-grain opacity-25" />
 
         <div className="relative z-10">{children}</div>

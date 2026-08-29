@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { THEMES, applyTheme, vibeToTheme } from "@/lib/theme";
+import { safeReturnTo } from "@/lib/safe-return-to";
+import { persistOnboardingProfile } from "@/lib/onboarding-profile";
+import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 
 const DRINKS = [
   { id: "whisky", label: "Whisky", emoji: "🥃" },
@@ -54,44 +57,82 @@ function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-export function OnboardingQuiz({ username }: { username: string }) {
+export function OnboardingQuiz({
+  username,
+  returnTo = "/",
+}: {
+  username: string;
+  returnTo?: string;
+}) {
   const router = useRouter();
+  const destination = safeReturnTo(returnTo);
   const [step, setStep] = useState(0);
   const [drinks, setDrinks] = useState<string[]>([]);
   const [flavours, setFlavours] = useState<string[]>([]);
   const [discovery, setDiscovery] = useState<string | null>(null);
   const [vibe, setVibe] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastAttempt, setLastAttempt] = useState<"finish" | "skip">("finish");
+  const hasStartedTracking = useRef(false);
 
-  async function persist(body: Record<string, unknown>) {
+  useEffect(() => {
+    if (!hasStartedTracking.current) {
+      hasStartedTracking.current = true;
+      trackAnalyticsEvent("tutorial_begin");
+    }
+    trackVirtualPageView(
+      step === 0 ? "/onboarding/taste" : "/onboarding/style",
+      step === 0 ? "Onboarding — your taste" : "Onboarding — your style",
+    );
+  }, [step]);
+
+  async function persist(
+    body: Record<string, unknown>,
+    attempt: "finish" | "skip",
+  ) {
     setBusy(true);
+    setSaveError(null);
+    setLastAttempt(attempt);
     try {
-      await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      await persistOnboardingProfile(body);
+      if (attempt === "finish") {
+        trackAnalyticsEvent("onboarding_step_complete", {
+          step_name: "style",
+          step_number: 2,
+        });
+      }
+      trackAnalyticsEvent("tutorial_complete", {
+        skipped: attempt === "skip",
+        drinks_count: attempt === "finish" ? drinks.length : 0,
+        flavours_count: attempt === "finish" ? flavours.length : 0,
+        intensity_set: attempt === "finish" && Boolean(discovery),
+        vibe_set: attempt === "finish" && Boolean(vibe),
       });
-      router.push("/");
+      router.push(destination);
       router.refresh();
     } catch {
-      // Even if the save hiccups, don't trap the user on onboarding.
-      router.push("/");
+      setSaveError("We couldn't save that yet. Your choices are still here — please try again.");
+      setBusy(false);
     }
   }
 
   function finish() {
-    persist({
-      preferredSpirits: drinks,
-      preferredFlavours: flavours,
-      intensity: discovery,
-      intent: vibe,
-      ...(vibe ? { theme: vibeToTheme(vibe) } : {}),
-      onboarded: true,
-    });
+    persist(
+      {
+        preferredSpirits: drinks,
+        preferredFlavours: flavours,
+        intensity: discovery,
+        intent: vibe,
+        ...(vibe ? { theme: vibeToTheme(vibe) } : {}),
+        onboarded: true,
+      },
+      "finish",
+    );
   }
 
   function skip() {
-    persist({ onboarded: true });
+    persist({ onboarded: true }, "skip");
   }
 
   function toggleDrink(id: string) {
@@ -231,6 +272,23 @@ export function OnboardingQuiz({ username }: { username: string }) {
         </motion.div>
       </AnimatePresence>
 
+      {saveError && (
+        <div
+          role="alert"
+          className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <span>{saveError}</span>
+          <button
+            type="button"
+            onClick={lastAttempt === "skip" ? skip : finish}
+            disabled={busy}
+            className="shrink-0 font-semibold underline underline-offset-2 disabled:opacity-50"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {/* Footer nav */}
       <div className="mt-7 flex items-center justify-between">
         <button
@@ -248,7 +306,13 @@ export function OnboardingQuiz({ username }: { username: string }) {
         ) : (
           <Button
             variant="velvet"
-            onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
+            onClick={() => {
+              trackAnalyticsEvent("onboarding_step_complete", {
+                step_name: "taste",
+                step_number: 1,
+              });
+              setStep((s) => Math.min(STEPS.length - 1, s + 1));
+            }}
             disabled={busy}
           >
             Next <ArrowRight className="ml-1 h-4 w-4" />

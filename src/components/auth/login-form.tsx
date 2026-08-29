@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { bustAuthCache } from "@/hooks/use-auth";
+import { safeReturnTo } from "@/lib/safe-return-to";
+import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const LI_OTP_KEY = "ss_login_otp";
@@ -19,8 +21,18 @@ function clerkError(e: unknown, fallback: string): string {
   return er?.errors?.[0]?.longMessage ?? er?.errors?.[0]?.message ?? fallback;
 }
 
-export function LoginForm() {
+export function LoginForm({
+  returnTo = "/",
+  referralCode,
+}: {
+  returnTo?: string;
+  referralCode?: string;
+}) {
   const router = useRouter();
+  const destination = safeReturnTo(returnTo);
+  const signupParams = new URLSearchParams({ returnTo: destination });
+  if (referralCode) signupParams.set("ref", referralCode);
+  const signupHref = `/signup?${signupParams.toString()}`;
   const { isLoaded, signIn, setActive } = useSignIn();
   // Fallback for emails Clerk doesn't know yet (e.g. legacy/password members):
   // create a Clerk shadow user via signUp just to verify the email, then our
@@ -41,20 +53,30 @@ export function LoginForm() {
   // Restore an in-flight OTP step across a refresh (Clerk rehydrates its own
   // verification attempt; we just bring the step + email back).
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(LI_OTP_KEY);
-      if (raw) {
-        const s = JSON.parse(raw);
-        if (s?.step === "otp" && s?.email) {
-          setEmail(s.email);
-          setFlow(s.flow === "signup" ? "signup" : "signin");
-          setStep("otp");
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = sessionStorage.getItem(LI_OTP_KEY);
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s?.step === "otp" && s?.email) {
+            setEmail(s.email);
+            setFlow(s.flow === "signup" ? "signup" : "signin");
+            setStep("otp");
+          }
         }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    trackVirtualPageView(
+      step === "otp" ? "/login/otp" : "/login/sign-in",
+      step === "otp" ? "Sign in verification" : "Sign in",
+    );
+  }, [step]);
 
   // Step 1 — send the OTP.
   async function handleEmail(e: React.FormEvent<HTMLFormElement>) {
@@ -102,6 +124,7 @@ export function LoginForm() {
         strategy: "email_code",
         emailAddressId: factor.emailAddressId,
       });
+      trackAnalyticsEvent("auth_code_requested", { mode: "sign_in" });
       setFlow("signin");
       setStep("otp");
       try {
@@ -117,6 +140,7 @@ export function LoginForm() {
       try {
         await signUp!.create({ emailAddress: addr });
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
+        trackAnalyticsEvent("auth_code_requested", { mode: "sign_in" });
         setFlow("signup");
         setStep("otp");
         try {
@@ -185,7 +209,8 @@ export function LoginForm() {
         /* ignore */
       }
       bustAuthCache(); // new session — drop the cached /api/auth/me so the shell shows the right user
-      router.push("/");
+      trackAnalyticsEvent("login", { method: "email_otp" });
+      router.push(destination);
       router.refresh();
     } catch (e) {
       setError(clerkError(e, "Verification failed. Request a new code."));
@@ -214,6 +239,7 @@ export function LoginForm() {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
       setResent(true);
+      trackAnalyticsEvent("auth_code_resent", { mode: "sign_in" });
       // Brief cooldown so the success message lands and the button isn't spammed.
       setTimeout(() => {
         setResent(false);
@@ -350,7 +376,7 @@ export function LoginForm() {
 
           <p className="text-center text-xs text-muted-foreground">
             New here?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
+            <Link href={signupHref} className="text-primary hover:underline">
               Request an invite
             </Link>
           </p>

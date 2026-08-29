@@ -43,6 +43,18 @@ export const cocktailSelect = {
 
 export type CocktailRow = Awaited<ReturnType<typeof getCocktails>>["cocktails"][number];
 
+/** Personalized, uncached list of mixes created by one user. */
+export async function getMyCocktails(userId: string, take = 50) {
+  const rows = await prisma.cocktailCreation.findMany({
+    where: { authorId: userId, isCurated: false },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(MAX_TAKE, Math.max(1, take)),
+    select: cocktailSelect,
+  });
+
+  return rows.filter((cocktail) => !containsProfanity(cocktail.name));
+}
+
 export async function getCocktails(opts: CocktailsQuery = {}) {
   const take = Math.min(MAX_TAKE, Math.max(1, opts.take ?? COCKTAILS_DEFAULT_TAKE));
 
@@ -166,8 +178,19 @@ export async function getCocktailBySlug(slugOrId: string) {
     : { slug: slugOrId };
   // Return regardless of visibility; the page enforces (public OR owner) so a
   // user can view their own private "My Mix" while others get a 404.
-  return prisma.cocktailCreation.findFirst({
+  const exact = await prisma.cocktailCreation.findFirst({
     where,
+    select: { ...cocktailSelect, authorId: true, isPublic: true },
+  });
+  if (exact || UUID_RE.test(slugOrId)) return exact;
+
+  // Legacy feed shares used `/cocktails/<readable-name>` before saved mixes
+  // received a uniqueness suffix. Resolve those links to the newest matching
+  // canonical slug so old recipe cards do not decay into 404s. The page still
+  // applies its normal public/owner/circle gate after this lookup.
+  return prisma.cocktailCreation.findFirst({
+    where: { slug: { startsWith: `${slugOrId}-` } },
+    orderBy: { createdAt: "desc" },
     select: { ...cocktailSelect, authorId: true, isPublic: true },
   });
 }

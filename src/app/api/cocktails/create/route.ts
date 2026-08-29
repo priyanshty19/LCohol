@@ -5,6 +5,7 @@ import { logInteraction } from "@/lib/interactions";
 import { rateLimit } from "@/lib/rate-limit";
 import { containsProfanity } from "@/lib/profanity";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+import { sanitizeCocktailImageUrl } from "@/lib/cocktail-image";
 
 // POST /api/cocktails/create
 //   { name, glass?, garnish?, isPublic?, ingredientSlugs: string[] }
@@ -19,12 +20,12 @@ function slugify(s: string): string {
     .slice(0, 200);
 }
 
-const NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+const NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 function nanoid(size = 10): string {
   const bytes = new Uint8Array(size);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => NANOID_ALPHABET[b & 63]).join("");
+  return Array.from(bytes, (b) => NANOID_ALPHABET[b % NANOID_ALPHABET.length]).join("");
 }
 
 function mixSlug(name: string): string {
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
       garnish: typeof body.garnish === "string" ? body.garnish.slice(0, 200) : null,
       category: "My Mix",
       categorySlug: "my-mix",
+      imageUrl: sanitizeCocktailImageUrl(body.imageUrl, me.id),
       isCurated: false,
       isPublic: body.isPublic === true,
       ingredients: {

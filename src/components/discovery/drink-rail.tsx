@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { FadeImage } from "@/components/ui/fade-image";
+import { DefaultDrinkArtwork } from "@/components/drinks/default-drink-artwork";
 
 type Rec = {
   id: string;
@@ -57,15 +58,16 @@ export function DrinkRail({ title, endpoint }: { title: string; endpoint: string
           <Link key={r.id} href={`/drinks/${r.slug}`} className="group w-32 shrink-0">
             <div className="relative aspect-square overflow-hidden rounded-xl border border-border/60 bg-card">
               {r.imageUrl ? (
-                <Image
+                <FadeImage
                   src={r.imageUrl}
                   alt={r.name}
                   fill
                   sizes="128px"
                   className="object-cover transition group-hover:scale-105"
+                  fallback={<DefaultDrinkArtwork name={r.name} category={r.category} />}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-2xl">🥃</div>
+                <DefaultDrinkArtwork name={r.name} category={r.category} />
               )}
             </div>
             <p className="mt-1.5 truncate text-sm font-medium">{r.name}</p>

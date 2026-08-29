@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { colorFor } from "@/lib/mix-colors";
 import { toast } from "@/lib/toast";
+import { compressImage } from "@/lib/image-compress";
 import { GLASS_LIST, GLASSES, type GlassDef, type GlassId } from "@/lib/glassware";
 import { GARNISHES, type GarnishId } from "@/lib/garnishes";
 import { CssVessel, hasWebGL, type Layer } from "./mix-vessel";
@@ -60,6 +62,8 @@ export function MixGame() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   // share the saved mix to the feed (PUBLIC or CIRCLE post linking the cocktail)
   const [sharing, setSharing] = useState(false);
@@ -122,6 +126,9 @@ export function MixGame() {
     setMixName("");
     setSavedSlug(null);
     setSaveError(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhoto(null);
+    setPhotoPreview(null);
     setShared(null);
     setShareError(null);
   }
@@ -131,6 +138,17 @@ export function MixGame() {
     setSaving(true);
     setSaveError(null);
     try {
+      let imageUrl: string | null = null;
+      if (photo) {
+        const compressed = await compressImage(photo, { maxEdge: 1400, quality: 0.78 });
+        const form = new FormData();
+        form.append("file", compressed, "mix-photo.jpg");
+        form.append("scope", "mixes");
+        const upload = await fetch("/api/upload", { method: "POST", body: form });
+        const uploaded = await upload.json().catch(() => ({}));
+        if (!upload.ok || !uploaded.url) throw new Error(uploaded.error ?? "Photo upload failed");
+        imageUrl = uploaded.url;
+      }
       const r = await fetch("/api/cocktails/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,6 +160,7 @@ export function MixGame() {
           ],
           glass: glass?.name,
           garnish: garnish ? GARNISHES.find((g) => g.id === garnish)?.label : undefined,
+          imageUrl,
         }),
       });
       const j = await r.json();
@@ -152,9 +171,10 @@ export function MixGame() {
         setSaveError(j.error ?? "Couldn't save");
         toast.error(j.error ?? "Couldn't save");
       }
-    } catch {
-      setSaveError("Couldn't save");
-      toast.error("Couldn't save");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Couldn't save";
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -409,6 +429,36 @@ export function MixGame() {
               </div>
 
               <div className="space-y-2 border-t border-border/40 pt-3">
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-muted-foreground" htmlFor="mix-photo">
+                    Drink photo <span className="font-normal opacity-70">(optional)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+                      {photoPreview ? (
+                        <Image src={photoPreview} alt="Selected drink" fill sizes="64px" className="object-cover" unoptimized />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-2xl" aria-hidden>🍸</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <Input
+                        id="mix-photo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const next = event.target.files?.[0] ?? null;
+                          if (photoPreview) URL.revokeObjectURL(photoPreview);
+                          setPhoto(next);
+                          setPhotoPreview(next ? URL.createObjectURL(next) : null);
+                          setSavedSlug(null);
+                        }}
+                        className="text-xs file:mr-2 file:border-0 file:bg-transparent file:text-xs file:font-semibold"
+                      />
+                      <p className="mt-1 text-[10px] text-muted-foreground/70">Compressed before upload to save space. A Sip Stories artwork is used if you skip it.</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Input value={mixName} onChange={(e) => { setMixName(e.target.value); setSavedSlug(null); }} placeholder="Name your drink…" maxLength={200} />
                   <Button variant="gold" disabled={saving || !mixName.trim()} onClick={saveMix}>
