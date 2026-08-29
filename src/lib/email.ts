@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.RESEND_FROM ?? "Sip Stories <onboarding@resend.dev>";
-const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const BASE = process.env.NEXT_PUBLIC_APP_URL ?? "https://staging.mysipstories.com";
 
 const resend = KEY ? new Resend(KEY) : null;
 

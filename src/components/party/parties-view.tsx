@@ -19,9 +19,10 @@ type Party = {
   author?: { profile?: { username?: string | null } | null } | null;
   _count?: { invites?: number };
   invites?: { rsvp: string }[];
+  visibility?: "PUBLIC" | "CIRCLE" | "PRIVATE";
 };
 
-type PartyTab = "invited" | "expired" | "created";
+type PartyTab = "open" | "invited" | "expired" | "created";
 
 const RSVP_TONE: Record<string, string> = {
   GOING: "text-primary",
@@ -61,6 +62,12 @@ function isExpired(p: Party, now = new Date()): boolean {
 }
 
 function emptyCopy(tab: PartyTab) {
+  if (tab === "open") {
+    return {
+      title: "No open parties right now",
+      subtitle: "Public parties that are live or coming up will appear here.",
+    };
+  }
   if (tab === "expired") {
     return {
       title: "No expired parties",
@@ -79,7 +86,7 @@ function emptyCopy(tab: PartyTab) {
   };
 }
 
-function PartyCard({ p, myRsvp, expired }: { p: Party; myRsvp?: string; expired?: boolean }) {
+function PartyCard({ p, myRsvp, expired, open }: { p: Party; myRsvp?: string; expired?: boolean; open?: boolean }) {
   const when = whenLine(p);
   return (
     <Link href={`/parties/${p.id}`} className="block">
@@ -95,6 +102,8 @@ function PartyCard({ p, myRsvp, expired }: { p: Party; myRsvp?: string; expired?
               <Badge variant="outline" className={`shrink-0 text-[10px] capitalize ${RSVP_TONE[myRsvp] ?? ""}`}>
                 {myRsvp.toLowerCase()}
               </Badge>
+            ) : open ? (
+              <Badge variant="drink" className="shrink-0 text-[10px]">Open</Badge>
             ) : null}
           </div>
           <div className="text-xs text-muted-foreground">📍 {venueLine(p)}</div>
@@ -108,20 +117,21 @@ function PartyCard({ p, myRsvp, expired }: { p: Party; myRsvp?: string; expired?
   );
 }
 
-export function PartiesView({ hosting, invited }: { hosting: Party[]; invited: Party[] }) {
+export function PartiesView({ hosting, invited, open }: { hosting: Party[]; invited: Party[]; open: Party[] }) {
   const [creating, setCreating] = useState(false);
-  const [tab, setTab] = useState<PartyTab>("invited");
+  const [tab, setTab] = useState<PartyTab>("open");
   const now = new Date();
   const activeInvites = invited.filter((p) => !isExpired(p, now));
   const expiredParties = [...invited, ...hosting].filter((p, index, all) => {
     return isExpired(p, now) && all.findIndex((other) => other.id === p.id) === index;
   });
   const tabs: { value: PartyTab; label: string; count: number }[] = [
+    { value: "open", label: "Open", count: open.length },
     { value: "invited", label: "Invited to", count: activeInvites.length },
     { value: "expired", label: "Expired", count: expiredParties.length },
     { value: "created", label: "You created", count: hosting.length },
   ];
-  const visible = tab === "invited" ? activeInvites : tab === "expired" ? expiredParties : hosting;
+  const visible = tab === "open" ? open : tab === "invited" ? activeInvites : tab === "expired" ? expiredParties : hosting;
   const empty = emptyCopy(tab);
 
   return (
@@ -136,7 +146,7 @@ export function PartiesView({ hosting, invited }: { hosting: Party[]; invited: P
         </Button>
       </header>
 
-      {hosting.length === 0 && invited.length === 0 && (
+      {hosting.length === 0 && invited.length === 0 && open.length === 0 && (
         <EmptyState
           emoji="🎉"
           title="No parties yet"
@@ -146,12 +156,12 @@ export function PartiesView({ hosting, invited }: { hosting: Party[]; invited: P
         />
       )}
 
-      {(hosting.length > 0 || invited.length > 0) && (
+      {(hosting.length > 0 || invited.length > 0 || open.length > 0) && (
         <section className="space-y-3">
           <div
             role="tablist"
             aria-label="Party filters"
-            className="grid grid-cols-3 gap-2 rounded-2xl border border-border/50 bg-card/40 p-1"
+            className="grid grid-cols-4 gap-2 rounded-2xl border border-border/50 bg-card/40 p-1"
           >
             {tabs.map((item) => {
               const active = tab === item.value;
@@ -190,6 +200,7 @@ export function PartiesView({ hosting, invited }: { hosting: Party[]; invited: P
                   p={p}
                   myRsvp={p.invites?.[0]?.rsvp}
                   expired={isExpired(p, now)}
+                  open={tab === "open"}
                 />
               ))}
             </div>

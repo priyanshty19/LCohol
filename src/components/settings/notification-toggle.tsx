@@ -32,8 +32,8 @@ export function NotificationToggle() {
       !("PushManager" in window) ||
       !VAPID
     ) {
-      setState("unsupported");
-      return;
+      const timer = window.setTimeout(() => setState("unsupported"), 0);
+      return () => window.clearTimeout(timer);
     }
     (async () => {
       const reg = await navigator.serviceWorker.getRegistration();
@@ -98,14 +98,15 @@ export function NotificationToggle() {
   if (state === "unsupported") {
     return (
       <p className="text-xs text-muted-foreground">
-        Push notifications aren&apos;t supported in this browser.
+        Push notifications aren&apos;t supported on this device.
       </p>
     );
   }
   if (state === "denied") {
     return (
       <p className="text-xs text-muted-foreground">
-        Notifications are blocked in your browser settings. Allow them there, then refresh.
+        Notifications are blocked in your device settings. Allow Sip Stories notifications there,
+        then refresh.
       </p>
     );
   }

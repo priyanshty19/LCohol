@@ -19,18 +19,32 @@ function slugify(s: string): string {
     .slice(0, 200);
 }
 
-const NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
+const NANOID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 function nanoid(size = 10): string {
   const bytes = new Uint8Array(size);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => NANOID_ALPHABET[b & 63]).join("");
+  return Array.from(bytes, (b) => NANOID_ALPHABET[b % NANOID_ALPHABET.length]).join("");
 }
 
 function mixSlug(name: string): string {
   const suffix = nanoid().toLowerCase();
   const base = slugify(name).slice(0, 220 - suffix.length - 1) || "my-mix";
   return `${base}-${suffix}`;
+}
+
+function sanitizeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
+    const image = new URL(value);
+    return storageHost && image.protocol === "https:" && image.hostname === storageHost &&
+      image.pathname.startsWith("/storage/v1/object/public/post-images/")
+      ? image.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 // A write endpoint is a DoS magnet: each call does several DB round-trips, so a
@@ -101,6 +115,7 @@ export async function POST(request: Request) {
       garnish: typeof body.garnish === "string" ? body.garnish.slice(0, 200) : null,
       category: "My Mix",
       categorySlug: "my-mix",
+      imageUrl: sanitizeImageUrl(body.imageUrl),
       isCurated: false,
       isPublic: body.isPublic === true,
       ingredients: {

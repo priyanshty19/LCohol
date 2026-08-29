@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   // Only the host or an invited guest can see the party.
   const isHost = party.authorId === me.id;
   const isGuest = party.invites.some((i) => i.invitedUserId === me.id);
-  if (!isHost && !isGuest) {
+  if (!isHost && !isGuest && party.visibility !== "PUBLIC") {
     return NextResponse.json({ error: "Party not found" }, { status: 404 });
   }
 

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#1a1012" />
+    <title>Offline | SIPSTORIES</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 28px;
+        color: #f7eee5;
+        background:
+          radial-gradient(circle at 50% 8%, rgba(235, 94, 36, 0.2), transparent 35%),
+          linear-gradient(180deg, #35170d, #1a1012 60%);
+      }
+      main { width: min(100%, 420px); text-align: center; }
+      .glass { width: 76px; height: 76px; }
+      h1 { margin: 18px 0 8px; font-family: Georgia, serif; font-size: 38px; }
+      h1 em { color: #eb5e24; font-weight: 600; }
+      h2 { margin: 72px 0 12px; font-family: Georgia, serif; font-size: 30px; }
+      p { margin: 0; color: #d9bd9f; font-size: 17px; line-height: 1.55; }
+      button {
+        width: 100%;
+        margin-top: 34px;
+        border: 0;
+        border-radius: 999px;
+        padding: 16px;
+        color: #1a1012;
+        background: #eb5e24;
+        font: inherit;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="glass" src="/icon-192.png" alt="" />
+      <h1><em>Sip</em> Stories</h1>
+      <h2>James lost the signal.</h2>
+      <p>Your seat is saved. Reconnect and we’ll put you right back at the bar.</p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

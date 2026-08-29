@@ -27,7 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   try {
-    const party = await prisma.partyPlan.findUnique({ where: { id }, select: { authorId: true } });
+    const party = await prisma.partyPlan.findUnique({ where: { id }, select: { authorId: true, visibility: true, status: true } });
     if (!party) return NextResponse.json({ error: "Party not found" }, { status: 404 });
     if (party.authorId === me.id) {
       return NextResponse.json({ error: "As host, you're already in." }, { status: 400 });
@@ -36,12 +36,31 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // Scoped updateMany (not find-then-update-by-id): if the host revokes the
     // invite between a read and the write, this cleanly affects 0 rows → 404,
     // instead of a P2025 → 500 on a vanished id.
-    const updated = await prisma.partyInvite.updateMany({
+    const existing = await prisma.partyInvite.findFirst({
       where: { partyPlanId: id, invitedUserId: me.id },
-      data: { rsvp: body.status, respondedAt: new Date() },
+      select: { id: true },
     });
-    if (updated.count === 0) {
+    if (!existing && party.visibility !== "PUBLIC") {
       return NextResponse.json({ error: "You're not invited to this party." }, { status: 404 });
+    }
+    if (party.status !== "UPCOMING") {
+      return NextResponse.json({ error: "This party is no longer accepting RSVPs." }, { status: 409 });
+    }
+    if (existing) {
+      await prisma.partyInvite.update({
+        where: { id: existing.id },
+        data: { rsvp: body.status, respondedAt: new Date() },
+      });
+    } else {
+      await prisma.partyInvite.create({
+        data: {
+          partyPlanId: id,
+          inviterId: party.authorId,
+          invitedUserId: me.id,
+          rsvp: body.status,
+          respondedAt: new Date(),
+        },
+      });
     }
 
     await notify({ userId: party.authorId, actorId: me.id, type: "RSVP", partyId: id });

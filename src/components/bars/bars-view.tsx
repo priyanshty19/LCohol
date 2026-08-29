@@ -201,7 +201,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
 
   function nearMe() {
     if (!("geolocation" in navigator)) {
-      setNearbyMsg("Your browser can't share location.");
+      setNearbyMsg("This device can't share location.");
       return;
     }
     setLocating(true);

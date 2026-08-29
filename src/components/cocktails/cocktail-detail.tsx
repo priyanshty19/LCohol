@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { CategoryIcon } from "@/components/drinks/category-icons";
+import { FadeImage } from "@/components/ui/fade-image";
+import { DefaultDrinkArtwork } from "@/components/drinks/default-drink-artwork";
 import { ShareCocktailButton } from "@/components/cocktails/share-cocktail-button";
 import type { CatalogCocktailEntry } from "@/types/database";
 
@@ -8,9 +9,14 @@ import type { CatalogCocktailEntry } from "@/types/database";
 // counterpart to /drinks/[slug]. The modal in cocktails-view becomes secondary.
 
 export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
-  const ingredientNames = entry.ingredients.map(
-    (i) => i.ingredient?.name ?? i.drink?.name ?? "Unknown",
-  );
+  const ingredientNames = entry.ingredients.flatMap((i) => {
+    const name = i.ingredient?.name ?? i.drink?.name ?? "Unknown";
+    // Existing seeded rows used this vague umbrella label. Keep old databases
+    // specific on sight while the corrected seed data rolls out.
+    return name.toLocaleLowerCase() === "three premium gins"
+      ? ["Stranger & Sons Gin", "Hapusa Himalayan Dry Gin", "Greater Than London Dry Gin"]
+      : [name];
+  });
 
   return (
     <article className="mx-auto max-w-2xl space-y-6">
@@ -25,8 +31,12 @@ export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
       <header className="glass-panel-subtle relative overflow-hidden rounded-2xl p-5">
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
         <div className="relative flex items-start gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/15">
-            <CategoryIcon category={entry.glass} className="h-11 w-11 text-primary/70" />
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl ring-1 ring-primary/15">
+            {entry.imageUrl ? (
+              <FadeImage src={entry.imageUrl} alt={entry.name} fill sizes="96px" className="object-cover" unoptimized fallback={<DefaultDrinkArtwork name={entry.name} category={entry.glass} kind="cocktail" />} />
+            ) : (
+              <DefaultDrinkArtwork name={entry.name} category={entry.glass} kind="cocktail" />
+            )}
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight">

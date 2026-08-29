@@ -39,6 +39,6 @@ export const config = {
     // unauthenticated requests to e.g. /manifest.json get 307'd to /login and the
     // browser parses the redirect HTML as JSON ("Manifest: Syntax error"). Covers
     // the PWA manifest, robots/sitemap, and static image/icon files.
-    "/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|offline.html|robots.txt|sitemap.xml|\\.well-known/assetlinks.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };

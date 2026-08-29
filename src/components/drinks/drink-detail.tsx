@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { FadeImage } from "@/components/ui/fade-image";
 import { ArrowLeft, Share2, Sparkles, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TasteProfileChart } from "./taste-profile-chart";
-import { CategoryIcon } from "./category-icons";
+import { DefaultDrinkArtwork } from "./default-drink-artwork";
 import type { DrinkWithRelations } from "@/types/database";
 
 const PRICE_LABELS: Record<string, string> = {
@@ -141,7 +141,7 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
       {/* Cinematic hero */}
       <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[28px] border border-white/10 bg-muted/20 sm:aspect-[16/10]">
         {drink.imageUrl ? (
-          <Image
+          <FadeImage
             src={drink.imageUrl}
             alt={drink.name}
             fill
@@ -149,11 +149,10 @@ export function DrinkDetail({ drinkSlug }: DrinkDetailProps) {
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 672px"
             unoptimized
+            fallback={<DefaultDrinkArtwork name={drink.name} category={drink.category.name} />}
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-gradient-to-br from-muted/40 via-transparent to-transparent">
-            <CategoryIcon category={drink.category.name} className="h-24 w-24 text-primary/40" />
-          </div>
+          <DefaultDrinkArtwork name={drink.name} category={drink.category.name} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
         {!drink.isUserSubmitted && (

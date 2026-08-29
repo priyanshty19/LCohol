@@ -23,7 +23,8 @@ const summaryInclude = {
 } as const;
 
 export async function getPartiesFor(userId: string) {
-  const [hosting, invited] = await Promise.all([
+  const liveCutoff = new Date(Date.now() - 6 * 60 * 60 * 1000);
+  const [hosting, invited, open] = await Promise.all([
     prisma.partyPlan.findMany({
       where: { authorId: userId },
       orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
@@ -37,8 +38,22 @@ export async function getPartiesFor(userId: string) {
         invites: { where: { invitedUserId: userId }, select: { rsvp: true } },
       },
     }),
+    prisma.partyPlan.findMany({
+      where: {
+        visibility: "PUBLIC",
+        status: "UPCOMING",
+        authorId: { not: userId },
+        OR: [{ startsAt: null }, { startsAt: { gte: liveCutoff } }],
+      },
+      orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
+      take: 50,
+      include: {
+        ...summaryInclude,
+        invites: { where: { invitedUserId: userId }, select: { rsvp: true } },
+      },
+    }),
   ]);
-  return { hosting, invited };
+  return { hosting, invited, open };
 }
 
 // Centralized host-ownership guard for party mutations. Returns the party (with

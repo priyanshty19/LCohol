@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sipstories.android",
+      "sha256_cert_fingerprints": [
+        "A8:51:98:F2:22:D7:B6:74:04:63:82:A3:7B:D7:32:CF:FB:56:EA:91:11:7F:3B:E3:8C:23:3A:FC:9E:71:4F:A0"
+      ]
+    }
+  }
+]

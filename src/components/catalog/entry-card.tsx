@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FadeImage } from "@/components/ui/fade-image";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { CategoryIcon } from "@/components/drinks/category-icons";
+import { DefaultDrinkArtwork } from "@/components/drinks/default-drink-artwork";
 import { calculateStatePrice, formatPriceINR } from "@/lib/state-pricing";
 import type { CatalogEntry } from "@/types/database";
 
@@ -53,17 +53,17 @@ export function EntryCard({ entry, stateCode = "DL", badge }: EntryCardProps) {
                 className="object-cover transition-[opacity,transform] duration-300 group-hover:scale-105"
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 unoptimized
+                fallback={<DefaultDrinkArtwork name={entry.name} category={entry.kind === "drink" ? entry.category : entry.glass} kind={entry.kind} />}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
             </>
           ) : (
-            <div className="flex h-full items-center justify-center bg-gradient-to-br from-muted/40 via-transparent to-transparent">
-              {/* Drinks resolve to a spirit icon; cocktails fall back to a glass. */}
-              <CategoryIcon
-                category={entry.kind === "drink" ? entry.category : entry.glass}
-                className="h-16 w-16 text-primary/45 transition-transform duration-300 group-hover:scale-110"
-              />
-            </div>
+            <DefaultDrinkArtwork
+              name={entry.name}
+              category={entry.kind === "drink" ? entry.category : entry.glass}
+              kind={entry.kind}
+              className="transition-transform duration-300 group-hover:scale-105"
+            />
           )}
           {/* Category pill overlay */}
           <div className="absolute left-2 top-2">

@@ -10,6 +10,6 @@ export const metadata: Metadata = { title: "Parties" };
 export default async function PartiesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  const { hosting, invited } = await getPartiesFor(user.id);
-  return <PartiesView hosting={hosting} invited={invited} />;
+  const { hosting, invited, open } = await getPartiesFor(user.id);
+  return <PartiesView hosting={hosting} invited={invited} open={open} />;
 }

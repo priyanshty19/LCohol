@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Access Denied" };
+
 export default function DeniedPage() {
   return (
     <div className="bg-ambient flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
@@ -12,10 +16,10 @@ export default function DeniedPage() {
           If you believe this is a mistake, contact the host.
         </p>
         <a
-          href="/login"
+          href="/api/auth/logout"
           className="btn-gold inline-flex min-h-[44px] items-center justify-center rounded-lg px-6 py-2.5 text-sm font-medium transition-colors"
         >
-          Back to Login
+          Sign out and return to login
         </a>
         <p className="font-display text-xs text-muted-foreground/50">
           SIPSTORIES · Private Beta

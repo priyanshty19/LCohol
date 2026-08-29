@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getCookie, setCookie } from "@/lib/client-cookies";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export const AGE_COOKIE = "sip_age_ok";
 export const GEO_COOKIE = "sip_geo_ok";
@@ -11,18 +12,24 @@ export function AgeGateOverlay() {
   const [exiting, setExiting] = useState(false);
 
   useEffect(() => {
-    // Persistent cookie (1yr) — survives tab close, unlike the old sessionStorage.
-    const verified = getCookie(AGE_COOKIE);
-    if (!verified) {
-      setVisible(true);
-      document.body.style.overflow = "hidden";
-    }
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      // Persistent cookie (1yr) — survives tab close, unlike the old sessionStorage.
+      const verified = getCookie(AGE_COOKIE);
+      if (!verified) {
+        setVisible(true);
+        document.body.style.overflow = "hidden";
+      }
+    });
     return () => {
+      active = false;
       document.body.style.overflow = "";
     };
   }, []);
 
   function handleAccept() {
+    trackAnalyticsEvent("age_gate_accept");
     setExiting(true);
     setTimeout(() => {
       // Only record age verification. The geo/prohibition-states disclaimer is a
@@ -35,6 +42,7 @@ export function AgeGateOverlay() {
   }
 
   function handleDecline() {
+    trackAnalyticsEvent("age_gate_decline");
     window.location.href = "https://www.google.com";
   }
 

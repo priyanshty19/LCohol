@@ -29,6 +29,7 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
   const [barResults, setBarResults] = useState<Bar[]>([]);
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
   const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState<"PUBLIC" | "CIRCLE">("CIRCLE");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
           barId: venueMode === "bar" ? selectedBar?.id ?? null : null,
           locationText: venueMode === "house" ? locationText.trim() || null : null,
           description: description.trim() || null,
+          visibility,
         }),
       });
       const j = await r.json();
@@ -183,6 +185,20 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Details (optional)</label>
               <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="BYOB, dress code, what to bring…" />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Who can find it?</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setVisibility("CIRCLE")} className={"rounded-xl border p-3 text-left text-xs transition " + (visibility === "CIRCLE" ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground")}>
+                  <span className="block font-semibold text-foreground">Private invite</span>
+                  Only people you invite
+                </button>
+                <button type="button" onClick={() => setVisibility("PUBLIC")} className={"rounded-xl border p-3 text-left text-xs transition " + (visibility === "PUBLIC" ? "border-primary bg-primary/10" : "border-border/60 text-muted-foreground")}>
+                  <span className="block font-semibold text-foreground">Open party</span>
+                  Discoverable while live or upcoming
+                </button>
+              </div>
             </div>
           </div>
 

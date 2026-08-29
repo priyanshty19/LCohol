@@ -51,7 +51,7 @@ export function PostCard({ post }: PostCardProps) {
   // replaces it) so the drink share reads cleanly.
   const cocktailSlug = cocktailSlugFromBody(post.body);
   const displayBody = cocktailSlug
-    ? post.body?.replace(/\n*(?:try it or remix it|view recipe)[^\n]*\/cocktails\/[a-z0-9-]+/i, "").trim()
+    ? post.body?.replace(/\n*(?:try it or remix it|view recipe)[^\n]*\/cocktails\/[a-z0-9_-]+/i, "").trim()
     : post.body;
 
   return (

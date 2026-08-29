@@ -59,6 +59,8 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const file = form.get("file");
+  const requestedScope = form.get("scope");
+  const scope = requestedScope === "mixes" ? "mixes" : "posts";
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   const ext = realType === "image/png" ? "png" : realType === "image/webp" ? "webp" : "jpg";
-  const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${user.id}/${scope}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
   const upload = () =>
     supabase.storage.from(BUCKET).upload(path, buffer, {

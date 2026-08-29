@@ -7,7 +7,12 @@ export type Layer = { slug: string; name: string; category: string };
 export function hasWebGL(): boolean {
   try {
     const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    // Three.js r163+ only supports WebGL 2. Treating a WebGL 1 context as
+    // compatible sends older Android GPUs into <Canvas>, where WebGLRenderer
+    // throws and leaves the Mix Lab stage blank instead of using the fallback.
+    const context = c.getContext("webgl2");
+    context?.getExtension("WEBGL_lose_context")?.loseContext();
+    return context !== null;
   } catch {
     return false;
   }

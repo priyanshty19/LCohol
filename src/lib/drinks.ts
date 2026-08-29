@@ -5,6 +5,7 @@ import { DRINKS_PAGE_SIZE } from "@/lib/constants";
 // pagination) and the drinks page server component (initial render).
 
 export type DrinksQuery = {
+  slugs?: string[];
   category?: string | null;
   subcategory?: string | null;
   brand?: string | null;
@@ -23,6 +24,7 @@ export async function getDrinks(opts: DrinksQuery = {}) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {};
+  if (opts.slugs?.length) where.slug = { in: opts.slugs.slice(0, DRINKS_PAGE_SIZE) };
   if (opts.category) where.category = { slug: opts.category };
   if (opts.subcategory) where.subcategory = { slug: opts.subcategory };
   if (opts.brand) where.brand = opts.brand;

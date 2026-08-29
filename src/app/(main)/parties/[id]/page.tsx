@@ -16,7 +16,7 @@ export default async function PartyPage({ params }: { params: Promise<{ id: stri
 
   const isHost = party.authorId === user.id;
   const myInvite = party.invites.find((i) => i.invitedUserId === user.id);
-  if (!isHost && !myInvite) notFound(); // only host + invited guests
+  if (!isHost && !myInvite && party.visibility !== "PUBLIC") notFound();
 
   return (
     <>
