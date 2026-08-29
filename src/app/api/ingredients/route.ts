@@ -4,9 +4,9 @@ import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // GET /api/ingredients → the picker dictionary for ingredient search.
 // Sourced from the normalized Ingredient table (NOT loaded cocktail rows, which
-// would be incomplete). Cached — this list changes rarely (route reads nothing,
-// so revalidate genuinely applies here, unlike the dynamic /api/cocktails).
-export const revalidate = 600;
+// would be incomplete). Keep this request-time so builds never depend on a live
+// preview database; the client query cache handles repeat picker requests.
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
