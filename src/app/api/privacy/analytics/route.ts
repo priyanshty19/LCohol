@@ -7,8 +7,9 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-function consentLabel(value: boolean | null): "granted" | "denied" | null {
-  return value === null ? null : value ? "granted" : "denied";
+function savedConsent(context: unknown): "granted" | "denied" | null {
+  if (!context || typeof context !== "object" || Array.isArray(context)) return null;
+  return normalizeAnalyticsConsent((context as { consent?: unknown }).consent);
 }
 
 export async function GET() {
@@ -17,13 +18,29 @@ export async function GET() {
     return NextResponse.json({ authenticated: false, data: { consent: null } });
   }
 
-  return NextResponse.json({
-    authenticated: true,
-    data: {
-      consent: consentLabel(user.analyticsConsent),
-      updatedAt: user.analyticsConsentUpdatedAt,
-    },
-  });
+  try {
+    const preference = await prisma.userInteraction.findFirst({
+      where: {
+        userId: user.id,
+        interactionType: "VIEW",
+        targetType: "FEATURE",
+        context: { path: ["feature"], equals: "analytics_consent" },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { context: true, createdAt: true },
+    });
+    return NextResponse.json({
+      authenticated: true,
+      data: {
+        consent: savedConsent(preference?.context),
+        updatedAt: preference?.createdAt ?? null,
+      },
+    });
+  } catch (error) {
+    if (isPoolExhausted(error)) return poolBusyResponse();
+    console.error("[api/privacy/analytics] GET", error);
+    return NextResponse.json({ error: "Couldn't load your privacy choice." }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -44,19 +61,20 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const updated = await prisma.user.update({
-      where: { id: user.id },
+    const updated = await prisma.userInteraction.create({
       data: {
-        analyticsConsent: consent === "granted",
-        analyticsConsentUpdatedAt: new Date(),
+        userId: user.id,
+        interactionType: "VIEW",
+        targetType: "FEATURE",
+        context: { feature: "analytics_consent", consent },
       },
-      select: { analyticsConsent: true, analyticsConsentUpdatedAt: true },
+      select: { context: true, createdAt: true },
     });
 
     return NextResponse.json({
       data: {
-        consent: consentLabel(updated.analyticsConsent),
-        updatedAt: updated.analyticsConsentUpdatedAt,
+        consent: savedConsent(updated.context),
+        updatedAt: updated.createdAt,
       },
     });
   } catch (error) {
