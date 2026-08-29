@@ -5,6 +5,7 @@ import { logInteraction } from "@/lib/interactions";
 import { rateLimit } from "@/lib/rate-limit";
 import { containsProfanity } from "@/lib/profanity";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
+import { sanitizeCocktailImageUrl } from "@/lib/cocktail-image";
 
 // POST /api/cocktails/create
 //   { name, glass?, garnish?, isPublic?, ingredientSlugs: string[] }
@@ -31,20 +32,6 @@ function mixSlug(name: string): string {
   const suffix = nanoid().toLowerCase();
   const base = slugify(name).slice(0, 220 - suffix.length - 1) || "my-mix";
   return `${base}-${suffix}`;
-}
-
-function sanitizeImageUrl(value: unknown): string | null {
-  if (typeof value !== "string" || !value) return null;
-  try {
-    const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
-    const image = new URL(value);
-    return storageHost && image.protocol === "https:" && image.hostname === storageHost &&
-      image.pathname.startsWith("/storage/v1/object/public/post-images/")
-      ? image.toString()
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 // A write endpoint is a DoS magnet: each call does several DB round-trips, so a
@@ -115,7 +102,7 @@ export async function POST(request: Request) {
       garnish: typeof body.garnish === "string" ? body.garnish.slice(0, 200) : null,
       category: "My Mix",
       categorySlug: "my-mix",
-      imageUrl: sanitizeImageUrl(body.imageUrl),
+      imageUrl: sanitizeCocktailImageUrl(body.imageUrl, me.id),
       isCurated: false,
       isPublic: body.isPublic === true,
       ingredients: {

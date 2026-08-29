@@ -1,14 +1,19 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { FadeImage } from "@/components/ui/fade-image";
-import { DefaultDrinkArtwork } from "@/components/drinks/default-drink-artwork";
 import { ShareCocktailButton } from "@/components/cocktails/share-cocktail-button";
+import { CocktailImageEditor } from "@/components/cocktails/cocktail-image-editor";
 import type { CatalogCocktailEntry } from "@/types/database";
 
 // Server-rendered cocktail detail (SSR, no client fetch) — the deep-linkable
 // counterpart to /drinks/[slug]. The modal in cocktails-view becomes secondary.
 
-export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
+export function CocktailDetail({
+  entry,
+  canEditImage = false,
+}: {
+  entry: CatalogCocktailEntry;
+  canEditImage?: boolean;
+}) {
   const ingredientNames = entry.ingredients.flatMap((i) => {
     const name = i.ingredient?.name ?? i.drink?.name ?? "Unknown";
     // Existing seeded rows used this vague umbrella label. Keep old databases
@@ -31,13 +36,13 @@ export function CocktailDetail({ entry }: { entry: CatalogCocktailEntry }) {
       <header className="glass-panel-subtle relative overflow-hidden rounded-2xl p-5">
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
         <div className="relative flex items-start gap-4">
-          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl ring-1 ring-primary/15">
-            {entry.imageUrl ? (
-              <FadeImage src={entry.imageUrl} alt={entry.name} fill sizes="96px" className="object-cover" unoptimized fallback={<DefaultDrinkArtwork name={entry.name} category={entry.glass} kind="cocktail" />} />
-            ) : (
-              <DefaultDrinkArtwork name={entry.name} category={entry.glass} kind="cocktail" />
-            )}
-          </div>
+          <CocktailImageEditor
+            cocktailId={entry.id}
+            name={entry.name}
+            glass={entry.glass}
+            initialImageUrl={entry.imageUrl}
+            canEdit={canEditImage}
+          />
           <div className="min-w-0 flex-1 space-y-2">
             <h1 className="font-display text-2xl font-semibold leading-tight tracking-tight">
               {entry.name}
