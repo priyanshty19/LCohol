@@ -71,11 +71,32 @@ test("closed, future, unknown, and locationless places are excluded", () => {
       id: "unknown",
       location: { latitude: 28.63, longitude: 77.23 },
     },
+    {
+      id: "restaurant-only",
+      businessStatus: "OPERATIONAL",
+      primaryType: "restaurant",
+      types: ["restaurant", "food"],
+      location: { latitude: 28.64, longitude: 77.24 },
+    },
     { id: "no-location", businessStatus: "OPERATIONAL" },
   ]);
 
   assert.deepEqual(bars.map((bar) => bar.id), ["open"]);
   assert.equal(bars[0]?.type, "BAR");
+});
+
+test("BYOB text search may retain operational venues without a Google bar type", () => {
+  const restaurant = {
+    id: "byob-restaurant",
+    displayName: { text: "Bring Your Own Bistro" },
+    businessStatus: "OPERATIONAL" as const,
+    primaryType: "restaurant",
+    types: ["restaurant", "food"],
+    location: { latitude: 28.64, longitude: 77.24 },
+  };
+
+  assert.equal(toOperationalNearbyBars([restaurant]).length, 0);
+  assert.equal(toOperationalNearbyBars([restaurant], null, true).length, 1);
 });
 
 test("nearby text search filters by name, area, and category", () => {
