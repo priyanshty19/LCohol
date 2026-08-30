@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { resolvePushCapability } from "@/lib/push-capability";
 
@@ -41,6 +41,7 @@ export function NotificationToggle() {
   const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
     const capability = resolvePushCapability({
@@ -56,11 +57,19 @@ export function NotificationToggle() {
     }
     let active = true;
     (async () => {
-      const registration = await navigator.serviceWorker.getRegistration();
-      const sub = registration ? await registration.pushManager.getSubscription() : null;
+      // Prepare the registration before the button is shown. On installed iOS
+      // apps where window.Notification is absent, subscribe() itself must run
+      // directly from the user's tap.
+      const registration = await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+        updateViaCache: "none",
+      });
+      registrationRef.current = registration;
+      const sub = await registration.pushManager.getSubscription();
       if (!active) return;
-      if (sub && Notification.permission === "granted") setState("on");
-      else if (Notification.permission === "denied") setState("denied");
+      if (sub) setState("on");
+      else if ("Notification" in window && Notification.permission === "denied")
+        setState("denied");
       else setState("default");
     })().catch((error) => {
       if (!active) return;
@@ -79,14 +88,20 @@ export function NotificationToggle() {
     setErrorMessage("");
     try {
       // WebKit requires the permission prompt to remain attached to this user
-      // gesture. Do not await service-worker work before requesting permission.
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") {
-        setState(perm === "denied" ? "denied" : "default");
-        return;
+      // gesture. Newer/installed WebKit builds can expose PushManager without
+      // exposing window.Notification, so support both permission entry points.
+      if ("Notification" in window) {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") {
+          setState(perm === "denied" ? "denied" : "default");
+          return;
+        }
       }
-      await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      const registration = await navigator.serviceWorker.ready;
+
+      const registration = registrationRef.current;
+      if (!registration) {
+        throw new Error("Notifications are still preparing. Please wait a moment and try again.");
+      }
       const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID!),
@@ -102,6 +117,10 @@ export function NotificationToggle() {
       }
       setState("on");
     } catch (error) {
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        setState("denied");
+        return;
+      }
       setErrorMessage(
         error instanceof Error ? error.message : "Couldn't enable push notifications.",
       );
@@ -141,8 +160,8 @@ export function NotificationToggle() {
   if (state === "unsupported") {
     return (
       <p className="text-xs leading-relaxed text-muted-foreground">
-        This device or browser doesn&apos;t expose Web Push. On iPhone or iPad, use iOS 16.4 or later
-        and open the installed Home Screen app.
+        This device or browser doesn&apos;t expose Web Push. On iPhone or iPad, update iOS and install
+        Sip Stories from the browser&apos;s Share → Add to Home Screen option.
       </p>
     );
   }

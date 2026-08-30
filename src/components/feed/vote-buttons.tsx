@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { bustFeedCache } from "./post-list";
+import {
+  beginVoteRequest,
+  finishVoteRequest,
+  parseVoteResponse,
+  type VoteState,
+} from "./vote-state";
 
 interface VoteButtonsProps {
   postId: string;
@@ -17,16 +23,17 @@ export function VoteButtons({
 }: VoteButtonsProps) {
   // Score + the viewer's vote move together, so keep them in one state object and
   // update atomically in a single pure updater.
-  const [state, setState] = useState<{ score: number; vote: number | null }>({
+  const [state, setState] = useState<VoteState>({
     score: initialScore,
-    vote: initialVote ?? null,
+    vote: initialVote === 1 || initialVote === -1 ? initialVote : null,
   });
   const { score, vote: userVote } = state;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestInFlight = useRef(false);
 
   async function handleVote(value: 1 | -1) {
-    if (pending) return;
+    if (!beginVoteRequest(requestInFlight)) return;
     setPending(true);
     setError(null);
     bustFeedCache(); // a cached first page now holds a stale score/vote for this post
@@ -37,17 +44,17 @@ export function VoteButtons({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       });
-      const data = (await res.json().catch(() => null)) as
-        | { data?: { vote?: number | null; score?: number } }
-        | null;
-      if (typeof data?.data?.score === "number") {
-        setState({ score: data.data.score, vote: data.data.vote ?? null });
+      const data = (await res.json().catch(() => null)) as { data?: unknown } | null;
+      const next = parseVoteResponse(data?.data);
+      if (res.ok && next) {
+        setState(next);
       } else {
         setError("Vote was not saved. Please try again.");
       }
     } catch {
       setError("Vote was not saved. Please try again.");
     } finally {
+      finishVoteRequest(requestInFlight);
       setPending(false);
     }
   }
