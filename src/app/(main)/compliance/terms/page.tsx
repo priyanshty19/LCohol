@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LegalPageClose } from "@/components/compliance/legal-page-close";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <div className="prose prose-invert mx-auto max-w-3xl">
+      <LegalPageClose pageName="Terms and Conditions" />
       <h1 className="font-display text-2xl font-bold text-primary">Terms of Service</h1>
       <p className="text-sm text-muted-foreground">
         Last updated: June 2026

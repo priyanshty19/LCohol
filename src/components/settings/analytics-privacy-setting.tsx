@@ -7,20 +7,26 @@ import {
   type AnalyticsConsent,
 } from "@/lib/analytics-consent";
 import { ANALYTICS_CONSENT_COOKIE } from "@/lib/analytics";
-import { setCookie } from "@/lib/client-cookies";
+import { getCookie, setCookie } from "@/lib/client-cookies";
 import { toast } from "@/lib/toast";
 
 export function AnalyticsPrivacySetting() {
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch("/api/privacy/analytics", { cache: "no-store" })
       .then((response) => response.json())
       .then((payload) => {
-        if (active) setConsent(normalizeAnalyticsConsent(payload.data?.consent));
+        if (!active) return;
+        const accountConsent = normalizeAnalyticsConsent(payload.data?.consent);
+        setAuthenticated(payload.authenticated === true);
+        setConsent(
+          accountConsent ?? normalizeAnalyticsConsent(getCookie(ANALYTICS_CONSENT_COOKIE)),
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -35,13 +41,15 @@ export function AnalyticsPrivacySetting() {
     if (saving || next === consent) return;
     setSaving(true);
     try {
-      const response = await fetch("/api/privacy/analytics", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ consent: next }),
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error ?? "Couldn't save your privacy choice.");
+      if (authenticated) {
+        const response = await fetch("/api/privacy/analytics", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ consent: next }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error ?? "Couldn't save your privacy choice.");
+      }
 
       setCookie(ANALYTICS_CONSENT_COOKIE, next);
       setConsent(next);
@@ -60,7 +68,8 @@ export function AnalyticsPrivacySetting() {
         <p className="text-sm font-medium">Usage analytics</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
           Choose whether Sip Stories may use privacy-safe Google Analytics. Advertising tracking
-          remains off. Your selection is saved to your account and follows you across devices.
+          remains off. Signed-in choices follow you across devices; otherwise the choice is saved
+          on this device.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="group" aria-label="Usage analytics preference">
@@ -86,7 +95,15 @@ export function AnalyticsPrivacySetting() {
         </button>
       </div>
       <p className="text-xs text-muted-foreground" aria-live="polite">
-        {loading ? "Loading your saved choice…" : saving ? "Saving…" : consent ? "Saved to your account." : "No choice saved yet."}
+        {loading
+          ? "Loading your saved choice…"
+          : saving
+            ? "Saving…"
+            : consent
+              ? authenticated
+                ? "Saved to your account."
+                : "Saved on this device."
+              : "No choice saved yet."}
       </p>
     </div>
   );
