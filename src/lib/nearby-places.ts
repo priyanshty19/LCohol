@@ -28,6 +28,11 @@ const GOOGLE_TYPES: Record<NearbyCategory, readonly string[]> = {
 
 const ALL_GOOGLE_TYPES = [...new Set(Object.values(GOOGLE_TYPES).flat())];
 
+function isSupportedGoogleBarPlace(place: Pick<GooglePlace, "primaryType" | "types">): boolean {
+  const types = new Set([place.primaryType, ...(place.types ?? [])].filter(Boolean));
+  return ALL_GOOGLE_TYPES.some((type) => types.has(type));
+}
+
 export function parseNearbyCategory(value: string | null): NearbyCategory | null {
   return NEARBY_CATEGORIES.includes(value as NearbyCategory) ? (value as NearbyCategory) : null;
 }
@@ -53,10 +58,18 @@ export function placeMatchesGoogleCategory(
   return GOOGLE_TYPES[category].some((type) => types.has(type));
 }
 
-export function toOperationalNearbyBars(places: GooglePlace[], requestedCategory: NearbyCategory | null = null) {
+export function toOperationalNearbyBars(
+  places: GooglePlace[],
+  requestedCategory: NearbyCategory | null = null,
+  allowTextSearchMatches = false,
+) {
   return places
     .filter((place) => place.location && place.businessStatus === "OPERATIONAL")
-    .filter((place) => !requestedCategory || placeMatchesGoogleCategory(place, requestedCategory))
+    .filter((place) =>
+      requestedCategory
+        ? placeMatchesGoogleCategory(place, requestedCategory)
+        : allowTextSearchMatches || isSupportedGoogleBarPlace(place),
+    )
     .map((place) => ({
       id: place.id,
       name: place.displayName?.text ?? "Unnamed bar",

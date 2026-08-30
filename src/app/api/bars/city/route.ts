@@ -62,7 +62,11 @@ const fetchCityPlacesCached = unstable_cache(
       nextPageToken?: string;
     };
     const googleCategory = cityCategoryAsNearby(category);
-    const data = toOperationalNearbyBars(json.places ?? [], googleCategory).map((place) => ({
+    const data = toOperationalNearbyBars(
+      json.places ?? [],
+      googleCategory,
+      category === "BYOB",
+    ).map((place) => ({
       ...place,
       type: category ?? place.type,
       city,

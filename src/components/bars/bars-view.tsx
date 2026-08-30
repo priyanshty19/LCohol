@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { saveProfileLocation } from "@/lib/client-location";
+import { filterNearbyBars } from "@/lib/nearby-places";
+import { googleBarsRequest } from "@/lib/bars-query";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
   ssr: false,
@@ -140,23 +142,18 @@ function BarCard({
   );
 }
 
-export function BarsView({ initialBars }: { initialBars: Bar[] }) {
+export function BarsView() {
   const [city, setCity] = useState("Delhi NCR");
   const [type, setType] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [bars, setBars] = useState<Bar[]>(initialBars); // seeded from server
+  const [bars, setBars] = useState<Bar[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   // Nearby (Google Places) mode — real bars around the user's location.
   const [nearby, setNearby] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [nearbyMsg, setNearbyMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [userLoc, setUserLoc] = useState<[number, number] | null>(null);
-  // Skip only the FIRST effect run (server already provided initialBars for the
-  // default city). A persistent signature match would wrongly skip the refetch
-  // when the user returns to the initial city from another one — leaving stale
-  // pins while the map recenters.
-  const firstRun = useRef(true);
   // Render the Leaflet map only AFTER mount. Even though BarsMap is ssr:false,
   // mounting react-leaflet during hydration can throw in the production build and
   // silently abort hydration of the whole BarsView subtree (dead city buttons,
@@ -169,71 +166,73 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   }, []);
 
   useEffect(() => {
-    if (nearby) return; // nearby results override the curated city list
-    if (firstRun.current) {
-      firstRun.current = false;
-      return; // initial render already has server bars for the default city
-    }
-    setLoading(true);
-    const params = new URLSearchParams({ city });
-    if (type) params.set("type", type);
-    if (q) params.set("q", q);
-    fetch(`/api/bars?${params.toString()}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setBars(d.data ?? []);
-        setSelected(null);
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, type, q]);
+    if (nearby && !userLoc) return;
+    const controller = new AbortController();
 
-  function fetchCity() {
-    setLoading(true);
-    const params = new URLSearchParams({ city });
-    if (type) params.set("type", type);
-    if (q) params.set("q", q);
-    fetch(`/api/bars?${params.toString()}`)
-      .then((r) => r.json())
-      .then((d) => { setBars(d.data ?? []); setSelected(null); })
-      .finally(() => setLoading(false));
-  }
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setStatusMsg(null);
+      const { endpoint, params } = googleBarsRequest({
+        city,
+        type,
+        query: q,
+        nearbyLocation: nearby ? userLoc : null,
+      });
+
+      try {
+        const response = await fetch(`${endpoint}?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error ?? "Couldn't load Google Maps places.");
+
+        const places = (body.data ?? []) as Bar[];
+        setBars(nearby ? filterNearbyBars(places, q) : places);
+        setSelected(null);
+        if (!places.length) {
+          setStatusMsg(
+            nearby ? "No matching places found within about 3 km." : "No matching Google Maps places found.",
+          );
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setBars([]);
+        setSelected(null);
+        setStatusMsg(error instanceof Error ? error.message : "Couldn't load Google Maps places.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, q.trim() ? 350 : 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [city, type, q, nearby, userLoc]);
 
   function nearMe() {
     if (!("geolocation" in navigator)) {
-      setNearbyMsg("This device can't share location.");
+      setStatusMsg("This device can't share location.");
       return;
     }
     setLocating(true);
-    setNearbyMsg(null);
+    setStatusMsg(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserLoc([latitude, longitude]);
+        setNearby(true);
+        setLocating(false);
         fetch(`/api/location/reverse?lat=${latitude}&lng=${longitude}`)
           .then(async (r) => (r.ok ? r.json() : null))
           .then((body) => {
             if (body?.data) saveProfileLocation(body.data);
           })
           .catch(() => {});
-        fetch(`/api/bars/nearby?lat=${latitude}&lng=${longitude}&radius=3000`)
-          .then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }))
-          .then(({ ok, body }) => {
-            if (!ok) {
-              setNearbyMsg(body.error ?? "Couldn't fetch nearby bars.");
-              return;
-            }
-            setNearby(true);
-            setBars(body.data ?? []);
-            setSelected(null);
-            if (!body.data?.length) setNearbyMsg("No bars found within ~3 km.");
-          })
-          .catch(() => setNearbyMsg("Couldn't fetch nearby bars."))
-          .finally(() => setLocating(false));
       },
       () => {
         setLocating(false);
-        setNearbyMsg("Location permission denied — showing city bars instead.");
+        setStatusMsg("Location permission denied — showing Google Maps places for the selected city.");
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
@@ -242,8 +241,7 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
   function exitNearby() {
     setNearby(false);
     setUserLoc(null);
-    setNearbyMsg(null);
-    fetchCity(); // restore curated city bars
+    setStatusMsg(null);
   }
 
   function askJames(b: Bar) {
@@ -295,9 +293,9 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
               const wasNearby = nearby;
               setNearby(false);
               setUserLoc(null);
-              setNearbyMsg(null);
+              setStatusMsg(null);
               if (c !== city) setCity(c);
-              else if (wasNearby) fetchCity();
+              else if (!wasNearby) setSelected(null);
             }}
             className={cn(
               "shrink-0 rounded-full px-3 py-1.5 text-sm",
@@ -308,16 +306,19 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
           </button>
         ))}
       </div>
-      {(nearby || nearbyMsg) && (
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-          <span>{nearby ? "Showing real bars near you (Google Places)." : nearbyMsg}</span>
-          {nearby && (
-            <button onClick={exitNearby} className="shrink-0 text-primary underline-offset-2 hover:underline">
-              Back to city bars
-            </button>
-          )}
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        <span>
+          {statusMsg ??
+            (nearby
+              ? "Showing operational places near you from Google Maps."
+              : "Showing operational places for this city from Google Maps.")}
+        </span>
+        {nearby && (
+          <button onClick={exitNearby} className="shrink-0 text-primary underline-offset-2 hover:underline">
+            Back to city bars
+          </button>
+        )}
+      </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
@@ -361,11 +362,11 @@ export function BarsView({ initialBars }: { initialBars: Bar[] }) {
           {!loading && bars.length === 0 && (
             <EmptyState
               emoji="🍸"
-              title="No bars mapped here yet"
-              subtitle="Try another neighborhood or city — the map's still filling up."
+              title="No matching places"
+              subtitle="Try another city, category, or search term."
             />
           )}
-          {bars.map((b) => (
+          {!loading && bars.map((b) => (
             <BarCard
               key={b.id}
               b={b}
