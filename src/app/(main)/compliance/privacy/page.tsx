@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { AnalyticsPrivacySetting } from "@/components/settings/analytics-privacy-setting";
+import { LegalPageClose } from "@/components/compliance/legal-page-close";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -9,6 +11,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div className="prose prose-invert mx-auto max-w-3xl">
+      <LegalPageClose pageName="Privacy Policy" />
       <h1 className="font-display text-2xl font-bold text-primary">Privacy Policy</h1>
       <p className="text-sm text-muted-foreground">
         Last updated: August 2026
@@ -192,13 +195,19 @@ export default function PrivacyPage() {
           <p className="mt-2">
             You can choose &ldquo;Essential only&rdquo; or &ldquo;Allow
             analytics&rdquo; in the one-time consent notice and change that decision at any
-            time under Privacy in Settings. Withdrawing
+            time using the Privacy Choices below. Withdrawing
             analytics consent stops future Analytics events and removes
             first-party Google Analytics cookies available to this site. Google
             may process consented analytics data as our service provider under
             its applicable data-processing terms. We do not use third-party
             advertising cookies.
           </p>
+          <div className="not-prose mt-4 rounded-2xl border border-border/70 bg-card/60 p-4 sm:p-5">
+            <h3 className="mb-3 font-display text-base font-semibold text-foreground">
+              Privacy Choices
+            </h3>
+            <AnalyticsPrivacySetting />
+          </div>
         </section>
 
         <section>
