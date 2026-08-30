@@ -25,3 +25,7 @@ test("installed apps are not rejected by the unreliable window PushManager globa
   assert.doesNotMatch(source, /Reflect\.has\(window, "PushManager"\)/);
   assert.match(source, /registration\.pushManager/);
 });
+
+test("the UI delegates platform support decisions to the tested capability model", () => {
+  assert.match(source, /resolvePushCapability/);
+});
