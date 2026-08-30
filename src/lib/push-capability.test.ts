@@ -21,9 +21,14 @@ test("ordinary iPhone Safari receives Home Screen guidance", () => {
   );
 });
 
-test("an installed iPhone app is eligible without a window PushManager check", () => {
+test("an installed iPhone app is eligible without a window Notification global", () => {
   assert.equal(
-    resolvePushCapability({ ...base, appleMobile: true, standalone: true }),
+    resolvePushCapability({
+      ...base,
+      appleMobile: true,
+      standalone: true,
+      notificationAvailable: false,
+    }),
     "available",
   );
 });

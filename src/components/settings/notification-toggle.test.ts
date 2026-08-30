@@ -4,17 +4,19 @@ import test from "node:test";
 
 const source = readFileSync(new URL("./notification-toggle.tsx", import.meta.url), "utf8");
 
-test("notification permission is requested before asynchronous service-worker setup", () => {
+test("notification permission is requested directly from the Enable tap when exposed", () => {
   const enableSource = source.slice(source.indexOf("async function enable"));
   const permissionRequest = enableSource.indexOf("Notification.requestPermission()");
-  const workerRegistration = enableSource.indexOf("navigator.serviceWorker.register(");
 
   assert.notEqual(permissionRequest, -1);
-  assert.notEqual(workerRegistration, -1);
-  assert.ok(
-    permissionRequest < workerRegistration,
-    "WebKit requires the permission request to remain tied to the user's Enable tap",
-  );
+  assert.match(enableSource, /if \("Notification" in window\)/);
+});
+
+test("installed iPhone apps can subscribe when window.Notification is absent", () => {
+  const enableSource = source.slice(source.indexOf("async function enable"));
+
+  assert.match(enableSource, /registrationRef\.current/);
+  assert.match(enableSource, /registration\.pushManager\.subscribe/);
 });
 
 test("iPhone users receive Home Screen installation guidance", () => {

@@ -17,10 +17,12 @@ export function resolvePushCapability({
 }: PushCapabilityInput): PushCapability {
   if (!serviceWorkerAvailable || !vapidConfigured) return "unsupported";
 
-  // iOS deliberately hides the Notification API in ordinary Safari. Explain
-  // the required installation step before treating that missing API as a lack
-  // of device support.
-  if (appleMobile && !standalone) return "install-required";
+  if (appleMobile) {
+    // iOS exposes Web Push only to Home Screen apps. Some WebKit releases do
+    // not expose window.Notification even though the installed app can create
+    // a subscription through ServiceWorkerRegistration.pushManager.
+    return standalone ? "available" : "install-required";
+  }
 
   return notificationAvailable ? "available" : "unsupported";
 }
