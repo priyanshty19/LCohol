@@ -56,13 +56,9 @@ export function NotificationToggle() {
       const timer = window.setTimeout(() => setState("install-required"), 0);
       return () => window.clearTimeout(timer);
     }
-    if (!Reflect.has(window, "PushManager")) {
-      const timer = window.setTimeout(() => setState("unsupported"), 0);
-      return () => window.clearTimeout(timer);
-    }
     (async () => {
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      const registration = await navigator.serviceWorker.getRegistration();
+      const sub = registration ? await registration.pushManager.getSubscription() : null;
       if (sub && Notification.permission === "granted") setState("on");
       else if (Notification.permission === "denied") setState("denied");
       else setState("default");
@@ -81,8 +77,8 @@ export function NotificationToggle() {
         return;
       }
       await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({
+      const registration = await navigator.serviceWorker.ready;
+      const sub = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID!),
       });
@@ -109,8 +105,8 @@ export function NotificationToggle() {
   async function disable() {
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      const registration = await navigator.serviceWorker.getRegistration();
+      const sub = registration ? await registration.pushManager.getSubscription() : null;
       if (sub) {
         await fetch("/api/push/unsubscribe", {
           method: "POST",

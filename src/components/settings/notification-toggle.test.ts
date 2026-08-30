@@ -20,3 +20,8 @@ test("notification permission is requested before asynchronous service-worker se
 test("iPhone users receive Home Screen installation guidance", () => {
   assert.match(source, /Add Sip Stories to your Home Screen/);
 });
+
+test("installed apps are not rejected by the unreliable window PushManager global", () => {
+  assert.doesNotMatch(source, /Reflect\.has\(window, "PushManager"\)/);
+  assert.match(source, /registration\.pushManager/);
+});
