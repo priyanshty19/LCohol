@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { resolvePushCapability } from "@/lib/push-capability";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -42,27 +43,35 @@ export function NotificationToggle() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const isAppleMobile = isAppleMobileDevice();
-    if (
-      typeof window === "undefined" ||
-      !("serviceWorker" in navigator) ||
-      !("Notification" in window) ||
-      !VAPID
-    ) {
-      const timer = window.setTimeout(() => setState("unsupported"), 0);
+    const capability = resolvePushCapability({
+      appleMobile: isAppleMobileDevice(),
+      standalone: isStandaloneApp(),
+      serviceWorkerAvailable: "serviceWorker" in navigator,
+      notificationAvailable: "Notification" in window,
+      vapidConfigured: Boolean(VAPID),
+    });
+    if (capability !== "available") {
+      const timer = window.setTimeout(() => setState(capability), 0);
       return () => window.clearTimeout(timer);
     }
-    if (isAppleMobile && !isStandaloneApp()) {
-      const timer = window.setTimeout(() => setState("install-required"), 0);
-      return () => window.clearTimeout(timer);
-    }
+    let active = true;
     (async () => {
       const registration = await navigator.serviceWorker.getRegistration();
       const sub = registration ? await registration.pushManager.getSubscription() : null;
+      if (!active) return;
       if (sub && Notification.permission === "granted") setState("on");
       else if (Notification.permission === "denied") setState("denied");
       else setState("default");
-    })();
+    })().catch((error) => {
+      if (!active) return;
+      setErrorMessage(
+        error instanceof Error ? error.message : "Couldn't check push notification support.",
+      );
+      setState("error");
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   async function enable() {
@@ -131,8 +140,9 @@ export function NotificationToggle() {
   }
   if (state === "unsupported") {
     return (
-      <p className="text-xs text-muted-foreground">
-        Push notifications aren&apos;t supported on this device.
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        This device or browser doesn&apos;t expose Web Push. On iPhone or iPad, use iOS 16.4 or later
+        and open the installed Home Screen app.
       </p>
     );
   }
