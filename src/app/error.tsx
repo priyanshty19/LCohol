@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 // Route-segment error boundary. Unlike global-error.tsx (which replaces the whole
@@ -33,9 +34,9 @@ export default function Error({
         <Button variant="gold" onClick={() => reset()}>
           Try again
         </Button>
-        <a href="/">
+        <Link href="/">
           <Button variant="glass">Back to feed</Button>
-        </a>
+        </Link>
       </div>
       {error.digest && (
         <p className="mt-4 text-[10px] text-muted-foreground/50">ref: {error.digest}</p>

@@ -1,5 +1,12 @@
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
+import {
+  IngredientCategory,
+  Mood,
+  Occasion,
+  PriceRange,
+  PrismaClient,
+  TagType,
+} from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { CATEGORIES, TAGS } from "../scripts/seed-categories";
 import { DRINKS } from "../scripts/seed-drinks";
@@ -58,7 +65,7 @@ async function main() {
       create: {
         name: tag.name,
         slug: tag.slug,
-        tagType: tag.tagType as any,
+        tagType: tag.tagType as TagType,
       },
     });
   }
@@ -77,7 +84,7 @@ async function main() {
       continue;
     }
 
-    const created = await prisma.drink.upsert({
+    await prisma.drink.upsert({
       where: { slug: drink.slug },
       update: {},
       create: {
@@ -89,17 +96,17 @@ async function main() {
         subcategoryId: subcategoryId || null,
         country: drink.country,
         abv: drink.abv,
-        priceRange: drink.priceRange as any,
+        priceRange: drink.priceRange as PriceRange,
         description: drink.description || null,
         isVerified: true,
         tasteProfile: {
           create: drink.taste,
         },
         occasions: {
-          create: drink.occasions.map((o) => ({ occasion: o as any })),
+          create: drink.occasions.map((o) => ({ occasion: o as Occasion })),
         },
         moods: {
-          create: drink.moods.map((m) => ({ mood: m as any })),
+          create: drink.moods.map((m) => ({ mood: m as Mood })),
         },
         foodPairings: {
           create: drink.foodPairings.map((f) => ({ food: f })),
@@ -178,7 +185,7 @@ async function main() {
       create: {
         name: ing.name,
         slug: ing.slug,
-        category: ing.category as any,
+        category: ing.category as IngredientCategory,
       },
     });
   }

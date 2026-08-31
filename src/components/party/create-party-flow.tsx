@@ -33,15 +33,18 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Bar search (the endpoint is cached). Debounced.
   useEffect(() => {
-    if (venueMode !== "bar" || barQuery.trim().length < 2) {
-      setBarResults([]);
-      return;
-    }
     const t = setTimeout(() => {
+      if (venueMode !== "bar" || barQuery.trim().length < 2) {
+        setBarResults([]);
+        return;
+      }
       fetch(`/api/bars?q=${encodeURIComponent(barQuery.trim())}`)
         .then((r) => r.json())
         .then((d) => setBarResults((d.data ?? []).slice(0, 6)))

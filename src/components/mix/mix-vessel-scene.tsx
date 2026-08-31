@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/immutability -- Three.js materials and shader uniforms are imperative objects intentionally updated by React Three Fiber effects and frame callbacks. */
+
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";

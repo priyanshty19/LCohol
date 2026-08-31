@@ -24,14 +24,13 @@ export function DrinkTagSelector({ selected, onChange }: DrinkTagSelectorProps) 
   const timeoutRef = useRef<NodeJS.Timeout>(undefined);
 
   useEffect(() => {
-    if (query.length < 2) {
-      setResults([]);
-      setOpen(false);
-      return;
-    }
-
     clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(async () => {
+      if (query.length < 2) {
+        setResults([]);
+        setOpen(false);
+        return;
+      }
       const res = await fetch(`/api/drinks/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const json = await res.json();

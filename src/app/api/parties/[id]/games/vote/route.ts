@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getPartyMembership } from "@/lib/parties";
 import { rateLimit } from "@/lib/rate-limit";
-import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 // POST /api/parties/[id]/games/vote  { gameId }  → toggle this member's upvote.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

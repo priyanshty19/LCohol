@@ -7,7 +7,6 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { colorFor } from "@/lib/mix-colors";
 import { toast } from "@/lib/toast";
 import { compressImage } from "@/lib/image-compress";
@@ -71,7 +70,7 @@ export function MixGame() {
   const [shareError, setShareError] = useState<string | null>(null);
 
   useEffect(() => {
-    setWebgl(hasWebGL());
+    const frame = requestAnimationFrame(() => setWebgl(hasWebGL()));
     // Pre-warm the WebGL scene chunk while the user reads the glass picker, so
     // picking a glass mounts the 3D instantly (no load hitch).
     void import("./mix-vessel-scene");
@@ -84,6 +83,7 @@ export function MixGame() {
     const io = new IntersectionObserver(([e]) => setInView(e.isIntersecting), { threshold: 0.05 });
     if (stageRef.current) io.observe(stageRef.current);
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", onVis);
       io.disconnect();
     };

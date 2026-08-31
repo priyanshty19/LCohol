@@ -23,9 +23,12 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 type State = "loading" | "unsupported" | "install-required" | "default" | "denied" | "error" | "on";
 
 function isAppleMobileDevice() {
+  const userAgent = navigator.userAgent;
+  const touchMac = navigator.maxTouchPoints > 1 &&
+    (/Macintosh|Mac OS X/i.test(userAgent) || /MacIntel|iPad/i.test(navigator.platform));
   return (
-    /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+    /iPhone|iPad|iPod/i.test(userAgent) ||
+    touchMac
   );
 }
 

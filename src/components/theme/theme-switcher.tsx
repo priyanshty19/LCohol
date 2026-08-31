@@ -10,10 +10,13 @@ export function ThemeSwitcher() {
   const [active, setActive] = useState<ThemeId>("dark");
 
   useEffect(() => {
-    setActive(getActiveTheme());
+    const frame = requestAnimationFrame(() => setActive(getActiveTheme()));
     const sync = () => setActive(getActiveTheme());
     window.addEventListener("themechange", sync);
-    return () => window.removeEventListener("themechange", sync);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("themechange", sync);
+    };
   }, []);
 
   function pick(id: ThemeId) {

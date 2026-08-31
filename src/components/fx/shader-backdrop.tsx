@@ -21,7 +21,7 @@ export default function ShaderBackdrop() {
   const [colors, setColors] = useState<Triplet>(FALLBACK);
 
   useEffect(() => {
-    setColors(readShaderColors());
+    const frame = requestAnimationFrame(() => setColors(readShaderColors()));
     const onTheme = () => setColors(readShaderColors());
     window.addEventListener("themechange", onTheme);
     // Also catch theme changes made without our helper (e.g. devtools).
@@ -31,6 +31,7 @@ export default function ShaderBackdrop() {
       attributeFilter: ["data-theme"],
     });
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("themechange", onTheme);
       mo.disconnect();
     };

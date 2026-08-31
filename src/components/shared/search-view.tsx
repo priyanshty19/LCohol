@@ -7,7 +7,8 @@ import { EntryCard } from "@/components/catalog/entry-card";
 import { DrinkRail } from "@/components/discovery/drink-rail";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { toCatalogDrink } from "@/lib/catalog";
+import { toCatalogDrink, type DrinkCatalogRow } from "@/lib/catalog";
+import type { PostWithRelations } from "@/types/database";
 import Link from "next/link";
 
 type SearchType = "all" | "posts" | "drinks" | "users";
@@ -31,14 +32,24 @@ const BROWSE: { href: string; label: string; emoji: string; sub: string }[] = [
   { href: "/help", label: "Help & Safety", emoji: "🆘", sub: "Sober up · get home safe" },
 ];
 
+type SearchProfile = {
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  shots: number | null;
+  bio: string | null;
+};
+
+type SearchResults = {
+  posts?: PostWithRelations[];
+  drinks?: DrinkCatalogRow[];
+  profiles?: SearchProfile[];
+};
+
 export function SearchView() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<SearchType>("all");
-  const [results, setResults] = useState<{
-    posts?: any[];
-    drinks?: any[];
-    profiles?: any[];
-  }>({});
+  const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
@@ -56,7 +67,7 @@ export function SearchView() {
       try {
         const params = new URLSearchParams({ q, type: t });
         const res = await fetch(`/api/search?${params}`);
-        const data = await res.json();
+        const data = (await res.json()) as SearchResults;
         setResults(data);
       } catch {
         console.error("Search failed");
@@ -174,7 +185,7 @@ export function SearchView() {
           <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Stories ({results.posts!.length})
           </h2>
-          {results.posts!.map((post: any) => (
+          {results.posts!.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
         </div>
@@ -186,7 +197,7 @@ export function SearchView() {
             Drinks ({results.drinks!.length})
           </h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {results.drinks!.map((drink: any) => (
+            {results.drinks!.map((drink) => (
               <EntryCard key={drink.id} entry={toCatalogDrink(drink)} />
             ))}
           </div>
@@ -199,7 +210,7 @@ export function SearchView() {
             People ({results.profiles!.length})
           </h2>
           <div className="grid gap-3 md:grid-cols-2">
-            {results.profiles!.map((profile: any) => (
+            {results.profiles!.map((profile) => (
               <Link
                 key={profile.username}
                 href={`/profile/${profile.username}`}
