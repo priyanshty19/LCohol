@@ -33,6 +33,19 @@ test("an installed iPhone app is eligible without a window Notification global",
   );
 });
 
+test("a stale iPhone Home Screen installation receives reinstall guidance", () => {
+  assert.equal(
+    resolvePushCapability({
+      ...base,
+      appleMobile: true,
+      standalone: true,
+      serviceWorkerAvailable: false,
+      notificationAvailable: false,
+    }),
+    "reinstall-required",
+  );
+});
+
 test("standalone mode wins when an installed app reports a desktop-style user agent", () => {
   assert.equal(
     resolvePushCapability({

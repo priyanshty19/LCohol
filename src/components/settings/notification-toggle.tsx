@@ -20,7 +20,15 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   return arr;
 }
 
-type State = "loading" | "unsupported" | "install-required" | "default" | "denied" | "error" | "on";
+type State =
+  | "loading"
+  | "unsupported"
+  | "install-required"
+  | "reinstall-required"
+  | "default"
+  | "denied"
+  | "error"
+  | "on";
 
 function isAppleMobileDevice() {
   const userAgent = navigator.userAgent;
@@ -173,6 +181,15 @@ export function NotificationToggle() {
       <p className="text-xs leading-relaxed text-muted-foreground">
         Add Sip Stories to your Home Screen first: in Safari tap Share → Add to Home Screen, open
         Sip Stories from its new icon, then return here to enable notifications.
+      </p>
+    );
+  }
+  if (state === "reinstall-required") {
+    return (
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        This Home Screen copy was installed before Web Push was enabled. Remove this Sip Stories
+        icon, open Sip Stories in Safari, then use Share → Add to Home Screen. If Apple shows an
+        Open as Web App switch, keep it enabled.
       </p>
     );
   }

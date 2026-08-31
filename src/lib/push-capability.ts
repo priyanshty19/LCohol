@@ -1,4 +1,8 @@
-export type PushCapability = "available" | "install-required" | "unsupported";
+export type PushCapability =
+  | "available"
+  | "install-required"
+  | "reinstall-required"
+  | "unsupported";
 
 type PushCapabilityInput = {
   appleMobile: boolean;
@@ -15,7 +19,17 @@ export function resolvePushCapability({
   notificationAvailable,
   vapidConfigured,
 }: PushCapabilityInput): PushCapability {
-  if (!serviceWorkerAvailable || !vapidConfigured) return "unsupported";
+  if (!vapidConfigured) return "unsupported";
+
+  // A Home Screen icon created before the site advertised itself as a proper
+  // web app can still open without Safari chrome, but WebKit does not grant it
+  // Service Worker / Web Push capabilities. Existing icons are not upgraded in
+  // place, so the only reliable recovery is a fresh Home Screen installation.
+  if (appleMobile && standalone && !serviceWorkerAvailable) {
+    return "reinstall-required";
+  }
+
+  if (!serviceWorkerAvailable) return "unsupported";
 
   // Installed web apps can expose PushManager through their service-worker
   // registration even when the browser omits window.Notification or reports a

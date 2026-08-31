@@ -23,6 +23,12 @@ test("iPhone users receive Home Screen installation guidance", () => {
   assert.match(source, /Add Sip Stories to your Home Screen/);
 });
 
+test("stale iPhone installations receive explicit reinstall guidance", () => {
+  assert.match(source, /installed before Web Push was enabled/);
+  assert.match(source, /Remove this Sip Stories/);
+  assert.match(source, /Open as Web App switch/);
+});
+
 test("installed apps are not rejected by the unreliable window PushManager global", () => {
   assert.doesNotMatch(source, /Reflect\.has\(window, "PushManager"\)/);
   assert.match(source, /registration\.pushManager/);
