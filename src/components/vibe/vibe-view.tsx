@@ -3,20 +3,19 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { VIBES, BUDGET_RANGES } from "@/lib/vibe-config";
-import { calculateStatePrice, formatPriceINR } from "@/lib/state-pricing";
+import { calculateStatePrice } from "@/lib/state-pricing";
 import { useStateSelection } from "@/components/drinks/state-selector";
 import { StateSelector } from "@/components/drinks/state-selector";
 import { EntryCard } from "@/components/catalog/entry-card";
 import { getRecipesByVibe } from "@/lib/cocktail-recipes";
-import { toCatalogDrink } from "@/lib/catalog";
+import { toCatalogDrink, type DrinkCatalogRow } from "@/lib/catalog";
 import { RecipeCard } from "@/components/mix/recipe-card";
-import { Button } from "@/components/ui/button";
 import { applyTheme, vibeToTheme } from "@/lib/theme";
 
 export function VibeView() {
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
   const [selectedBudget, setSelectedBudget] = useState<string | null>(null);
-  const [drinks, setDrinks] = useState<any[]>([]);
+  const [drinks, setDrinks] = useState<DrinkCatalogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeRecipe, setActiveRecipe] = useState<string | null>(null);
   const { stateCode, setStateCode, loaded } = useStateSelection();
@@ -25,9 +24,7 @@ export function VibeView() {
   const currentBudget = BUDGET_RANGES.find((b) => b.id === selectedBudget);
 
   useEffect(() => {
-    if (!selectedVibe) { setDrinks([]); return; }
-
-    setLoading(true);
+    if (!selectedVibe) return;
     const vibe = VIBES.find((v) => v.id === selectedVibe)!;
 
     // Ask the server for this vibe's exact set. Filtering a generic first page
@@ -37,14 +34,16 @@ export function VibeView() {
       slugs: vibe.drinkSlugs.join(","),
       take: String(vibe.drinkSlugs.length),
     });
-    fetch(`/api/drinks?${params}`)
-      .then((r) => r.json())
-      .then((data) => {
-        let results = (data.data ?? []) as any[];
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      fetch(`/api/drinks?${params}`)
+        .then((r) => r.json())
+        .then((data) => {
+        let results = (data.data ?? []) as DrinkCatalogRow[];
 
         // Apply budget filter
         if (currentBudget) {
-          results = results.filter((d: any) => {
+          results = results.filter((d) => {
             if (!d.basePriceInr) return true;
             const price = calculateStatePrice(d.basePriceInr, stateCode);
             const inMin = price >= currentBudget.min;
@@ -55,14 +54,16 @@ export function VibeView() {
 
         // Sort by vibe order preference
         results.sort(
-          (a: any, b: any) =>
+          (a, b) =>
             vibe.drinkSlugs.indexOf(a.slug) - vibe.drinkSlugs.indexOf(b.slug)
         );
 
-        setDrinks(results);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+          setDrinks(results);
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [selectedVibe, selectedBudget, stateCode, currentBudget]);
 
   const cocktailSuggestions = selectedVibe
@@ -76,11 +77,11 @@ export function VibeView() {
         <div className="flex items-center gap-2">
           <span className="text-3xl">🌙</span>
           <h1 className="font-display text-2xl font-semibold text-primary">
-            Tonight's Vibe
+            Tonight&apos;s Vibe
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tell us your mood — we'll tell you what to pour
+          Tell us your mood — we&apos;ll tell you what to pour
         </p>
       </div>
 
@@ -88,7 +89,7 @@ export function VibeView() {
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            What's the vibe?
+            What&apos;s the vibe?
           </h2>
           <button
             type="button"
@@ -242,7 +243,7 @@ export function VibeView() {
           <span className="text-5xl">☝️</span>
           <p className="mt-4 text-base font-medium">Pick a vibe to get started</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            We'll match you with the perfect drinks and cocktail recipes
+            We&apos;ll match you with the perfect drinks and cocktail recipes
           </p>
         </div>
       )}

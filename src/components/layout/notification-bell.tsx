@@ -49,11 +49,14 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
-    load();
+    const initial = window.setTimeout(() => void load(), 0);
     const t = setInterval(() => {
       if (document.visibilityState === "visible") load();
     }, 30000);
-    return () => clearInterval(t);
+    return () => {
+      window.clearTimeout(initial);
+      clearInterval(t);
+    };
   }, []);
 
   useEffect(() => {

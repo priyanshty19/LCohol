@@ -96,7 +96,8 @@ export function CircleView({ embedded = false }: { embedded?: boolean }) {
   }, []);
 
   useEffect(() => {
-    void loadSummary();
+    const timer = window.setTimeout(() => void loadSummary(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadSummary]);
 
   // Near-real-time: quietly re-sync every 30s while the tab is visible, and

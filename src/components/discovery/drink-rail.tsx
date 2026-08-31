@@ -17,24 +17,32 @@ type Rec = {
 // Generic horizontal drink rail. Fetches `{ drinks: Rec[] }` from `endpoint` and
 // renders nothing until it has results — so it never shows an empty box.
 export function DrinkRail({ title, endpoint }: { title: string; endpoint: string }) {
-  const [recs, setRecs] = useState<Rec[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [result, setResult] = useState<{ endpoint: string; recs: Rec[]; loaded: boolean }>({
+    endpoint,
+    recs: [],
+    loaded: false,
+  });
+  const current = result.endpoint === endpoint
+    ? result
+    : { endpoint, recs: [] as Rec[], loaded: false };
 
   useEffect(() => {
     let active = true;
-    setLoaded(false);
     fetch(endpoint)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!active) return;
-        setRecs(Array.isArray(d?.drinks) ? d.drinks : []);
-        setLoaded(true);
+        setResult({ endpoint, recs: Array.isArray(d?.drinks) ? d.drinks : [], loaded: true });
       })
-      .catch(() => active && setLoaded(true));
+      .catch(() => {
+        if (active) setResult({ endpoint, recs: [], loaded: true });
+      });
     return () => {
       active = false;
     };
   }, [endpoint]);
+
+  const { recs, loaded } = current;
 
   // Collapse only once we KNOW it's empty; while loading we reserve height with a
   // skeleton so the content below doesn't jump (no layout shift / pop-in).

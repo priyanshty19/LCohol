@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function GlobalError({
@@ -24,9 +25,9 @@ export default function GlobalError({
           <Button variant="gold" onClick={() => reset()}>
             Try again
           </Button>
-          <a href="/">
+          <Link href="/">
             <Button variant="glass">Back to feed</Button>
-          </a>
+          </Link>
         </div>
       </body>
     </html>

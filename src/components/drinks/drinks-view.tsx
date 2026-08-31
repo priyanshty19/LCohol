@@ -7,7 +7,7 @@ import { StateSelector, useStateSelection } from "./state-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { toCatalogDrink } from "@/lib/catalog";
+import { toCatalogDrink, type DrinkCatalogRow } from "@/lib/catalog";
 import {
   Select,
   SelectContent,
@@ -38,14 +38,13 @@ export function DrinksView({
   initialDrinks,
   initialFilters,
 }: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  initialDrinks: { data: any[]; hasMore: boolean; nextCursor?: string };
+  initialDrinks: { data: DrinkCatalogRow[]; hasMore: boolean; nextCursor?: string };
   initialFilters: FilterData;
 }) {
   // Seeded from the server render — no mount fetch (filters + first page).
-  const [drinks, setDrinks] = useState<any[]>(initialDrinks.data);
+  const [drinks, setDrinks] = useState<DrinkCatalogRow[]>(initialDrinks.data);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<FilterData | null>(initialFilters);
+  const filters = initialFilters;
   const [hasMore, setHasMore] = useState(initialDrinks.hasMore);
   const [cursor, setCursor] = useState<string | undefined>(initialDrinks.nextCursor);
   const [totalShown, setTotalShown] = useState(initialDrinks.data.length);
@@ -67,13 +66,13 @@ export function DrinksView({
   }, [search]);
 
   const fetchDrinks = useCallback(
-    async (loadMore = false) => {
+    async (loadMore = false, pageCursor?: string) => {
       setLoading(true);
       const params = new URLSearchParams({ sort });
       if (category !== "all") params.set("category", category);
       if (brand !== "all") params.set("brand", brand);
       if (searchDebounced) params.set("search", searchDebounced);
-      if (loadMore && cursor) params.set("cursor", cursor);
+      if (loadMore && pageCursor) params.set("cursor", pageCursor);
 
       try {
         const res = await fetch(`/api/drinks?${params}`);
@@ -93,7 +92,7 @@ export function DrinksView({
         setLoading(false);
       }
     },
-    [sort, category, brand, searchDebounced, cursor]
+    [sort, category, brand, searchDebounced]
   );
 
   // Re-fetch when filters change (skip while unchanged from the server render).
@@ -101,8 +100,8 @@ export function DrinksView({
     const sig = `${sort}|${category}|${brand}|${searchDebounced}`;
     if (sig === initialSig.current) return;
     setCursor(undefined);
-    fetchDrinks(false);
-  }, [sort, category, brand, searchDebounced]);
+    void fetchDrinks(false);
+  }, [sort, category, brand, searchDebounced, fetchDrinks]);
 
   function clearFilters() {
     setSearch("");
@@ -167,7 +166,7 @@ export function DrinksView({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            {filters?.categories.map((cat) => (
+            {filters.categories.map((cat) => (
               <SelectItem key={cat.slug} value={cat.slug} className="text-xs">
                 {cat.name}
               </SelectItem>
@@ -182,7 +181,7 @@ export function DrinksView({
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
             <SelectItem value="all">All Brands</SelectItem>
-            {filters?.brands.map((b) => (
+            {filters.brands.map((b) => (
               <SelectItem key={b} value={b} className="text-xs">
                 {b}
               </SelectItem>
@@ -231,7 +230,7 @@ export function DrinksView({
               className="cursor-pointer gap-1 text-xs"
               onClick={() => setCategory("all")}
             >
-              {filters?.categories.find((c) => c.slug === category)?.name ??
+              {filters.categories.find((c) => c.slug === category)?.name ??
                 category}{" "}
               ×
             </Badge>
@@ -306,7 +305,7 @@ export function DrinksView({
             <div className="flex justify-center pt-4">
               <Button
                 variant="glass"
-                onClick={() => fetchDrinks(true)}
+                onClick={() => fetchDrinks(true, cursor)}
                 disabled={loading}
               >
                 {loading ? "Loading..." : "Load More"}

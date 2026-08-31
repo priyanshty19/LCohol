@@ -63,11 +63,11 @@ export function PostList({ sort, postType, initialPosts, initialHasMore, initial
   const initialSig = useRef(initialPosts != null ? `${sort}|${postType ?? ""}` : null);
 
   const fetchPosts = useCallback(
-    async (loadMore = false) => {
+    async (loadMore = false, pageCursor?: string) => {
       setLoading(true);
       const params = new URLSearchParams({ sort });
       if (postType) params.set("type", postType);
-      if (loadMore && cursor) params.set("cursor", cursor);
+      if (loadMore && pageCursor) params.set("cursor", pageCursor);
 
       try {
         const json = loadMore
@@ -86,15 +86,15 @@ export function PostList({ sort, postType, initialPosts, initialHasMore, initial
         setLoading(false);
       }
     },
-    [sort, postType, cursor]
+    [sort, postType]
   );
 
   useEffect(() => {
     const sig = `${sort}|${postType ?? ""}`;
     if (sig === initialSig.current) return; // server-seeded for this sort
     setCursor(undefined);
-    fetchPosts(false);
-  }, [sort, postType]);
+    void fetchPosts(false);
+  }, [sort, postType, fetchPosts]);
 
   if (loading && posts.length === 0) {
     return (
@@ -141,7 +141,7 @@ export function PostList({ sort, postType, initialPosts, initialHasMore, initial
           <Button
             variant="glass"
             size="lg"
-            onClick={() => fetchPosts(true)}
+            onClick={() => fetchPosts(true, cursor)}
             disabled={loading}
           >
             {loading ? "Loading..." : "Load More"}

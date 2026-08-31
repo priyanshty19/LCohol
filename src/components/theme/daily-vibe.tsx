@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { THEMES, applyTheme, type ThemeId } from "@/lib/theme";
@@ -71,10 +71,10 @@ export function DailyVibe() {
     setCookie(VIBE_DAY_COOKIE, todayKey());
   }
 
-  function dismiss() {
+  const dismiss = useCallback(() => {
     markAsked();
     setOpen(false);
-  }
+  }, []);
 
   // While open: Escape closes; focus the primary action; restore focus on close.
   useEffect(() => {
@@ -93,7 +93,7 @@ export function DailyVibe() {
       document.removeEventListener("keydown", onKeyDown);
       (restoreFocusRef.current ?? document.body).focus?.();
     };
-  }, [open]);
+  }, [open, dismiss]);
 
   function pick(id: ThemeId) {
     applyTheme(id, { persist: true });

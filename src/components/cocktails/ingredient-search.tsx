@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,14 +56,15 @@ export function IngredientSearch() {
   // Live, debounced match fetch whenever the selection (or Discover) changes.
   useEffect(() => {
     const slugs = [...selected.keys()];
-    if (!slugs.length) {
-      setResults([]);
-      setSelectedCount(0);
-      return;
-    }
-    setLoading(true);
-    phraseRef.current = phrasesFor("cocktails")[Math.floor(Date.now() / 1000) % 3];
     const t = setTimeout(() => {
+      if (!slugs.length) {
+        setResults([]);
+        setSelectedCount(0);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      phraseRef.current = phrasesFor("cocktails")[Math.floor(Date.now() / 1000) % 3];
       const params = new URLSearchParams({ slugs: slugs.join(","), take: "24" });
       if (includeDiscover) params.set("include", "discover");
       fetch(`/api/cocktails/by-ingredients?${params.toString()}`)

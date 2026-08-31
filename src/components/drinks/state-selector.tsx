@@ -55,10 +55,12 @@ export function useStateSelection() {
     let alive = true;
     // Cookie is the instant, offline-safe source.
     const saved = getCookie(STATE_COOKIE);
-    if (saved && INDIAN_STATES.some((s) => s.code === saved)) {
-      setStateCode(saved);
-    }
-    setLoaded(true);
+    const timer = window.setTimeout(() => {
+      if (saved && INDIAN_STATES.some((s) => s.code === saved)) {
+        setStateCode(saved);
+      }
+      setLoaded(true);
+    }, 0);
 
     // If logged in and the DB has a state name, reconcile to its code — unless
     // there's already a cookie OR the user has picked since mount.
@@ -80,6 +82,7 @@ export function useStateSelection() {
 
     return () => {
       alive = false;
+      window.clearTimeout(timer);
     };
   }, []);
 

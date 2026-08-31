@@ -46,7 +46,9 @@ export function CommentModal({
 
   // Lazy-load on first open only (don't fetch every card's comments up front).
   useEffect(() => {
-    if (open && !loaded) load();
+    if (!open || loaded) return;
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 

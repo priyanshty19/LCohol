@@ -38,7 +38,7 @@ export function HangoverView() {
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          No judgment. Just survival tips from someone who's been there
+          No judgment. Just survival tips from someone who&apos;s been there
         </p>
       </div>
 
@@ -130,13 +130,13 @@ export function HangoverView() {
         >
           {isLikelyClear ? (
             <p className="text-sm text-[var(--ml-sober)] font-medium">
-              ✓ You're likely alcohol-free by now. You've got this.
+              ✓ You&apos;re likely alcohol-free by now. You&apos;ve got this.
             </p>
           ) : (
             <p className="text-sm text-[var(--ml-sos)] font-medium">
               ~{hoursRemaining} hour{hoursRemaining !== 1 ? "s" : ""} of processing remaining.{" "}
               <span className="text-muted-foreground font-normal">
-                Don't drive. Drink water.
+                Don&apos;t drive. Drink water.
               </span>
             </p>
           )}
@@ -184,7 +184,7 @@ export function HangoverView() {
       {/* Never Again pledge */}
       <div className="glass-panel space-y-4 rounded-xl p-5">
         <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          📝 The "Never Again" Pledge (we'll see)
+          📝 The &quot;Never Again&quot; Pledge (we&apos;ll see)
         </h2>
         {!pledgeDone ? (
           <>
@@ -215,9 +215,9 @@ export function HangoverView() {
         ) : (
           <div className="text-center py-4 space-y-2">
             <span className="text-4xl">🏅</span>
-            <p className="font-display font-semibold text-sm">"{pledge}"</p>
+            <p className="font-display font-semibold text-sm">&quot;{pledge}&quot;</p>
             <p className="text-xs text-muted-foreground">
-              Pledge accepted. We'll hold you to... absolutely nothing. Get some rest.
+              Pledge accepted. We&apos;ll hold you to... absolutely nothing. Get some rest.
             </p>
             <button
               onClick={() => { setPledge(null); setPledgeDone(false); }}
@@ -235,14 +235,14 @@ export function HangoverView() {
           <span className="text-5xl">☝️</span>
           <p className="mt-4 font-medium">Select your severity level above</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            We'll build a custom recovery plan for you
+            We&apos;ll build a custom recovery plan for you
           </p>
         </div>
       )}
 
       {/* Footer disclaimer */}
       <p className="text-center text-xs text-muted-foreground/40 pb-4">
-        This is community advice, not medical guidance. If you're feeling seriously unwell, please see a doctor.
+        This is community advice, not medical guidance. If you&apos;re feeling seriously unwell, please see a doctor.
       </p>
     </div>
   );

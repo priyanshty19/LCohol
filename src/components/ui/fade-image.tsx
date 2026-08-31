@@ -14,6 +14,7 @@ export function FadeImage({ className, onLoad, onError, fallback, ...props }: Im
   return (
     <Image
       {...props}
+      alt={props.alt}
       onLoad={(e) => {
         setLoaded(true);
         onLoad?.(e);

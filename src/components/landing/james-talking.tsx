@@ -77,7 +77,10 @@ export function JamesTalking({ compact = false }: { compact?: boolean }) {
   // must match the server's non-reduced output, then upgrade after mount.
   // Without this gate the style object diverges and React throws a hydration
   // mismatch on the transform/transition props below.
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const prefersReduced = mounted ? !!prefersReducedRaw : false;
 
   const conv = CONVERSATIONS[idx];
@@ -85,15 +88,18 @@ export function JamesTalking({ compact = false }: { compact?: boolean }) {
   // Build-up sequence when the conversation changes: show the question, a beat
   // of "thinking", then hand off to the typewriter.
   useEffect(() => {
-    setVisible(true);
-    setTyped("");
-    setPhase("user");
+    const reset = setTimeout(() => {
+      setVisible(true);
+      setTyped("");
+      setPhase("user");
+    }, 0);
     const t1 = setTimeout(() => setPhase("thinking"), USER_VISIBLE_MS);
     const t2 = setTimeout(
       () => setPhase("typing"),
       USER_VISIBLE_MS + THINKING_MS
     );
     return () => {
+      clearTimeout(reset);
       clearTimeout(t1);
       clearTimeout(t2);
     };

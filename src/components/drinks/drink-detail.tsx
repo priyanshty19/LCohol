@@ -12,13 +12,6 @@ import { TasteProfileChart } from "./taste-profile-chart";
 import { DefaultDrinkArtwork } from "./default-drink-artwork";
 import type { DrinkWithRelations } from "@/types/database";
 
-const PRICE_LABELS: Record<string, string> = {
-  BUDGET: "Budget (Under INR 500)",
-  MID_RANGE: "Mid Range (INR 500-2000)",
-  PREMIUM: "Premium (INR 2000-5000)",
-  LUXURY: "Luxury (Above INR 5000)",
-};
-
 const PRICE_SHORT: Record<string, string> = {
   BUDGET: "Budget",
   MID_RANGE: "Mid-range",

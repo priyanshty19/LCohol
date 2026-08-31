@@ -21,7 +21,10 @@ export function useFxCapability() {
     const mem = nav.deviceMemory ?? 4;
     const save = nav.connection?.saveData ?? false;
     const small = window.innerWidth < 768;
-    setEnabled(!reduce && !save && !small && cores >= 4 && mem >= 4);
+    const frame = requestAnimationFrame(() => {
+      setEnabled(!reduce && !save && !small && cores >= 4 && mem >= 4);
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   return enabled;

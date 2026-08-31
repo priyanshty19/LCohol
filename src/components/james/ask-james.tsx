@@ -81,17 +81,20 @@ export function AskJames() {
 
   // Restore the session's conversation (sessionStorage clears on tab close).
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as { messages?: Msg[]; collapsed?: boolean };
-        if (Array.isArray(saved.messages)) setMessages(saved.messages);
-        setCollapsed(Boolean(saved.collapsed));
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = sessionStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw) as { messages?: Msg[]; collapsed?: boolean };
+          if (Array.isArray(saved.messages)) setMessages(saved.messages);
+          setCollapsed(Boolean(saved.collapsed));
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
-    setHydrated(true);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
