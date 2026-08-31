@@ -64,6 +64,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(PRODUCTION_SITE_URL),
   manifest: "/manifest.json",
   icons: { icon: "/icon-192.png", apple: "/icon-512.png" },
+  appleWebApp: {
+    capable: true,
+    title: "Sip Stories",
+    statusBarStyle: "black",
+  },
   applicationName: "Sip Stories",
   title: {
     default: "Sip Stories — India’s Anonymous Tasting Room",

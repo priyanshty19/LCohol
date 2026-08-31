@@ -25,6 +25,14 @@ test("PWA manifest sends Android launches to the existing app client", async () 
   );
 });
 
+test("root metadata explicitly enables Apple Home Screen app mode", async () => {
+  const layout = await readFile(`${root}/src/app/layout.tsx`, "utf8");
+
+  assert.match(layout, /appleWebApp:\s*\{/);
+  assert.match(layout, /capable:\s*true/);
+  assert.match(layout, /title:\s*"Sip Stories"/);
+});
+
 test("public Android and PWA bootstrap files bypass authentication", async () => {
   const proxy = await readFile(`${root}/src/proxy.ts`, "utf8");
 
