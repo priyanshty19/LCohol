@@ -1,0 +1,11 @@
+{
+  "Simulator Target Bundle": "com.sipstories.ios",
+  "aps": {
+    "alert": {
+      "title": "Sip Stories",
+      "body": "Notification routing test"
+    },
+    "sound": "default"
+  },
+  "url": "/settings"
+}

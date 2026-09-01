@@ -60,6 +60,7 @@ struct SipStoriesWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            notificationBridge.pageWillLoad()
             updateState(isLoading: true, errorMessage: nil)
         }
 

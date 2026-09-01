@@ -7,6 +7,8 @@ final class NativeNotificationBridge: NSObject, WKScriptMessageHandler {
 
     private weak var webView: WKWebView?
     private var observers: [NSObjectProtocol] = []
+    private var pageReady = false
+    private var didConsumePendingRoute = false
 
     override init() {
         super.init()
@@ -31,6 +33,16 @@ final class NativeNotificationBridge: NSObject, WKScriptMessageHandler {
                 self?.emit(status: "error", error: message)
             }
         )
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .sipStoriesPushRoute,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let route = notification.object as? String else { return }
+                self?.navigate(to: route)
+            }
+        )
     }
 
     deinit {
@@ -41,9 +53,20 @@ final class NativeNotificationBridge: NSObject, WKScriptMessageHandler {
         self.webView = webView
     }
 
+    func pageWillLoad() {
+        pageReady = false
+    }
+
     func pageDidLoad() {
+        pageReady = true
         evaluate("window.__sipStoriesNativeNotifications = true;")
         sendCurrentStatus()
+        if !didConsumePendingRoute {
+            didConsumePendingRoute = true
+            if let route = PushRouteStore.takePendingRoute() {
+                navigate(to: route)
+            }
+        }
     }
 
     func userContentController(
@@ -120,5 +143,18 @@ final class NativeNotificationBridge: NSObject, WKScriptMessageHandler {
         DispatchQueue.main.async { [weak webView] in
             webView?.evaluateJavaScript(script)
         }
+    }
+
+    private func navigate(to route: String) {
+        guard pageReady,
+              let normalized = PushRouteStore.normalizedRoute(from: route),
+              let webView,
+              let currentURL = webView.url,
+              let destination = URL(string: normalized, relativeTo: currentURL)?.absoluteURL,
+              let host = destination.host?.lowercased(),
+              destination.scheme?.lowercased() == "https",
+              host == "mysipstories.com" || host.hasSuffix(".mysipstories.com") else { return }
+        webView.load(URLRequest(url: destination))
+        _ = PushRouteStore.takePendingRoute()
     }
 }
