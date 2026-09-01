@@ -29,6 +29,15 @@ test("stale iPhone installations receive explicit reinstall guidance", () => {
   assert.match(source, /Open as Web App switch/);
 });
 
+test("the native iPhone wrapper delegates permission and token registration to Apple", () => {
+  assert.match(source, /SipStoriesIOS\\\//);
+  assert.match(source, /sipStoriesNotifications/);
+  assert.match(source, /action: "request"/);
+  assert.match(source, /sipstories:native-notification/);
+  assert.match(source, /\/api\/push\/native\/subscribe/);
+  assert.match(source, /rememberNativePushToken/);
+});
+
 test("installed apps are not rejected by the unreliable window PushManager global", () => {
   assert.doesNotMatch(source, /Reflect\.has\(window, "PushManager"\)/);
   assert.match(source, /registration\.pushManager/);

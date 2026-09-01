@@ -16,6 +16,7 @@ test("production dependencies are ready only when every required secret is prese
   assert.deepEqual(configuredRuntimeServices(COMPLETE_ENV), {
     googlePlaces: true,
     imageUploads: true,
+    nativePush: true,
     webPush: true,
   });
 });
@@ -27,7 +28,7 @@ test("mismatched public push keys are reported as an unhealthy push configuratio
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: "browser-key",
       VAPID_PUBLIC_KEY: "server-key",
     }),
-    { googlePlaces: true, imageUploads: true, webPush: false },
+    { googlePlaces: true, imageUploads: true, nativePush: true, webPush: false },
   );
 });
 
@@ -35,6 +36,25 @@ test("missing provider configuration is visible instead of becoming an empty UI"
   assert.deepEqual(configuredRuntimeServices({}), {
     googlePlaces: false,
     imageUploads: false,
+    nativePush: true,
     webPush: false,
   });
+});
+
+test("releasing native iOS push makes APNs credentials part of readiness", () => {
+  assert.equal(
+    configuredRuntimeServices({ ...COMPLETE_ENV, NATIVE_IOS_PUSH_ENABLED: "true" }).nativePush,
+    false,
+  );
+  assert.equal(
+    configuredRuntimeServices({
+      ...COMPLETE_ENV,
+      NATIVE_IOS_PUSH_ENABLED: "true",
+      APNS_KEY_ID: "key",
+      APNS_TEAM_ID: "team",
+      APNS_PRIVATE_KEY: "private-key",
+      APNS_BUNDLE_ID: "com.sipstories.ios",
+    }).nativePush,
+    true,
+  );
 });

@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { SipStoriesLogo } from "@/components/brand/logo";
 import { NotificationBell } from "./notification-bell";
+import { removeNativePushTokenForLogout } from "@/lib/native-push-client";
 
 // Mirrors the mobile core (Feed · Parties · Mix Lab · Search) plus the two
 // browse surfaces desktop has room for. Bars + Cocktails are one entry (set/
@@ -35,6 +36,7 @@ export function Header() {
   const router = useRouter();
 
   async function handleLogout() {
+    await removeNativePushTokenForLogout().catch(() => {});
     await fetch("/api/auth/logout", { method: "POST" });
     bustAuthCache(); // soft-nav keeps the module cache — clear it so we don't show the old user
     router.push("/login");
