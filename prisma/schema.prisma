@@ -12,58 +12,59 @@ datasource db {
 // ============================================================================
 
 model User {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  authId    String   @unique @map("auth_id")
-  email     String   @unique
-  dob       DateTime @db.Date
-  isVerified Boolean @default(false) @map("is_verified")
-  isBanned  Boolean  @default(false) @map("is_banned")
-  role         Role      @default(USER)
-  passwordHash String?   @map("password_hash")
-  tokenEpoch   Int       @default(0) @map("token_epoch")
-  referralCode String?   @unique @map("referral_code")
-  invitedById  String?   @map("invited_by_id") @db.Uuid
-  consentedAt  DateTime? @map("consented_at")
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authId        String    @unique @map("auth_id")
+  email         String    @unique
+  dob           DateTime  @db.Date
+  isVerified    Boolean   @default(false) @map("is_verified")
+  isBanned      Boolean   @default(false) @map("is_banned")
+  role          Role      @default(USER)
+  passwordHash  String?   @map("password_hash")
+  tokenEpoch    Int       @default(0) @map("token_epoch")
+  referralCode  String?   @unique @map("referral_code")
+  invitedById   String?   @map("invited_by_id") @db.Uuid
+  consentedAt   DateTime? @map("consented_at")
   ageVerifiedAt DateTime? @map("age_verified_at")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  profile            Profile?
-  posts              Post[]
-  comments           Comment[]
-  votes              Vote[]
-  drinkReviews       DrinkReview[]
-  cocktailCreations  CocktailCreation[]
-  partyPlans         PartyPlan[]
-  hangoverLogs       HangoverLog[]
-  reports            Report[]         @relation("Reporter")
-  interactions       UserInteraction[]
-  invitedBy          User?    @relation("Referrals", fields: [invitedById], references: [id])
-  invitees           User[]   @relation("Referrals")
-  moderationActions  ModerationAction[] @relation("ModActor")
-  resolvedReports    Report[]           @relation("ReportResolver")
-  barReviews         BarReview[]
-  referralsSent      Referral[]   @relation("ReferralInviter")
-  referralAccepted   Referral?    @relation("ReferralAccepted")
-  connectionsA       Connection[] @relation("ConnectionA")
-  connectionsB       Connection[] @relation("ConnectionB")
-  requestsSent       ConnectionRequest[] @relation("RequestsSent")
-  requestsReceived   ConnectionRequest[] @relation("RequestsReceived")
-  postShares           PostShare[]
-  postSendsSent        PostSend[]    @relation("PostSendFrom")
-  postSendsReceived    PostSend[]    @relation("PostSendTo")
-  mentionsMade         Mention[]     @relation("MentionFrom")
-  mentionsReceived     Mention[]     @relation("MentionTo")
-  notifications        Notification[] @relation("NotificationRecipient")
-  notificationsActed   Notification[] @relation("NotificationActor")
-  partyInvitesSent     PartyInvite[]  @relation("PartyInviteInviter")
-  partyInvitesReceived PartyInvite[]  @relation("PartyInviteInvited")
-  partyDrinkSuggestions PartyDrinkSuggestion[]
-  partyGameSuggestions  PartyGameSuggestion[]
-  partyGameVotes        PartyGameVote[]
-  beverages             Beverage[]            @relation("BeverageAuthor")
-  pushSubscriptions     PushSubscription[]
-  tasteVector           UserTasteVector?
+  profile                 Profile?
+  posts                   Post[]
+  comments                Comment[]
+  votes                   Vote[]
+  drinkReviews            DrinkReview[]
+  cocktailCreations       CocktailCreation[]
+  partyPlans              PartyPlan[]
+  hangoverLogs            HangoverLog[]
+  reports                 Report[]                 @relation("Reporter")
+  interactions            UserInteraction[]
+  invitedBy               User?                    @relation("Referrals", fields: [invitedById], references: [id])
+  invitees                User[]                   @relation("Referrals")
+  moderationActions       ModerationAction[]       @relation("ModActor")
+  resolvedReports         Report[]                 @relation("ReportResolver")
+  barReviews              BarReview[]
+  referralsSent           Referral[]               @relation("ReferralInviter")
+  referralAccepted        Referral?                @relation("ReferralAccepted")
+  connectionsA            Connection[]             @relation("ConnectionA")
+  connectionsB            Connection[]             @relation("ConnectionB")
+  requestsSent            ConnectionRequest[]      @relation("RequestsSent")
+  requestsReceived        ConnectionRequest[]      @relation("RequestsReceived")
+  postShares              PostShare[]
+  postSendsSent           PostSend[]               @relation("PostSendFrom")
+  postSendsReceived       PostSend[]               @relation("PostSendTo")
+  mentionsMade            Mention[]                @relation("MentionFrom")
+  mentionsReceived        Mention[]                @relation("MentionTo")
+  notifications           Notification[]           @relation("NotificationRecipient")
+  notificationsActed      Notification[]           @relation("NotificationActor")
+  partyInvitesSent        PartyInvite[]            @relation("PartyInviteInviter")
+  partyInvitesReceived    PartyInvite[]            @relation("PartyInviteInvited")
+  partyDrinkSuggestions   PartyDrinkSuggestion[]
+  partyGameSuggestions    PartyGameSuggestion[]
+  partyGameVotes          PartyGameVote[]
+  beverages               Beverage[]               @relation("BeverageAuthor")
+  pushSubscriptions       PushSubscription[]
+  nativePushSubscriptions NativePushSubscription[]
+  tasteVector             UserTasteVector?
 
   @@map("users")
 }
@@ -96,8 +97,8 @@ model Referral {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  inviter    User  @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
-  acceptedBy User? @relation("ReferralAccepted", fields: [acceptedById], references: [id])
+  inviter    User        @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  acceptedBy User?       @relation("ReferralAccepted", fields: [acceptedById], references: [id])
   connection Connection?
 
   @@index([inviterId])
@@ -108,11 +109,11 @@ model Referral {
 // per pair with userAId < userBId (canonical order) so the unique pair index
 // blocks duplicates regardless of who invited whom.
 model Connection {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userAId    String    @map("user_a_id") @db.Uuid
-  userBId    String    @map("user_b_id") @db.Uuid
-  referralId String?   @unique @map("referral_id") @db.Uuid
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userAId    String   @map("user_a_id") @db.Uuid
+  userBId    String   @map("user_b_id") @db.Uuid
+  referralId String?  @unique @map("referral_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
 
   userA    User      @relation("ConnectionA", fields: [userAId], references: [id], onDelete: Cascade)
   userB    User      @relation("ConnectionB", fields: [userBId], references: [id], onDelete: Cascade)
@@ -152,28 +153,28 @@ model ConnectionRequest {
 }
 
 model Profile {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  username        String   @unique @db.VarChar(30)
-  displayName     String?  @map("display_name") @db.VarChar(50)
-  bio             String?  @db.VarChar(300)
-  avatarUrl       String?  @map("avatar_url")
-  shots           Int      @default(0) @map("karma")
-  drinkingStyle   DrinkingStyle? @map("drinking_style")
-  favoriteDrinkId String?  @map("favorite_drink_id") @db.Uuid
-  state           String?  @db.VarChar(50)
-  city            String?  @db.VarChar(50)
-  emergencyPhone  String?  @map("emergency_phone") @db.VarChar(20)
-  preferredSpirits  String[] @default([]) @map("preferred_spirits")
-  preferredFlavours String[] @default([]) @map("preferred_flavours")
-  intensity       String?  @db.VarChar(20)
-  intent          String?  @db.VarChar(20)
-  onboardedAt     DateTime? @map("onboarded_at")
-  theme           String?  @default("light") @db.VarChar(24)
-  emailNotifications Boolean @default(true) @map("email_notifications")
-  geoDismissedAt  DateTime? @map("geo_dismissed_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String         @unique @map("user_id") @db.Uuid
+  username           String         @unique @db.VarChar(30)
+  displayName        String?        @map("display_name") @db.VarChar(50)
+  bio                String?        @db.VarChar(300)
+  avatarUrl          String?        @map("avatar_url")
+  shots              Int            @default(0) @map("karma")
+  drinkingStyle      DrinkingStyle? @map("drinking_style")
+  favoriteDrinkId    String?        @map("favorite_drink_id") @db.Uuid
+  state              String?        @db.VarChar(50)
+  city               String?        @db.VarChar(50)
+  emergencyPhone     String?        @map("emergency_phone") @db.VarChar(20)
+  preferredSpirits   String[]       @default([]) @map("preferred_spirits")
+  preferredFlavours  String[]       @default([]) @map("preferred_flavours")
+  intensity          String?        @db.VarChar(20)
+  intent             String?        @db.VarChar(20)
+  onboardedAt        DateTime?      @map("onboarded_at")
+  theme              String?        @default("light") @db.VarChar(24)
+  emailNotifications Boolean        @default(true) @map("email_notifications")
+  geoDismissedAt     DateTime?      @map("geo_dismissed_at")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
 
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   favoriteDrink Drink? @relation(fields: [favoriteDrinkId], references: [id])
@@ -199,19 +200,19 @@ enum DrinkingStyle {
 // ============================================================================
 
 model Post {
-  id        String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  authorId  String     @map("author_id") @db.Uuid
-  title     String     @db.VarChar(300)
-  body      String?
-  imageUrl  String?    @map("image_url")
-  postType  PostType   @map("post_type")
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId   String         @map("author_id") @db.Uuid
+  title      String         @db.VarChar(300)
+  body       String?
+  imageUrl   String?        @map("image_url")
+  postType   PostType       @map("post_type")
   visibility PostVisibility @default(PUBLIC) @map("visibility")
-  score     Int        @default(0)
-  isDeleted Boolean    @default(false) @map("is_deleted")
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  score      Int            @default(0)
+  isDeleted  Boolean        @default(false) @map("is_deleted")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
 
-  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author   User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   comments Comment[]
   votes    Vote[]
   tags     PostTag[]
@@ -272,12 +273,12 @@ model Comment {
 }
 
 model Vote {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  postId     String?  @map("post_id") @db.Uuid
-  commentId  String?  @map("comment_id") @db.Uuid
-  value      Int      // 1 = upvote, -1 = downvote
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  postId    String?  @map("post_id") @db.Uuid
+  commentId String?  @map("comment_id") @db.Uuid
+  value     Int // 1 = upvote, -1 = downvote
+  createdAt DateTime @default(now()) @map("created_at")
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -374,36 +375,36 @@ model DrinkSubcategory {
 }
 
 model Drink {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  categoryId      String     @map("category_id") @db.Uuid
-  subcategoryId   String?    @map("subcategory_id") @db.Uuid
-  name            String     @db.VarChar(200)
-  slug            String     @unique @db.VarChar(220)
-  brand           String?    @db.VarChar(100)
-  variant         String?    @db.VarChar(100)
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId      String      @map("category_id") @db.Uuid
+  subcategoryId   String?     @map("subcategory_id") @db.Uuid
+  name            String      @db.VarChar(200)
+  slug            String      @unique @db.VarChar(220)
+  brand           String?     @db.VarChar(100)
+  variant         String?     @db.VarChar(100)
   description     String?
-  country         String?    @db.VarChar(50)
-  abv             Decimal?   @db.Decimal(4, 1)
+  country         String?     @db.VarChar(50)
+  abv             Decimal?    @db.Decimal(4, 1)
   priceRange      PriceRange? @map("price_range")
-  basePriceInr    Int?       @map("base_price_inr") // Delhi MRP in INR as reference
-  imageUrl        String?    @map("image_url")
-  isVerified      Boolean    @default(false) @map("is_verified")
-  isUserSubmitted Boolean    @default(false) @map("is_user_submitted")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  basePriceInr    Int?        @map("base_price_inr") // Delhi MRP in INR as reference
+  imageUrl        String?     @map("image_url")
+  isVerified      Boolean     @default(false) @map("is_verified")
+  isUserSubmitted Boolean     @default(false) @map("is_user_submitted")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
 
-  category     DrinkCategory     @relation(fields: [categoryId], references: [id])
-  subcategory  DrinkSubcategory? @relation(fields: [subcategoryId], references: [id])
-  tasteProfile DrinkTasteProfile?
-  occasions    DrinkOccasion[]
-  moods        DrinkMood[]
-  foodPairings DrinkFoodPairing[]
-  posts        PostDrink[]
-  reviews      DrinkReview[]
-  communityScores CommunityScore[]
-  favoritedBy  Profile[]
-  cocktailIngredients CocktailIngredient[]
-  partyPlanDrinks PartyPlanDrink[]
+  category              DrinkCategory          @relation(fields: [categoryId], references: [id])
+  subcategory           DrinkSubcategory?      @relation(fields: [subcategoryId], references: [id])
+  tasteProfile          DrinkTasteProfile?
+  occasions             DrinkOccasion[]
+  moods                 DrinkMood[]
+  foodPairings          DrinkFoodPairing[]
+  posts                 PostDrink[]
+  reviews               DrinkReview[]
+  communityScores       CommunityScore[]
+  favoritedBy           Profile[]
+  cocktailIngredients   CocktailIngredient[]
+  partyPlanDrinks       PartyPlanDrink[]
   partyDrinkSuggestions PartyDrinkSuggestion[]
 
   @@index([categoryId])
@@ -423,17 +424,17 @@ enum PriceRange {
 }
 
 model DrinkTasteProfile {
-  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  drinkId    String  @unique @map("drink_id") @db.Uuid
-  sweetness  Int     @default(0) @db.SmallInt // 0-10
-  bitterness Int     @default(0) @db.SmallInt
-  sourness   Int     @default(0) @db.SmallInt
-  smokiness  Int     @default(0) @db.SmallInt
-  spiciness  Int     @default(0) @db.SmallInt
-  fruitiness Int     @default(0) @db.SmallInt
-  floral     Int     @default(0) @db.SmallInt
-  body       Int     @default(0) @db.SmallInt // light=1 to full=10
-  finish     Int     @default(0) @db.SmallInt // short=1 to long=10
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId    String @unique @map("drink_id") @db.Uuid
+  sweetness  Int    @default(0) @db.SmallInt // 0-10
+  bitterness Int    @default(0) @db.SmallInt
+  sourness   Int    @default(0) @db.SmallInt
+  smokiness  Int    @default(0) @db.SmallInt
+  spiciness  Int    @default(0) @db.SmallInt
+  fruitiness Int    @default(0) @db.SmallInt
+  floral     Int    @default(0) @db.SmallInt
+  body       Int    @default(0) @db.SmallInt // light=1 to full=10
+  finish     Int    @default(0) @db.SmallInt // short=1 to long=10
 
   drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
 
@@ -441,8 +442,8 @@ model DrinkTasteProfile {
 }
 
 model DrinkOccasion {
-  drinkId    String @map("drink_id") @db.Uuid
-  occasion   Occasion
+  drinkId  String   @map("drink_id") @db.Uuid
+  occasion Occasion
 
   drink Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
 
@@ -504,15 +505,15 @@ model DrinkFoodPairing {
 // ============================================================================
 
 model DrinkReview {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  drinkId   String   @map("drink_id") @db.Uuid
-  authorId  String   @map("author_id") @db.Uuid
-  rating    Int      @db.SmallInt // 1-5
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  drinkId   String    @map("drink_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  rating    Int       @db.SmallInt // 1-5
   body      String?
   occasion  Occasion?
   mood      Mood?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   drink  Drink @relation(fields: [drinkId], references: [id], onDelete: Cascade)
   author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -527,11 +528,11 @@ model DrinkReview {
 // ============================================================================
 
 model Ingredient {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String   @unique @db.VarChar(100)
-  slug      String   @unique @db.VarChar(110)
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String             @unique @db.VarChar(100)
+  slug      String             @unique @db.VarChar(110)
   category  IngredientCategory
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime           @default(now()) @map("created_at")
 
   cocktailIngredients CocktailIngredient[]
 
@@ -552,31 +553,31 @@ enum IngredientCategory {
 }
 
 model CocktailCreation {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  authorId    String   @map("author_id") @db.Uuid
-  name        String   @db.VarChar(200)
-  slug        String   @unique @db.VarChar(220)
-  description String?
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId     String   @map("author_id") @db.Uuid
+  name         String   @db.VarChar(200)
+  slug         String   @unique @db.VarChar(220)
+  description  String?
   instructions String?
-  imageUrl    String?  @map("image_url")
-  score       Int      @default(0)
-  isPublic    Boolean  @default(true) @map("is_public")
+  imageUrl     String?  @map("image_url")
+  score        Int      @default(0)
+  isPublic     Boolean  @default(true) @map("is_public")
   // Raw free-text category from the CSV "Source" column (display label).
-  category    String?  @db.VarChar(80)
+  category     String?  @db.VarChar(80)
   // Controlled slug derived from `category` via normalizeCocktailCategory() — the
   // standardized axis shared with the drink taxonomy for filtering/unification.
-  categorySlug String? @map("category_slug") @db.VarChar(80)
-  glass       String?  @db.VarChar(80)
-  garnish     String?
-  sourceBarId String?  @map("source_bar_id") @db.Uuid
-  sourceLabel String?  @map("source_label") @db.VarChar(200)
-  isCurated   Boolean  @default(false) @map("is_curated")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  categorySlug String?  @map("category_slug") @db.VarChar(80)
+  glass        String?  @db.VarChar(80)
+  garnish      String?
+  sourceBarId  String?  @map("source_bar_id") @db.Uuid
+  sourceLabel  String?  @map("source_label") @db.VarChar(200)
+  isCurated    Boolean  @default(false) @map("is_curated")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  author      User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  sourceBar   Bar?                 @relation(fields: [sourceBarId], references: [id])
-  ingredients CocktailIngredient[]
+  author                User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  sourceBar             Bar?                   @relation(fields: [sourceBarId], references: [id])
+  ingredients           CocktailIngredient[]
   partyDrinkSuggestions PartyDrinkSuggestion[]
 
   @@unique([authorId, name, sourceLabel])
@@ -680,13 +681,13 @@ model DrinkProfile {
 
 // 1:1 with a Beverage of kind=COCKTAIL (recipe attributes).
 model Recipe {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  beverageId  String  @unique @map("beverage_id") @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  beverageId   String  @unique @map("beverage_id") @db.Uuid
   instructions String?
-  glass       String? @db.VarChar(80)
-  garnish     String?
-  sourceBarId String? @map("source_bar_id") @db.Uuid
-  sourceLabel String? @map("source_label") @db.VarChar(200)
+  glass        String? @db.VarChar(80)
+  garnish      String?
+  sourceBarId  String? @map("source_bar_id") @db.Uuid
+  sourceLabel  String? @map("source_label") @db.VarChar(200)
 
   beverage  Beverage @relation(fields: [beverageId], references: [id], onDelete: Cascade)
   sourceBar Bar?     @relation(fields: [sourceBarId], references: [id])
@@ -758,27 +759,27 @@ enum ScoreType {
 // ============================================================================
 
 model PartyPlan {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  authorId    String    @map("author_id") @db.Uuid
-  title       String    @db.VarChar(200)
-  description String?
-  guestCount  Int?      @map("guest_count")
-  budget      BudgetRange?
-  occasion    Occasion?
-  eventDate   DateTime? @map("event_date") @db.Date
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId     String         @map("author_id") @db.Uuid
+  title        String         @db.VarChar(200)
+  description  String?
+  guestCount   Int?           @map("guest_count")
+  budget       BudgetRange?
+  occasion     Occasion?
+  eventDate    DateTime?      @map("event_date") @db.Date
   startsAt     DateTime?      @map("starts_at")
   locationText String?        @map("location_text") @db.VarChar(200)
   barId        String?        @map("bar_id") @db.Uuid
   status       PartyStatus    @default(UPCOMING)
   visibility   PostVisibility @default(CIRCLE)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  author          User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  bar             Bar?                   @relation(fields: [barId], references: [id])
-  drinks          PartyPlanDrink[]
-  invites         PartyInvite[]
-  notifications   Notification[]
+  author           User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  bar              Bar?                   @relation(fields: [barId], references: [id])
+  drinks           PartyPlanDrink[]
+  invites          PartyInvite[]
+  notifications    Notification[]
   drinkSuggestions PartyDrinkSuggestion[]
   gameSuggestions  PartyGameSuggestion[]
 
@@ -805,9 +806,9 @@ enum BudgetRange {
 }
 
 model PartyPlanDrink {
-  partyPlanId String @map("party_plan_id") @db.Uuid
-  drinkId     String @map("drink_id") @db.Uuid
-  quantity    Int    @default(1)
+  partyPlanId String  @map("party_plan_id") @db.Uuid
+  drinkId     String  @map("drink_id") @db.Uuid
+  quantity    Int     @default(1)
   notes       String?
 
   partyPlan PartyPlan @relation(fields: [partyPlanId], references: [id], onDelete: Cascade)
@@ -872,15 +873,15 @@ model PartyGameVote {
 // ============================================================================
 
 model HangoverLog {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  authorId      String   @map("author_id") @db.Uuid
-  severity      Int      @db.SmallInt // 1-10
-  drinksMixed   Boolean  @default(false) @map("drinks_mixed")
-  waterIntake   WaterIntake? @map("water_intake")
-  foodBefore    Boolean? @map("food_before")
-  hoursSlept    Decimal? @map("hours_slept") @db.Decimal(3, 1)
-  recoveryTip   String?  @map("recovery_tip")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId    String       @map("author_id") @db.Uuid
+  severity    Int          @db.SmallInt // 1-10
+  drinksMixed Boolean      @default(false) @map("drinks_mixed")
+  waterIntake WaterIntake? @map("water_intake")
+  foodBefore  Boolean?     @map("food_before")
+  hoursSlept  Decimal?     @map("hours_slept") @db.Decimal(3, 1)
+  recoveryTip String?      @map("recovery_tip")
+  createdAt   DateTime     @default(now()) @map("created_at")
 
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -907,7 +908,7 @@ model UserInteraction {
   interactionType InteractionType @map("interaction_type")
   targetType      TargetType      @map("target_type")
   targetId        String?         @map("target_id") @db.Uuid // null for query/feature events (no uuid target)
-  context         Json?           // flexible context: search query, occasion, mood, etc.
+  context         Json? // flexible context: search query, occasion, mood, etc.
   createdAt       DateTime        @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -989,23 +990,23 @@ enum TargetType {
 // ============================================================================
 
 model Report {
-  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  reporterId String       @map("reporter_id") @db.Uuid
-  postId     String?      @map("post_id") @db.Uuid
-  commentId  String?      @map("comment_id") @db.Uuid
-  reason     ReportReason
-  reasons    ReportReason[] @default([])
-  details    String?
-  moderatorRemark String?    @map("moderator_remark")
-  status     ReportStatus @default(PENDING)
-  createdAt  DateTime     @default(now()) @map("created_at")
-  resolvedAt DateTime?    @map("resolved_at")
-  resolvedById String?    @map("resolved_by_id") @db.Uuid
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reporterId      String         @map("reporter_id") @db.Uuid
+  postId          String?        @map("post_id") @db.Uuid
+  commentId       String?        @map("comment_id") @db.Uuid
+  reason          ReportReason
+  reasons         ReportReason[] @default([])
+  details         String?
+  moderatorRemark String?        @map("moderator_remark")
+  status          ReportStatus   @default(PENDING)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  resolvedAt      DateTime?      @map("resolved_at")
+  resolvedById    String?        @map("resolved_by_id") @db.Uuid
 
-  reporter User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  post     Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  resolvedBy User?  @relation("ReportResolver", fields: [resolvedById], references: [id])
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment    Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  resolvedBy User?    @relation("ReportResolver", fields: [resolvedById], references: [id])
 
   @@index([status])
   @@index([createdAt])
@@ -1107,9 +1108,9 @@ model Bar {
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  reviews   BarReview[]
-  cocktails CocktailCreation[]
-  parties   PartyPlan[]
+  reviews        BarReview[]
+  cocktails      CocktailCreation[]
+  parties        PartyPlan[]
   recipes        Recipe[]
   venueBeverages VenueBeverage[]
 
@@ -1237,6 +1238,23 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// A native mobile-device token registered with Apple Push Notification service.
+// Tokens can rotate, so registration upserts the token and rebinds it to the
+// currently authenticated account.
+model NativePushSubscription {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  deviceToken String   @unique @map("device_token") @db.VarChar(512)
+  platform    String   @default("ios") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("native_push_subscriptions")
 }
 
 // Survives account deletion ON PURPOSE — deliberately NOT a relation to User, so

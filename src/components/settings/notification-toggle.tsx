@@ -3,8 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { resolvePushCapability } from "@/lib/push-capability";
+import { rememberNativePushToken } from "@/lib/native-push-client";
 
 const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+type NativeNotificationMessage = {
+  status: "authorized" | "default" | "denied" | "error" | "registering";
+  token?: string;
+  error?: string;
+};
+
+type NativeNotificationHandler = {
+  postMessage(payload: { action: "openSettings" | "request" | "status" }): void;
+};
+
+function nativeNotificationHandler(): NativeNotificationHandler | null {
+  const nativeWindow = window as Window & {
+    webkit?: { messageHandlers?: { sipStoriesNotifications?: NativeNotificationHandler } };
+  };
+  return nativeWindow.webkit?.messageHandlers?.sipStoriesNotifications ?? null;
+}
+
+function isNativeIOSApp() {
+  return /SipStoriesIOS\//i.test(navigator.userAgent);
+}
 
 // Base64url → Uint8Array, required for PushManager.subscribe's applicationServerKey.
 // Backed by an explicit ArrayBuffer so the type is Uint8Array<ArrayBuffer> (a valid
@@ -24,6 +46,9 @@ type State =
   | "loading"
   | "unsupported"
   | "install-required"
+  | "native-on"
+  | "native-registering"
+  | "native-update-required"
   | "reinstall-required"
   | "default"
   | "denied"
@@ -53,8 +78,81 @@ export function NotificationToggle() {
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const nativeIOSRef = useRef(false);
 
   useEffect(() => {
+    if (isNativeIOSApp()) {
+      nativeIOSRef.current = true;
+      const bridge = nativeNotificationHandler();
+      if (!bridge) {
+        const timer = window.setTimeout(() => setState("native-update-required"), 0);
+        return () => window.clearTimeout(timer);
+      }
+
+      let active = true;
+      const handleNativeStatus = async (event: Event) => {
+        const detail = (event as CustomEvent<NativeNotificationMessage>).detail;
+        if (!active || !detail?.status) return;
+
+        if (detail.status === "default") {
+          setBusy(false);
+          setState("default");
+          return;
+        }
+        if (detail.status === "denied") {
+          setBusy(false);
+          setState("denied");
+          return;
+        }
+        if (detail.status === "registering") {
+          setBusy(true);
+          setState("native-registering");
+          return;
+        }
+        if (detail.status === "error") {
+          setBusy(false);
+          setErrorMessage(detail.error ?? "Apple couldn't register this iPhone for notifications.");
+          setState("error");
+          return;
+        }
+        if (!detail.token) {
+          setBusy(false);
+          setErrorMessage("Apple allowed notifications but didn't return a device token yet.");
+          setState("error");
+          return;
+        }
+
+        try {
+          const response = await fetch("/api/push/native/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ deviceToken: detail.token, platform: "ios" }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Couldn't save this iPhone for notifications.");
+          }
+          rememberNativePushToken(detail.token);
+          if (active) setState("native-on");
+        } catch (error) {
+          if (!active) return;
+          setErrorMessage(
+            error instanceof Error ? error.message : "Couldn't save this iPhone for notifications.",
+          );
+          setState("error");
+        } finally {
+          if (active) setBusy(false);
+        }
+      };
+
+      window.addEventListener("sipstories:native-notification", handleNativeStatus);
+      bridge.postMessage({ action: "status" });
+      return () => {
+        active = false;
+        window.removeEventListener("sipstories:native-notification", handleNativeStatus);
+      };
+    }
+
     const capability = resolvePushCapability({
       appleMobile: isAppleMobileDevice(),
       standalone: isStandaloneApp(),
@@ -98,6 +196,17 @@ export function NotificationToggle() {
     setBusy(true);
     setErrorMessage("");
     try {
+      if (nativeIOSRef.current) {
+        const bridge = nativeNotificationHandler();
+        if (!bridge) {
+          setState("native-update-required");
+          return;
+        }
+        setState("native-registering");
+        bridge.postMessage({ action: "request" });
+        return;
+      }
+
       // WebKit requires the permission prompt to remain attached to this user
       // gesture. Newer/installed WebKit builds can expose PushManager without
       // exposing window.Notification, so support both permission entry points.
@@ -168,6 +277,17 @@ export function NotificationToggle() {
   if (state === "loading") {
     return <p className="text-xs text-muted-foreground">Checking…</p>;
   }
+  if (state === "native-update-required") {
+    return (
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Update the Sip Stories iPhone app to the latest build, then reopen Settings to enable
+        native Apple notifications.
+      </p>
+    );
+  }
+  if (state === "native-registering") {
+    return <p className="text-xs text-muted-foreground">Registering this iPhone with Apple…</p>;
+  }
   if (state === "unsupported") {
     return (
       <p className="text-xs leading-relaxed text-muted-foreground">
@@ -210,6 +330,20 @@ export function NotificationToggle() {
         </p>
         <Button variant="outline" size="sm" onClick={enable} disabled={busy}>
           {busy ? "Trying…" : "Try again"}
+        </Button>
+      </div>
+    );
+  }
+  if (state === "native-on") {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-[var(--ml-sober)]">Push is on for this iPhone.</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => nativeNotificationHandler()?.postMessage({ action: "openSettings" })}
+        >
+          Apple settings
         </Button>
       </div>
     );

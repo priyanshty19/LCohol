@@ -19,6 +19,13 @@
 /.xcode-derived/
 /out/
 
+# Xcode user state and local build products
+**/xcuserdata/
+**/*.xcuserstate
+**/DerivedData/
+**/.derived-device/
+**/Artifacts/
+
 # production
 /build
 
