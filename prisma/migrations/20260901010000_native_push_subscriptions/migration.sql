@@ -18,3 +18,8 @@ ON "native_push_subscriptions"("user_id");
 ALTER TABLE "native_push_subscriptions"
 ADD CONSTRAINT "native_push_subscriptions_user_id_fkey"
 FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- This table is server-internal. Keep it inaccessible through Supabase's Data
+-- API even when the public schema has permissive default grants.
+ALTER TABLE "native_push_subscriptions" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "native_push_subscriptions" FROM anon, authenticated;
