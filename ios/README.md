@@ -1,6 +1,6 @@
 # Sip Stories for iPhone
 
-This is the iOS shell for the existing Sip Stories web app. Debug builds load `https://staging.mysipstories.com/`; Release builds load `https://mysipstories.com/`. Both run full-screen in a persistent `WKWebView`, so the web and iPhone versions use the same authentication, backend, content, and account data.
+This is the iOS shell for the existing Sip Stories web app. Debug and Release builds load the verified application at `https://staging.mysipstories.com/`. Both run full-screen in a persistent `WKWebView`, so the web and iPhone versions use the same authentication, backend, content, and account data. Move Release to `https://mysipstories.com/` only after that domain serves the application instead of its current launching-soon page.
 
 ## Current configuration
 
@@ -8,7 +8,7 @@ This is the iOS shell for the existing Sip Stories web app. Debug builds load `h
 - Bundle identifier: `com.sipstories.ios`
 - Minimum iOS version: iOS 16
 - Debug URL: `https://staging.mysipstories.com/`
-- Release URL: `https://mysipstories.com/`
+- Release URL: `https://staging.mysipstories.com/`
 - Signing: Automatic (an Apple Developer team must be selected in Xcode)
 - Native push: Apple notification permission is requested only after the user
   taps **Enable notifications** in the web Settings screen. The app forwards its

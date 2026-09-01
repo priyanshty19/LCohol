@@ -302,7 +302,7 @@
 				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sipstories.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SIPSTORIES_START_URL = "https://mysipstories.com/";
+				SIPSTORIES_START_URL = "https://staging.mysipstories.com/";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
