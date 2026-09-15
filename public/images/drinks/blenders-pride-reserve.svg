@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-labelledby="title desc">
+  <title id="title">Blenders Pride Reserve Collection</title>
+  <desc id="desc">Sip Stories illustrated whisky bottle</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#211108"/><stop offset="1" stop-color="#754018"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff" stop-opacity=".24"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <clipPath id="bottle"><path d="M82 26h16v16l16 18v66a8 8 0 0 1-8 8H74a8 8 0 0 1-8-8V60l16-18z"/></clipPath>
+    <filter id="shadow"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="640" height="480" rx="28" fill="url(#bg)"/>
+  <circle cx="120" cy="80" r="190" fill="url(#glow)"/>
+  <circle cx="570" cy="410" r="170" fill="#000" opacity=".13"/>
+  <path d="M40 384C170 330 264 422 416 359c73-30 130-21 184 1v120H40z" fill="#080608" opacity=".2"/>
+  <g transform="translate(140 24) scale(2)" filter="url(#shadow)">
+    <path d="M82 26h16v16l16 18v66a8 8 0 0 1-8 8H74a8 8 0 0 1-8-8V60l16-18z" fill="#fff8eb" opacity=".92"/>
+    <rect x="0" y="91" width="180" height="110" fill="#b86620" clip-path="url(#bottle)" opacity=".96"/>
+    
+    <rect x="67" y="94" width="46" height="34" rx="4" fill="#efbd67"/>
+    <path d="M75 105h30M75 114h22" stroke="#211108" stroke-width="4" stroke-linecap="round" opacity=".72"/>
+    <path d="M82 26h16v16l16 18v66a8 8 0 0 1-8 8H74a8 8 0 0 1-8-8V60l16-18z" fill="none" stroke="#fff" stroke-width="2.5" opacity=".55"/>
+  </g>
+  <text x="38" y="405" fill="#fff8eb" font-family="Georgia,serif" font-size="25" font-weight="700">Blenders Pride Reserve…</text>
+  <text x="40" y="434" fill="#fff8eb" opacity=".72" font-family="Arial,sans-serif" font-size="14" letter-spacing="1.5">PERNOD RICARD</text>
+  <text x="600" y="434" text-anchor="end" fill="#fff8eb" opacity=".72" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">SIP STORIES</text>
+</svg>

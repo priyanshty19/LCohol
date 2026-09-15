@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { EntryCard } from "@/components/catalog/entry-card";
+import { DrinkGridCard } from "./drink-grid-card";
 import { CategoryIcon } from "./category-icons";
 import { StateSelector, useStateSelection } from "./state-selector";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export function DrinksView({
   }, [search]);
 
   const fetchDrinks = useCallback(
-    async (loadMore = false, pageCursor?: string) => {
+    async (loadMore = false, pageCursor?: string, signal?: AbortSignal) => {
       setLoading(true);
       const params = new URLSearchParams({ sort });
       if (category !== "all") params.set("category", category);
@@ -75,8 +75,10 @@ export function DrinksView({
       if (loadMore && pageCursor) params.set("cursor", pageCursor);
 
       try {
-        const res = await fetch(`/api/drinks?${params}`);
+        const res = await fetch(`/api/drinks?${params}`, { signal });
         const json = await res.json();
+        // A superseded filter change must not repaint the grid.
+        if (signal?.aborted) return;
         if (loadMore) {
           setDrinks((prev) => [...prev, ...json.data]);
           setTotalShown((prev) => prev + json.data.length);
@@ -87,9 +89,11 @@ export function DrinksView({
         setHasMore(json.hasMore);
         setCursor(json.nextCursor);
       } catch (err) {
+        if (signal?.aborted) return;
+        if (err instanceof DOMException && err.name === "AbortError") return;
         console.error("Failed to fetch drinks:", err);
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
     },
     [sort, category, brand, searchDebounced]
@@ -100,7 +104,9 @@ export function DrinksView({
     const sig = `${sort}|${category}|${brand}|${searchDebounced}`;
     if (sig === initialSig.current) return;
     setCursor(undefined);
-    void fetchDrinks(false);
+    const controller = new AbortController();
+    void fetchDrinks(false, undefined, controller.signal);
+    return () => controller.abort();
   }, [sort, category, brand, searchDebounced, fetchDrinks]);
 
   function clearFilters() {
@@ -116,14 +122,13 @@ export function DrinksView({
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="font-display text-2xl font-bold text-primary text-glow sm:text-3xl">
-          Discover Drinks
-        </h1>
+      <header className="space-y-1.5">
+        <p className="eyebrow">Browse the market</p>
+        <h1 className="screen-title text-foreground">Drinks Database</h1>
         <p className="text-sm text-muted-foreground">
-          Search across spirits, beers & wines in the Indian market
+          Search across spirits, beers &amp; wines in the Indian market.
         </p>
-      </div>
+      </header>
 
       {/* Search bar */}
       <div className="relative">
@@ -158,10 +163,10 @@ export function DrinksView({
       </div>
 
       {/* Filter row */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="rail -mx-4 items-center px-4 sm:mx-0 sm:flex sm:flex-wrap sm:px-0">
         {/* Category */}
         <Select value={category} onValueChange={(v) => setCategory(v ?? "all")}>
-          <SelectTrigger className="glass-panel-subtle h-9 w-[140px] text-xs">
+          <SelectTrigger className="glass-panel-subtle rail-item h-9 w-[140px] text-xs">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
@@ -176,7 +181,7 @@ export function DrinksView({
 
         {/* Brand */}
         <Select value={brand} onValueChange={(v) => setBrand(v ?? "all")}>
-          <SelectTrigger className="glass-panel-subtle h-9 w-[180px] text-xs">
+          <SelectTrigger className="glass-panel-subtle rail-item h-9 w-[180px] text-xs">
             <SelectValue placeholder="All Brands" />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
@@ -191,7 +196,7 @@ export function DrinksView({
 
         {/* Sort */}
         <Select value={sort} onValueChange={(v) => setSort(v ?? "name")}>
-          <SelectTrigger className="glass-panel-subtle h-9 w-[160px] text-xs">
+          <SelectTrigger className="glass-panel-subtle rail-item h-9 w-[160px] text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -205,7 +210,7 @@ export function DrinksView({
 
         {/* State pricing */}
         {loaded && (
-          <div className="ml-auto">
+          <div className="rail-item sm:ml-auto">
             <StateSelector value={stateCode} onChange={setStateCode} />
           </div>
         )}
@@ -255,18 +260,18 @@ export function DrinksView({
 
       {/* Results */}
       {loading && drinks.length === 0 ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="h-64 animate-pulse rounded-xl bg-muted"
+              className="aspect-[3/4] animate-pulse rounded-xl bg-muted"
             />
           ))}
         </div>
       ) : drinks.length === 0 ? (
-        <div className="glass-panel flex flex-col items-center justify-center rounded-xl py-20 text-center">
+        <div className="stitch-panel flex flex-col items-center justify-center py-20 text-center">
           <CategoryIcon className="h-14 w-14 text-muted-foreground/40" />
-          <p className="mt-3 font-display text-lg font-medium">No drinks found</p>
+          <p className="section-title mt-3">No drinks found</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {hasActiveFilters
               ? "Try adjusting your filters or search term"
@@ -291,9 +296,9 @@ export function DrinksView({
             {hasMore ? "+" : ""}
           </p>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             {drinks.map((drink) => (
-              <EntryCard
+              <DrinkGridCard
                 key={drink.id}
                 entry={toCatalogDrink(drink)}
                 stateCode={stateCode}
