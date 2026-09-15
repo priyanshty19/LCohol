@@ -10,7 +10,8 @@ import { CardListSkeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { saveProfileLocation } from "@/lib/client-location";
 import { filterNearbyBars } from "@/lib/nearby-places";
-import { googleBarsRequest } from "@/lib/bars-query";
+import { barsRequest } from "@/lib/bars-query";
+import { CircleLoves } from "@/components/cocktails/circle-loves";
 
 const BarsMap = dynamic(() => import("./bars-map"), {
   ssr: false,
@@ -75,32 +76,43 @@ function BarCard({
         }
       }}
       className={cn(
-        "glass-panel cursor-pointer rounded-xl p-3 transition-[border-color,box-shadow]",
-        active ? "glow-active" : "hover:border-primary/20"
+        "media-card cursor-pointer p-3.5",
+        active && "border-primary/60 shadow-[0_0_22px_color-mix(in_srgb,var(--primary)_28%,transparent)]"
       )}
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* A lit left rail marks the bar currently pinned on the map, so the
+          list and the map always agree about what's selected. */}
+      <span
+        aria-hidden
+        className={cn(
+          "absolute inset-y-0 left-0 w-[3px] transition-opacity",
+          active ? "bg-primary opacity-100 shadow-[0_0_12px_var(--primary)]" : "opacity-0"
+        )}
+      />
+      <div className="flex items-start justify-between gap-2 pl-1.5">
         <div className="min-w-0">
-          <span className="block truncate font-display text-base font-medium">
+          <span className="section-title block truncate text-base">
             {b.name}
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
             {b.address}
           </span>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           {b.rating != null && (
-            <div className="text-sm font-semibold text-primary">
+            <span className="overlay-chip !border-primary/35 !bg-primary/15 !text-primary">
               ★ {Number(b.rating).toFixed(1)}
-            </div>
+            </span>
           )}
-          <div className="text-[11px] text-muted-foreground">
-            {priceTier(b.priceRange)}
-          </div>
+          {priceTier(b.priceRange) && (
+            <span className="text-[11px] text-muted-foreground">
+              {priceTier(b.priceRange)}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pl-1.5">
         <Badge variant="drink">{b.type}</Badge>
         {b.bestsellers?.slice(0, 3).map((d) => (
           <Badge key={d} variant="topic">
@@ -110,7 +122,7 @@ function BarCard({
       </div>
 
       {active && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2 pl-1.5">
           {b.description && (
             <p className="text-sm text-muted-foreground">{b.description}</p>
           )}
@@ -142,7 +154,7 @@ function BarCard({
   );
 }
 
-export function BarsView() {
+export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
   const [city, setCity] = useState("Delhi NCR");
   const [type, setType] = useState<string | null>(null);
   const [q, setQ] = useState("");
@@ -154,12 +166,13 @@ export function BarsView() {
   const [locating, setLocating] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [userLoc, setUserLoc] = useState<[number, number] | null>(null);
-  // Render the Leaflet map only AFTER mount. Even though BarsMap is ssr:false,
-  // mounting react-leaflet during hydration can throw in the production build and
+  // Render the Google map only AFTER mount. Even though BarsMap is ssr:false,
+  // mounting a browser-only map during hydration can throw in the production build and
   // silently abort hydration of the whole BarsView subtree (dead city buttons,
   // dead search). Gating on `mapReady` keeps the server HTML and first client
   // render identical (both the placeholder), so hydration always completes.
   const [mapReady, setMapReady] = useState(false);
+  const requestQuery = nearby ? "" : q;
   useEffect(() => {
     const t = window.setTimeout(() => setMapReady(true), 0);
     return () => window.clearTimeout(t);
@@ -172,10 +185,10 @@ export function BarsView() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setStatusMsg(null);
-      const { endpoint, params } = googleBarsRequest({
+      const { endpoint, params } = barsRequest({
         city,
         type,
-        query: q,
+        query: requestQuery,
         nearbyLocation: nearby ? userLoc : null,
       });
 
@@ -184,33 +197,34 @@ export function BarsView() {
           signal: controller.signal,
         });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error ?? "Couldn't load Google Maps places.");
+        if (!response.ok) throw new Error(body.error ?? "Couldn't load bars.");
 
         const places = (body.data ?? []) as Bar[];
-        setBars(nearby ? filterNearbyBars(places, q) : places);
+        setBars(places);
         setSelected(null);
         if (!places.length) {
           setStatusMsg(
-            nearby ? "No matching places found within about 3 km." : "No matching Google Maps places found.",
+            nearby ? "No matching places found within about 3 km." : "No matching curated places found.",
           );
         }
       } catch (error) {
         if (controller.signal.aborted) return;
         setBars([]);
         setSelected(null);
-        setStatusMsg(error instanceof Error ? error.message : "Couldn't load Google Maps places.");
+        setStatusMsg(error instanceof Error ? error.message : "Couldn't load bars.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, q.trim() ? 350 : 0);
+    }, requestQuery.trim() ? 350 : 0);
 
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [city, type, q, nearby, userLoc]);
+  }, [city, type, requestQuery, nearby, userLoc]);
 
   function nearMe() {
+    if (nearby && userLoc) return;
     if (!("geolocation" in navigator)) {
       setStatusMsg("This device can't share location.");
       return;
@@ -232,7 +246,7 @@ export function BarsView() {
       },
       () => {
         setLocating(false);
-        setStatusMsg("Location permission denied — showing Google Maps places for the selected city.");
+        setStatusMsg("Location permission denied — showing curated places for the selected city.");
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
@@ -254,8 +268,9 @@ export function BarsView() {
     );
   }
 
+  const visibleBars = nearby ? filterNearbyBars(bars, q) : bars;
   const center: [number, number] = nearby && userLoc ? userLoc : CITY_CENTER[city] ?? [28.55, 77.15];
-  const mapBars = bars.map((b) => ({
+  const mapBars = visibleBars.map((b) => ({
     id: b.id,
     name: b.name,
     lat: b.lat,
@@ -265,23 +280,18 @@ export function BarsView() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-primary">
-          Explore Bars
-        </h1>
+      <header className="space-y-1.5">
+        <h1 className="screen-title text-foreground">Bars &amp; Cocktails</h1>
         <p className="text-sm text-muted-foreground">
           Where&apos;s the scene tonight? Tap a pin or a card.
         </p>
-      </div>
+      </header>
 
-      <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+      <div className="rail -mx-4 px-4 sm:mx-0 sm:px-0">
         <button
           onClick={nearMe}
           disabled={locating}
-          className={cn(
-            "flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-sm",
-            nearby ? "pill-active" : "pill-inactive"
-          )}
+          className={cn("chip rail-item min-h-9", nearby ? "chip-on" : "chip-off")}
         >
           📍 {locating ? "Locating…" : "Near me"}
         </button>
@@ -298,8 +308,8 @@ export function BarsView() {
               else if (!wasNearby) setSelected(null);
             }}
             className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-sm",
-              !nearby && c === city ? "pill-active" : "pill-inactive"
+              "chip rail-item min-h-9",
+              !nearby && c === city ? "chip-on" : "chip-off"
             )}
           >
             {c}
@@ -311,7 +321,7 @@ export function BarsView() {
           {statusMsg ??
             (nearby
               ? "Showing operational places near you from Google Maps."
-              : "Showing operational places for this city from Google Maps.")}
+              : "Showing curated Sip Stories places for this city.")}
         </span>
         {nearby && (
           <button onClick={exitNearby} className="shrink-0 text-primary underline-offset-2 hover:underline">
@@ -327,14 +337,11 @@ export function BarsView() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <div className="hide-scrollbar flex gap-1 overflow-x-auto">
+        <div className="rail -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             aria-pressed={!type}
             onClick={() => setType(null)}
-            className={cn(
-              "shrink-0 rounded-full px-2.5 py-1 text-xs",
-              !type ? "pill-active" : "pill-inactive"
-            )}
+            className={cn("chip rail-item !py-1.5 text-xs", !type ? "chip-on" : "chip-off")}
           >
             All
           </button>
@@ -344,8 +351,8 @@ export function BarsView() {
               aria-pressed={t === type}
               onClick={() => setType(t === type ? null : t)}
               className={cn(
-                "shrink-0 rounded-full px-2.5 py-1 text-xs",
-                t === type ? "pill-active" : "pill-inactive"
+                "chip rail-item !py-1.5 text-xs",
+                t === type ? "chip-on" : "chip-off"
               )}
             >
               {t}
@@ -358,15 +365,16 @@ export function BarsView() {
           that a wide bar card can push past the viewport (horizontal overflow). */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="order-2 min-w-0 space-y-2 lg:order-1 lg:max-h-[70vh] lg:overflow-y-auto lg:pr-1">
+          <h2 className="section-title">Discover bars</h2>
           {loading && <CardListSkeleton count={4} />}
-          {!loading && bars.length === 0 && (
+          {!loading && visibleBars.length === 0 && (
             <EmptyState
               emoji="🍸"
               title="No matching places"
               subtitle="Try another city, category, or search term."
             />
           )}
-          {!loading && bars.map((b) => (
+          {!loading && visibleBars.map((b) => (
             <BarCard
               key={b.id}
               b={b}
@@ -380,9 +388,10 @@ export function BarsView() {
         {/* isolate = own stacking context, so Leaflet's internal z-indexes (panes
             up to ~700, controls ~1000) can't escape and render over fixed overlays
             like the James panel (z-50). */}
-        <div className="isolate order-1 h-[42vh] overflow-hidden rounded-2xl border border-border/50 lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
+        <div className="isolate order-1 h-[42vh] overflow-hidden rounded-2xl border border-[var(--glass-border)] lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
           {mapReady ? (
             <BarsMap
+              apiKey={mapsApiKey}
               bars={mapBars}
               center={center}
               selectedId={selected}
@@ -395,6 +404,11 @@ export function BarsView() {
           )}
         </div>
       </div>
+
+      {/* Cocktails your connections have invented — the stitch bars screen
+          pairs venue discovery with this rail. Renders nothing when the
+          viewer's circle is empty, so it never leaves a hole. */}
+      <CircleLoves title="Loved by your circle" />
     </div>
   );
 }

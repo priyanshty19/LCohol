@@ -78,6 +78,7 @@ async function main() {
   for (const drink of DRINKS) {
     const categoryId = categoryMap.get(drink.categorySlug);
     const subcategoryId = subcategoryMap.get(drink.subcategorySlug);
+    const imageUrl = `/images/drinks/${drink.slug}.svg`;
 
     if (!categoryId) {
       console.warn(`  ⚠ Skipping ${drink.name}: category "${drink.categorySlug}" not found`);
@@ -86,7 +87,7 @@ async function main() {
 
     await prisma.drink.upsert({
       where: { slug: drink.slug },
-      update: {},
+      update: { imageUrl },
       create: {
         name: drink.name,
         slug: drink.slug,
@@ -98,6 +99,7 @@ async function main() {
         abv: drink.abv,
         priceRange: drink.priceRange as PriceRange,
         description: drink.description || null,
+        imageUrl,
         isVerified: true,
         tasteProfile: {
           create: drink.taste,

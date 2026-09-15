@@ -31,9 +31,12 @@ export function CircleLoves({ title = "🫂 Loved by your circle" }: { title?: s
       <h2 className="font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      {/* Shared rail: snap scrolling with the scrollbar hidden, bled to the
+          screen edge so the last card is visibly clipped and the row reads as
+          scrollable rather than cut off. */}
+      <div className="rail -mx-4 px-4">
         {cocktails.map((c) => (
-          <div key={c.id} className="w-56 shrink-0">
+          <div key={c.id} className="rail-item w-56">
             <EntryCard entry={toCatalogCocktail(c)} />
             {c.author?.profile?.username && (
               <p className="mt-1 truncate text-[10px] text-muted-foreground/80">

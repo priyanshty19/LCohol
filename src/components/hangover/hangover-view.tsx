@@ -7,8 +7,74 @@ import {
   NEVER_AGAIN_PLEDGES,
   type Severity,
 } from "@/lib/hangover-config";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+// Each severity step owns a hue so the scale reads as a ramp at a glance —
+// the selected tile lights up in its own colour via .neon-tile's --tile-hue.
+const SEVERITY_HUE: Record<Severity, string> = {
+  1: "#a3b018",
+  2: "#e08a1e",
+  3: "#f0553d",
+  4: "#a855f7",
+  5: "#c2334d",
+};
+
+// Recovery cards get a halo colour keyed off the remedy, so the plan reads as
+// a set of distinct protocols rather than five identical cards.
+const REMEDY_HUES = ["#38bdf8", "#facc15", "#4ade80", "#f472b6", "#a78bfa"];
+
+function Slider({
+  label,
+  value,
+  min,
+  max,
+  unit,
+  hue,
+  onChange,
+  minLabel,
+  maxLabel,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit?: string;
+  hue: string;
+  onChange: (n: number) => void;
+  minLabel: string;
+  maxLabel: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <label htmlFor={`slider-${label}`} className="text-sm font-medium">
+          {label}
+        </label>
+        <span
+          className="font-display text-xl font-bold tabular-nums"
+          style={{ color: hue }}
+        >
+          {value}
+          {unit}
+        </span>
+      </div>
+      <input
+        id={`slider-${label}`}
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="neon-range"
+        style={{ ["--range-hue" as string]: hue }}
+      />
+      <div className="flex justify-between text-[10px] text-muted-foreground/60">
+        <span>{minLabel}</span>
+        <span>{maxLabel}</span>
+      </div>
+    </div>
+  );
+}
 
 export function HangoverView() {
   const [severity, setSeverity] = useState<Severity | null>(null);
@@ -30,161 +96,171 @@ export function HangoverView() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-3xl">🆘</span>
-          <h1 className="font-display text-2xl font-semibold text-primary">
-            Hangover SOS
-          </h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          No judgment. Just survival tips from someone who&apos;s been there
+      <header className="space-y-1.5">
+        <h1 className="screen-title text-foreground">Hangover SOS</h1>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Warm, witty, and non-judgmental. We&apos;ve all been there.
         </p>
-      </div>
+      </header>
 
       {/* Severity scale */}
-      <div className="glass-panel space-y-4 rounded-xl p-5">
-        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          How bad is it?
-        </h2>
+      <section className="space-y-3">
+        <h2 className="section-title">How bad is it?</h2>
         <div className="grid grid-cols-5 gap-2">
           {([1, 2, 3, 4, 5] as Severity[]).map((s) => {
             const m = SEVERITY_META[s];
+            const on = severity === s;
             return (
               <button
                 key={s}
+                type="button"
                 onClick={() => setSeverity(s)}
-                className={`flex min-h-11 flex-col items-center gap-1.5 rounded-xl p-3 transition-all duration-150 ${
-                  severity === s
-                    ? "glass-panel-elevated border-primary/40 glow-primary"
-                    : "glass-panel"
-                }`}
+                aria-pressed={on}
+                data-on={on}
+                className="neon-tile min-h-20 !gap-1"
+                style={{ ["--tile-hue" as string]: SEVERITY_HUE[s] }}
+                aria-label={`Level ${s}: ${m.label}`}
               >
-                <span className="text-2xl">{m.emoji}</span>
-                <span className="text-[10px] text-muted-foreground font-medium text-center leading-tight">
+                <span className="text-2xl leading-none" aria-hidden>
+                  {m.emoji}
+                </span>
+                <span
+                  className={cn(
+                    "text-[11px] font-bold",
+                    on ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
                   {s}
                 </span>
               </button>
             );
           })}
         </div>
-        {meta && (
-          <p className={`text-sm font-medium ${meta.color}`}>
-            {meta.emoji} {meta.label}
+        {meta ? (
+          <p className="text-sm font-medium" style={{ color: SEVERITY_HUE[severity!] }}>
+            Level {severity}: {meta.label}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Pick a level and we&apos;ll build you a recovery plan.
           </p>
         )}
-      </div>
+      </section>
 
       {/* The Math section */}
-      <div className="glass-panel space-y-4 rounded-xl p-5">
-        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          🧮 The Sober Math
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          1 unit = 1 peg (30ml standard spirit) or 1 beer. Your liver clears ~1 unit per hour.
-        </p>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Units consumed last night: <span className="text-primary font-bold">{unitsConsumed}</span>
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              value={unitsConsumed}
-              onChange={(e) => setUnitsConsumed(Number(e.target.value))}
-              className="w-full accent-[var(--primary)]"
-            />
-            <div className="flex justify-between text-[10px] text-muted-foreground/50">
-              <span>1</span><span>10</span><span>20</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Hours since last drink: <span className="text-primary font-bold">{hoursSince}h</span>
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={24}
-              value={hoursSince}
-              onChange={(e) => setHoursSince(Number(e.target.value))}
-              className="w-full accent-[var(--primary)]"
-            />
-            <div className="flex justify-between text-[10px] text-muted-foreground/50">
-              <span>1h</span><span>12h</span><span>24h</span>
-            </div>
-          </div>
+      <section className="stitch-panel space-y-5 p-5">
+        <div className="space-y-1">
+          <h2 className="section-title">The Sober Math</h2>
+          <p className="text-xs text-muted-foreground">
+            1 unit = 1 peg (30ml standard spirit) or 1 beer. Your liver clears
+            about 1 unit per hour.
+          </p>
         </div>
+
+        <Slider
+          label="Units consumed last night"
+          value={unitsConsumed}
+          min={1}
+          max={20}
+          hue="#38bdf8"
+          minLabel="1"
+          maxLabel="20"
+          onChange={setUnitsConsumed}
+        />
+
+        <Slider
+          label="Hours since last drink"
+          value={hoursSince}
+          unit="h"
+          min={0}
+          max={24}
+          hue="#4ade80"
+          minLabel="0h"
+          maxLabel="24h"
+          onChange={setHoursSince}
+        />
 
         {/* Result */}
         <div
-          className={`rounded-lg border p-3 text-center ${
+          className={cn(
+            "rounded-xl border px-4 py-3 text-center text-sm font-medium",
             isLikelyClear
-              ? "border-[var(--ml-sober)]/30 bg-[var(--ml-sober)]/10"
-              : "border-[var(--ml-sos)]/30 bg-[var(--ml-sos)]/10 glow-danger"
-          }`}
+              ? "border-[var(--ml-sober)]/35 bg-[var(--ml-sober)]/10 text-[var(--ml-sober)]"
+              : "border-[var(--ml-sos)]/35 bg-[var(--ml-sos)]/10 text-[var(--ml-sos)]",
+          )}
+          role="status"
         >
           {isLikelyClear ? (
-            <p className="text-sm text-[var(--ml-sober)] font-medium">
-              ✓ You&apos;re likely alcohol-free by now. You&apos;ve got this.
-            </p>
+            <>✓ You&apos;re on the mend. Keep hydrating.</>
           ) : (
-            <p className="text-sm text-[var(--ml-sos)] font-medium">
-              ~{hoursRemaining} hour{hoursRemaining !== 1 ? "s" : ""} of processing remaining.{" "}
-              <span className="text-muted-foreground font-normal">
+            <>
+              ~{hoursRemaining} hour{hoursRemaining !== 1 ? "s" : ""} of
+              processing left.{" "}
+              <span className="font-normal text-muted-foreground">
                 Don&apos;t drive. Drink water.
               </span>
-            </p>
+            </>
           )}
         </div>
-      </div>
+      </section>
 
       {/* Remedies */}
       {severity && activeRemedies.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="font-display font-semibold">
-            Recovery Plan — Level {severity} Protocol
+        <section className="space-y-4">
+          <h2 className="section-title">
+            Recovery plan — level {severity}
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {activeRemedies.map((remedy) => (
-              <Card
-                key={remedy.id}
-                variant="glass"
-                className="p-4 space-y-3"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{remedy.emoji}</span>
-                  <div>
-                    <h3 className="font-display font-semibold text-sm">{remedy.title}</h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      {remedy.subtitle}
-                    </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {activeRemedies.map((remedy, i) => {
+              const hue = REMEDY_HUES[i % REMEDY_HUES.length];
+              return (
+                <article
+                  key={remedy.id}
+                  className="stitch-panel flex flex-col gap-3 p-5"
+                >
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <span
+                      className="icon-halo"
+                      style={{ ["--halo-hue" as string]: hue }}
+                      aria-hidden
+                    >
+                      {remedy.emoji}
+                    </span>
+                    <div>
+                      <h3 className="section-title text-base">{remedy.title}</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {remedy.subtitle}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <ol className="space-y-2">
-                  {remedy.steps.map((step, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                      <span className="flex-shrink-0 text-primary font-bold mt-0.5 text-xs">
-                        {i + 1}.
-                      </span>
-                      <span className="leading-relaxed">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            ))}
+                  <ol className="space-y-2">
+                    {remedy.steps.map((step, si) => (
+                      <li
+                        key={si}
+                        className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground"
+                      >
+                        <span
+                          className="mt-0.5 shrink-0 text-xs font-bold tabular-nums"
+                          style={{ color: hue }}
+                        >
+                          {si + 1}.
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+              );
+            })}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Never Again pledge */}
-      <div className="glass-panel space-y-4 rounded-xl p-5">
-        <h2 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          📝 The &quot;Never Again&quot; Pledge (we&apos;ll see)
+      <section className="stitch-panel space-y-4 p-5">
+        <h2 className="section-title">
+          The &quot;never again&quot; pledge{" "}
+          <span className="text-sm font-normal text-muted-foreground">(we&apos;ll see)</span>
         </h2>
         {!pledgeDone ? (
           <>
@@ -192,57 +268,51 @@ export function HangoverView() {
               {NEVER_AGAIN_PLEDGES.map((p) => (
                 <button
                   key={p}
+                  type="button"
                   onClick={() => setPledge(p)}
-                  className={`min-h-11 rounded-full px-3 text-xs ${
-                    pledge === p ? "pill-active" : "pill-inactive"
-                  }`}
+                  aria-pressed={pledge === p}
+                  className={cn("chip min-h-10", pledge === p ? "chip-on" : "chip-off")}
                 >
                   {p}
                 </button>
               ))}
             </div>
             {pledge && (
-              <Button
-                variant="gold"
-                size="lg"
+              <button
+                type="button"
                 onClick={() => setPledgeDone(true)}
-                className="mt-2"
+                className="btn-neon min-h-11 w-full px-5 text-sm sm:w-auto"
               >
                 I solemnly pledge this 🤞
-              </Button>
+              </button>
             )}
           </>
         ) : (
-          <div className="text-center py-4 space-y-2">
-            <span className="text-4xl">🏅</span>
-            <p className="font-display font-semibold text-sm">&quot;{pledge}&quot;</p>
+          <div className="space-y-2 py-4 text-center">
+            <span className="text-4xl" aria-hidden>🏅</span>
+            <p className="font-display text-base font-semibold">&quot;{pledge}&quot;</p>
             <p className="text-xs text-muted-foreground">
-              Pledge accepted. We&apos;ll hold you to... absolutely nothing. Get some rest.
+              Pledge accepted. We&apos;ll hold you to… absolutely nothing. Get
+              some rest.
             </p>
             <button
-              onClick={() => { setPledge(null); setPledgeDone(false); }}
-              className="text-xs text-muted-foreground/50 underline underline-offset-2"
+              type="button"
+              onClick={() => {
+                setPledge(null);
+                setPledgeDone(false);
+              }}
+              className="text-xs text-muted-foreground/60 underline underline-offset-2 hover:text-foreground"
             >
               Reset
             </button>
           </div>
         )}
-      </div>
-
-      {/* Empty state */}
-      {!severity && (
-        <div className="glass-panel-subtle rounded-xl border-dashed py-12 text-center">
-          <span className="text-5xl">☝️</span>
-          <p className="mt-4 font-medium">Select your severity level above</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            We&apos;ll build a custom recovery plan for you
-          </p>
-        </div>
-      )}
+      </section>
 
       {/* Footer disclaimer */}
-      <p className="text-center text-xs text-muted-foreground/40 pb-4">
-        This is community advice, not medical guidance. If you&apos;re feeling seriously unwell, please see a doctor.
+      <p className="pb-4 text-center text-xs text-muted-foreground/50">
+        This is community advice, not medical guidance. If you&apos;re feeling
+        seriously unwell, please see a doctor.
       </p>
     </div>
   );
