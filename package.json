@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "setup": "npm install && prisma generate && node scripts/db-check.mjs && prisma migrate deploy && tsx scripts/dev-login.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:admins": "npx tsx prisma/seed-admins.ts",
     "db:seed:cocktails": "npx tsx prisma/seed-cocktails.ts",
+    "db:images": "npx tsx scripts/sync-drink-images.mts",
     "db:unseed:cocktails": "npx tsx prisma/unseed-cocktails.ts",
     "db:reset": "prisma migrate reset"
   },

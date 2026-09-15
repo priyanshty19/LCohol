@@ -62,3 +62,16 @@ next-env.d.ts
 
 # Stitch design reference (local only)
 .stitch-ref/
+
+# Local-only auth helper (see scripts/dev-login.ts header) — never ship
+scripts/dev-login.ts
+dev-login-cookie.txt
+START-SIPSTORIES.bat
+scripts/db-check.mjs
+.env.backup
+scripts/clerk-check.mjs
+
+# Design reference + agent scratch — not part of the app, ~10MB of PNGs that
+# would be re-uploaded on every Vercel build.
+/Sipstories_stitch/
+/Claude outputs/

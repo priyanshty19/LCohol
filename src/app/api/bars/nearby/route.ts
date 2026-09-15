@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 import {
@@ -41,32 +40,31 @@ function num(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Only SUCCESSFUL lookups are cached: the function throws on upstream failure so
-// errors aren't memoized for 10 minutes. The rounded location, radius, and
-// category arguments all participate in the cache key.
-const fetchNearbyCached = unstable_cache(
-  async (lat: number, lng: number, radius: number, category: NearbyCategory | null, key: string) => {
-    const res = await fetch(PLACES_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Goog-Api-Key": key,
-        "X-Goog-FieldMask": FIELD_MASK,
-      },
-      body: JSON.stringify({
-        includedTypes: googleTypesForCategory(category),
-        maxResultCount: 20,
-        rankPreference: "DISTANCE",
-        locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
-      }),
-    });
-    if (!res.ok) throw new Error(`places ${res.status}`);
-    const json = (await res.json()) as { places?: GooglePlace[] };
-    return toOperationalNearbyBars(json.places ?? [], category);
-  },
-  ["bars-nearby"],
-  { revalidate: 600 },
-);
+async function fetchNearby(
+  lat: number,
+  lng: number,
+  radius: number,
+  category: NearbyCategory | null,
+  key: string,
+) {
+  const res = await fetch(PLACES_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": key,
+      "X-Goog-FieldMask": FIELD_MASK,
+    },
+    body: JSON.stringify({
+      includedTypes: googleTypesForCategory(category),
+      maxResultCount: 20,
+      rankPreference: "DISTANCE",
+      locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
+    }),
+  });
+  if (!res.ok) throw new Error(`places ${res.status}`);
+  const json = (await res.json()) as { places?: GooglePlace[] };
+  return toOperationalNearbyBars(json.places ?? [], category);
+}
 
 export async function GET(request: Request) {
   // Auth + throttle BEFORE touching the billed upstream.
@@ -109,7 +107,7 @@ export async function GET(request: Request) {
   const rLng = Math.round(lng * 1000) / 1000;
 
   try {
-    const data = await fetchNearbyCached(rLat, rLng, radius, category, key);
+    const data = await fetchNearby(rLat, rLng, radius, category, key);
     return NextResponse.json({ data, meta: { category, radius, count: data.length } });
   } catch {
     return NextResponse.json({ error: "Nearby search failed", data: [] }, { status: 502 });

@@ -81,9 +81,11 @@ export async function POST(request: NextRequest) {
 
   const model = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: "llama-3.3-70b-versatile",
+    model: "qwen/qwen3.6-27b",
     temperature: 0.7,
     maxTokens: 700,
+    // Without this, qwen streams its <think> block straight into the bubble.
+    reasoningEffort: "none",
   });
 
   const encoder = new TextEncoder();

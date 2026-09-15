@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/shared/empty-state";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CreatePartyFlow } from "./create-party-flow";
+import { PartyEmptyArt } from "./party-empty-art";
+import { cn } from "@/lib/utils";
 
 type Party = {
   id: string;
@@ -64,56 +63,109 @@ function isExpired(p: Party, now = new Date()): boolean {
 function emptyCopy(tab: PartyTab) {
   if (tab === "open") {
     return {
-      title: "No open parties right now",
-      subtitle: "Public parties that are live or coming up will appear here.",
+      title: "No open parties right now.",
+      subtitle: "The night is young — why not host your own?",
     };
   }
   if (tab === "expired") {
     return {
-      title: "No expired parties",
+      title: "Nothing has wound down yet.",
       subtitle: "Past plans will settle here once their date has passed.",
     };
   }
   if (tab === "created") {
     return {
-      title: "You haven't created a party yet",
-      subtitle: "Throw one, pick the drinks, and invite your circle.",
+      title: "You haven't thrown one yet.",
+      subtitle: "Pick the occasion, stock the bar, invite your circle.",
     };
   }
   return {
-    title: "No active invites",
-    subtitle: "Party invites you can still attend will show up here.",
+    title: "No invites on the table.",
+    subtitle: "Party invites you can still make will show up here.",
   };
 }
 
 function PartyCard({ p, myRsvp, expired, open }: { p: Party; myRsvp?: string; expired?: boolean; open?: boolean }) {
   const when = whenLine(p);
+  const invited = p._count?.invites ?? 0;
   return (
-    <Link href={`/parties/${p.id}`} className="block">
-      <Card className="transition hover:border-foreground/30 hover:shadow-md">
-        <CardContent className="space-y-1.5 pt-5">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-base font-semibold leading-snug">{p.title}</h3>
-            {p.status === "CANCELLED" ? (
-              <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">Cancelled</Badge>
-            ) : expired ? (
-              <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">Expired</Badge>
-            ) : myRsvp ? (
-              <Badge variant="outline" className={`shrink-0 text-[10px] capitalize ${RSVP_TONE[myRsvp] ?? ""}`}>
-                {myRsvp.toLowerCase()}
-              </Badge>
-            ) : open ? (
-              <Badge variant="drink" className="shrink-0 text-[10px]">Open</Badge>
-            ) : null}
+    <Link href={`/parties/${p.id}`} className="group block">
+      {/* Stitch party card: a lit left rail marks a live/open party, the title
+          carries the serif display face, and the meta collapses to one line so
+          four cards still scan at a glance on a phone. */}
+      <article className="media-card h-full p-4">
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-y-0 left-0 w-[3px] transition-opacity",
+            expired || p.status === "CANCELLED"
+              ? "bg-muted-foreground/25"
+              : "bg-primary shadow-[0_0_12px_var(--primary)]"
+          )}
+        />
+        <div className="flex items-start justify-between gap-2 pl-2">
+          <h3 className="section-title text-base text-foreground transition-colors group-hover:text-primary">
+            {p.title}
+          </h3>
+          {p.status === "CANCELLED" ? (
+            <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">Cancelled</Badge>
+          ) : expired ? (
+            <Badge variant="outline" className="shrink-0 text-[10px] text-muted-foreground">Expired</Badge>
+          ) : myRsvp ? (
+            <Badge variant="outline" className={`shrink-0 text-[10px] capitalize ${RSVP_TONE[myRsvp] ?? ""}`}>
+              {myRsvp.toLowerCase()}
+            </Badge>
+          ) : open ? (
+            <Badge variant="drink" className="shrink-0 text-[10px]">Open</Badge>
+          ) : null}
+        </div>
+
+        <dl className="mt-2.5 space-y-1 pl-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <span aria-hidden>📍</span>
+            <dd className="truncate">{venueLine(p)}</dd>
           </div>
-          <div className="text-xs text-muted-foreground">📍 {venueLine(p)}</div>
-          {when && <div className="text-xs text-muted-foreground">🗓 {when}</div>}
-          <div className="text-[11px] text-muted-foreground/60">
-            Hosted by @{p.author?.profile?.username ?? "someone"} · {p._count?.invites ?? 0} invited
-          </div>
-        </CardContent>
-      </Card>
+          {when && (
+            <div className="flex items-center gap-1.5">
+              <span aria-hidden>🗓</span>
+              <dd>{when}</dd>
+            </div>
+          )}
+        </dl>
+
+        <p className="mt-3 pl-2 text-[11px] text-muted-foreground/60">
+          Hosted by @{p.author?.profile?.username ?? "someone"}
+          {invited > 0 && ` · ${invited} invited`}
+        </p>
+      </article>
     </Link>
+  );
+}
+
+function PartiesEmpty({
+  title,
+  subtitle,
+  onThrow,
+}: {
+  title: string;
+  subtitle: string;
+  onThrow: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center px-4 py-6 text-center sm:py-10">
+      <PartyEmptyArt className="w-full max-w-xs text-foreground sm:max-w-sm" />
+      <h2 className="screen-title mt-6 max-w-sm text-balance text-foreground">
+        {title}
+      </h2>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">{subtitle}</p>
+      <button
+        type="button"
+        onClick={onThrow}
+        className="btn-neon mt-7 min-h-12 w-full max-w-sm px-6 text-sm"
+      >
+        Throw a party
+      </button>
+    </div>
   );
 }
 
@@ -127,41 +179,46 @@ export function PartiesView({ hosting, invited, open }: { hosting: Party[]; invi
   });
   const tabs: { value: PartyTab; label: string; count: number }[] = [
     { value: "open", label: "Open", count: open.length },
-    { value: "invited", label: "Invited to", count: activeInvites.length },
+    { value: "invited", label: "Invited", count: activeInvites.length },
     { value: "expired", label: "Expired", count: expiredParties.length },
-    { value: "created", label: "You created", count: hosting.length },
+    { value: "created", label: "Yours", count: hosting.length },
   ];
   const visible = tab === "open" ? open : tab === "invited" ? activeInvites : tab === "expired" ? expiredParties : hosting;
   const empty = emptyCopy(tab);
+  const nothingAnywhere = hosting.length === 0 && invited.length === 0 && open.length === 0;
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold tracking-tight">Parties</h1>
-          <p className="text-sm text-muted-foreground">Round up your circle for a night out or a house party.</p>
+          <h1 className="screen-title text-foreground">Parties</h1>
+          <p className="text-sm text-muted-foreground">
+            Round up your circle for a night out or a house party.
+          </p>
         </div>
-        <Button variant="gold" className="font-display" onClick={() => setCreating(true)}>
+        {/* On a phone the CTA lives in the empty state / below the list, so the
+            header button is desktop-only and never competes with it. */}
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="btn-neon hidden min-h-10 px-5 text-sm sm:inline-flex sm:items-center"
+        >
           Throw a party
-        </Button>
+        </button>
       </header>
 
-      {hosting.length === 0 && invited.length === 0 && open.length === 0 && (
-        <EmptyState
-          emoji="🎉"
-          title="No parties yet"
-          subtitle="Throw one, pick the drinks, and invite your circle. The night starts here."
-          actionLabel="Throw a party"
-          onAction={() => setCreating(true)}
+      {nothingAnywhere ? (
+        <PartiesEmpty
+          title="No open parties right now."
+          subtitle="The night is young — why not host your own?"
+          onThrow={() => setCreating(true)}
         />
-      )}
-
-      {(hosting.length > 0 || invited.length > 0 || open.length > 0) && (
-        <section className="space-y-3">
+      ) : (
+        <section className="space-y-4">
           <div
             role="tablist"
             aria-label="Party filters"
-            className="grid grid-cols-4 gap-2 rounded-2xl border border-border/50 bg-card/40 p-1"
+            className="rail"
           >
             {tabs.map((item) => {
               const active = tab === item.value;
@@ -172,26 +229,30 @@ export function PartiesView({ hosting, invited, open }: { hosting: Party[]; invi
                   role="tab"
                   aria-selected={active}
                   onClick={() => setTab(item.value)}
-                  className={`rounded-xl px-2 py-2 text-center text-xs font-semibold transition ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
+                  className={cn("chip rail-item min-h-9", active ? "chip-on" : "chip-off")}
                 >
-                  <span className="block truncate">{item.label}</span>
-                  <span className="text-[10px] opacity-80">{item.count}</span>
+                  {item.label}
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 text-[10px] font-semibold",
+                      active
+                        ? "bg-[color-mix(in_srgb,var(--primary-foreground)_22%,transparent)]"
+                        : "bg-[color-mix(in_srgb,var(--foreground)_10%,transparent)]"
+                    )}
+                  >
+                    {item.count}
+                  </span>
                 </button>
               );
             })}
           </div>
 
           {visible.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="space-y-1 py-8 text-center">
-                <h2 className="font-display text-lg font-semibold">{empty.title}</h2>
-                <p className="text-sm text-muted-foreground">{empty.subtitle}</p>
-              </CardContent>
-            </Card>
+            <PartiesEmpty
+              title={empty.title}
+              subtitle={empty.subtitle}
+              onThrow={() => setCreating(true)}
+            />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {visible.map((p) => (
