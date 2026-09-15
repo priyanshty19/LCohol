@@ -9,22 +9,20 @@ import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { OtpInput } from "@/components/auth/otp-input";
-import {
-  satisfyAutoRequirements,
-  verificationError,
-  type ClerkSignUpLike,
-} from "@/lib/clerk-signup-requirements";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { generateFunkyName } from "@/lib/funky-names";
 import { bustAuthCache } from "@/hooks/use-auth";
 import { safeReturnTo } from "@/lib/safe-return-to";
 import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
-import { clerkErrorMessage as clerkError } from "@/lib/clerk-errors";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const SU_OTP_KEY = "ss_signup_otp";
 const DRINK_CHOICES = ["Whiskey", "Rum", "Vodka", "Beer", "Gin", "Tequila", "Brandy"];
+
+function clerkError(e: unknown, fallback: string): string {
+  const er = e as { errors?: { longMessage?: string; message?: string }[] };
+  return er?.errors?.[0]?.longMessage ?? er?.errors?.[0]?.message ?? fallback;
+}
 
 // Full age in years from a YYYY-MM-DD string (month/day aware). NaN if unparseable.
 function ageFromDob(dobStr: string): number {
@@ -268,26 +266,17 @@ export function SignupForm({
             code: code.trim(),
           });
           if (res.status !== "complete" || !res.createdSessionId) {
-            setError(verificationError(res, "signin"));
+            setError("That code didn't verify. Check it and try again.");
             setLoading(false);
             return;
           }
           await setActiveSignIn!({ session: res.createdSessionId });
         } else {
-          let res = await signUp.attemptEmailAddressVerification({
+          const res = await signUp.attemptEmailAddressVerification({
             code: code.trim(),
           });
-          // Email is verified here. Don't blame the code for fields the Clerk
-          // instance requires but this app never collects — fill them in.
-          // See lib/clerk-signup-requirements.ts.
-          if (res.status === "missing_requirements") {
-            res = (await satisfyAutoRequirements(
-              res as unknown as ClerkSignUpLike,
-              details.email,
-            )) as unknown as typeof res;
-          }
           if (res.status !== "complete" || !res.createdSessionId) {
-            setError(verificationError(res, "signup"));
+            setError("That code didn't verify. Check it and try again.");
             setLoading(false);
             return;
           }
@@ -389,78 +378,75 @@ export function SignupForm({
 
   if (step === "otp") {
     return (
-      // Flat, static flex column — no Card/CardContent/CardFooter. The nested
-      // flex + `:has()` padding rules in that trio were painting the submit
-      // button over the code row on this screen. See login-form.tsx.
-      <div className="glass-panel overflow-hidden rounded-xl ring-1 ring-foreground/10">
-        <form onSubmit={handleOtp} className="flex w-full flex-col gap-5 p-5">
-          <div className="flex flex-col gap-1">
-            <h2 className="font-display text-lg font-semibold">Check your email</h2>
-            <p className="text-sm text-muted-foreground">
-              We sent a 6-digit code to{" "}
-              <span className="break-all text-foreground">{details.email}</span>.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="code">Verification code</Label>
-            <OtpInput
-              id="code"
-              value={code}
-              onChange={setCode}
-              disabled={loading}
-              autoFocus
-              invalid={Boolean(error)}
-              describedBy={error ? "signup-otp-error" : undefined}
-            />
-          </div>
-
-          {error && (
-            <div
-              id="signup-otp-error"
-              role="alert"
-              className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              {error}
+      <Card variant="glass">
+        <form onSubmit={handleOtp}>
+          <CardContent className="space-y-4 pt-6">
+            <div className="space-y-1">
+              <h2 className="font-display text-lg font-semibold">Check your email</h2>
+              <p className="text-sm text-muted-foreground">
+                We sent a 6-digit code to{" "}
+                <span className="text-foreground">{details.email}</span>.
+              </p>
             </div>
-          )}
 
-          <div className="h-px w-full bg-border/60" aria-hidden="true" />
+            <div className="space-y-2">
+              <Label htmlFor="code">Verification code</Label>
+              <Input
+                id="code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                required
+                autoFocus
+                className="text-center text-lg tracking-[0.4em]"
+              />
+            </div>
 
-          <Button
-            type="submit"
-            variant="gold"
-            size="lg"
-            className="w-full"
-            disabled={loading || code.length < 6}
-          >
-            {loading ? "Verifying…" : "Verify & join"}
-          </Button>
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+          </CardContent>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <button type="button" onClick={resend} className="hover:text-primary">
-              Resend code
-            </button>
-            <span aria-hidden="true">·</span>
-            <button
-              type="button"
-              onClick={() => {
-                setStep("details");
-                setCode("");
-                setError(null);
-                try {
-                  sessionStorage.removeItem(SU_OTP_KEY);
-                } catch {
-                  /* ignore */
-                }
-              }}
-              className="hover:text-primary"
+          <CardFooter className="flex flex-col gap-3">
+            <Button
+              type="submit"
+              variant="gold"
+              size="lg"
+              className="w-full"
+              disabled={loading || code.length < 6}
             >
-              Wrong email?
-            </button>
-          </div>
+              {loading ? "Verifying…" : "Verify & join"}
+            </Button>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <button type="button" onClick={resend} className="hover:text-primary">
+                Resend code
+              </button>
+              <span>·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("details");
+                  setCode("");
+                  setError(null);
+                  try {
+                    sessionStorage.removeItem(SU_OTP_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="hover:text-primary"
+              >
+                Wrong email?
+              </button>
+            </div>
+          </CardFooter>
         </form>
-      </div>
+      </Card>
     );
   }
 

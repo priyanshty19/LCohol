@@ -1,11 +1,11 @@
-type BarsRequest = {
+type GoogleBarsRequest = {
   city: string;
   type: string | null;
   query: string;
   nearbyLocation: [number, number] | null;
 };
 
-export function barsRequest({ city, type, query, nearbyLocation }: BarsRequest) {
+export function googleBarsRequest({ city, type, query, nearbyLocation }: GoogleBarsRequest) {
   const nearby = nearbyLocation !== null;
   const params = nearby
     ? new URLSearchParams({
@@ -19,7 +19,7 @@ export function barsRequest({ city, type, query, nearbyLocation }: BarsRequest) 
   if (!nearby && query.trim()) params.set("q", query.trim());
 
   return {
-    endpoint: nearby ? "/api/bars/nearby" : "/api/bars",
+    endpoint: nearby ? "/api/bars/nearby" : "/api/bars/city",
     params,
   };
 }

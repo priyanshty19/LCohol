@@ -53,30 +53,6 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
   }
 }
 
-/**
- * Fail-CLOSED variant, for paths where losing the limiter is worse than losing
- * the request: credential checks, OTP completion, account mutations.
- *
- * `rateLimit` deliberately fails open so a Redis blip degrades limiting instead
- * of taking the product down — the right call for reads. It is the wrong call
- * in front of auth: an outage would silently remove the only brake on
- * credential stuffing and enumeration, exactly when nobody is watching.
- */
-export async function rateLimitStrict(
-  key: string,
-  limit: number,
-  windowMs: number,
-): Promise<boolean> {
-  if (!redis) return inMemoryRateLimit(key, limit, windowMs);
-  try {
-    const { success } = await getLimiter(limit, windowMs).limit(key);
-    return success;
-  } catch (e) {
-    console.error("[rateLimitStrict] Redis unavailable, failing CLOSED", e);
-    return false;
-  }
-}
-
 export function clientIp(request: Request): string {
   // Prefer x-real-ip: on Vercel the platform sets it to the true client IP and
   // overwrites any client-supplied value, so it can't be spoofed. Only fall back
@@ -90,13 +66,5 @@ export function clientIp(request: Request): string {
     const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
     if (hops.length) return hops[hops.length - 1];
   }
-  // Every unidentifiable caller previously shared the single key "unknown", so
-  // at scale one noisy client could exhaust that bucket and 429 every other
-  // unattributable request. Spread them over a small set of stable buckets
-  // derived from request shape: still bounded (so it can't be used to escape
-  // limiting) but no longer one global point of shared failure.
-  const ua = request.headers.get("user-agent") ?? "";
-  let h = 0;
-  for (let i = 0; i < ua.length; i++) h = (h * 31 + ua.charCodeAt(i)) | 0;
-  return `unknown-${Math.abs(h) % 16}`;
+  return "unknown";
 }

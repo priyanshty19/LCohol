@@ -6,7 +6,6 @@ import { getCocktailBySlug } from "@/lib/cocktails";
 import { toCatalogCocktail } from "@/lib/catalog";
 import { getCurrentUser } from "@/lib/auth";
 import { areConnected } from "@/lib/connections";
-import { prisma } from "@/lib/prisma";
 
 type CocktailForGate = NonNullable<Awaited<ReturnType<typeof getCocktailBySlug>>>;
 type Viewer = Awaited<ReturnType<typeof getCurrentUser>>;
@@ -47,14 +46,6 @@ export default async function CocktailDetailPage({
   // Private mixes are visible to the author and their circle.
   const me = await getCurrentUser();
   if (!(await canViewCocktail(cocktail, me))) notFound();
-  const initialCheered = me
-    ? Boolean(
-        await prisma.cocktailCheer.findUnique({
-          where: { userId_cocktailId: { userId: me.id, cocktailId: cocktail.id } },
-          select: { id: true },
-        }),
-      )
-    : false;
 
   return (
     <>
@@ -62,8 +53,6 @@ export default async function CocktailDetailPage({
       <CocktailDetail
         entry={toCatalogCocktail(cocktail)}
         canEditImage={Boolean(me && cocktail.authorId === me.id && !cocktail.isCurated)}
-        canCheer={Boolean(me && cocktail.authorId !== me.id)}
-        initialCheered={initialCheered}
       />
     </>
   );

@@ -54,7 +54,7 @@ export function SearchView() {
   const [searched, setSearched] = useState(false);
 
   const search = useCallback(
-    async (q: string, t: SearchType, signal?: AbortSignal) => {
+    async (q: string, t: SearchType) => {
       if (q.length < 2) {
         setResults({});
         setSearched(false);
@@ -66,19 +66,13 @@ export function SearchView() {
 
       try {
         const params = new URLSearchParams({ q, type: t });
-        const res = await fetch(`/api/search?${params}`, { signal });
+        const res = await fetch(`/api/search?${params}`);
         const data = (await res.json()) as SearchResults;
-        // Without this guard a slow reply for "gi" can land after the reply for
-        // "gin" and repaint the list with results the user has already moved past.
-        if (signal?.aborted) return;
         setResults(data);
-      } catch (err) {
-        // An abort is our own doing when the query moved on — not a failure.
-        if (signal?.aborted) return;
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        console.error("Search failed", err);
+      } catch {
+        console.error("Search failed");
       } finally {
-        if (!signal?.aborted) setLoading(false);
+        setLoading(false);
       }
     },
     []
@@ -87,14 +81,8 @@ export function SearchView() {
   // Live search: debounce keystrokes so we hit the API once the user pauses,
   // not on every character. Enter still triggers an immediate search.
   useEffect(() => {
-    // Debouncing alone does not prevent a race — it only delays the request.
-    // The controller is what actually cancels the superseded one.
-    const controller = new AbortController();
-    const t = setTimeout(() => search(query, type, controller.signal), 300);
-    return () => {
-      clearTimeout(t);
-      controller.abort();
-    };
+    const t = setTimeout(() => search(query, type), 300);
+    return () => clearTimeout(t);
   }, [query, type, search]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {

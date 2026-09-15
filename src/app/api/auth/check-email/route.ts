@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canonicalizeEmail } from "@/lib/email-normalize";
-import { rateLimitStrict, clientIp } from "@/lib/rate-limit";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 
 /**
@@ -12,7 +12,7 @@ import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
  * ("that email address is taken") even though no account exists here.
  */
 export async function POST(request: NextRequest) {
-  if (!(await rateLimitStrict(`check-email:${clientIp(request)}`, 20, 60_000))) {
+  if (!(await rateLimit(`check-email:${clientIp(request)}`, 20, 60_000))) {
     return NextResponse.json(
       { exists: false, error: "Too many attempts. Please wait a minute." },
       { status: 429 },

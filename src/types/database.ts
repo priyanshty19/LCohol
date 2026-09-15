@@ -114,7 +114,6 @@ export type CatalogDrinkEntry = CatalogCore & {
 
 export type CatalogCocktailEntry = CatalogCore & {
   kind: "cocktail";
-  cheerCount: number;
   glass: string | null;
   garnish: string | null;
   instructions: string | null;
