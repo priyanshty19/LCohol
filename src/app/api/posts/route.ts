@@ -36,18 +36,29 @@ function sanitizeImageUrl(value: unknown): string | null {
 }
 
 export async function GET(request: Request) {
-  // Public hot path: a 500-row include + JS ranking per call. Throttle per IP so
-  // a ?sort=hot loop can't exhaust the pool for everyone. (WAF is the real backstop.)
-  if (!(await rateLimit(`posts-feed:${clientIp(request)}`, 60, 60_000))) {
-    return NextResponse.json(
-      { error: "Too many requests. Please slow down." },
-      { status: 429, headers: { "Retry-After": "30" } },
-    );
-  }
-
   const { searchParams } = new URL(request.url);
   try {
     const me = await getCurrentUser();
+
+    // Public hot path: a 500-row include + JS ranking per call. Throttled so a
+    // ?sort=hot loop can't exhaust the pool for everyone. (WAF is the real backstop.)
+    //
+    // Keyed by ACCOUNT first, IP second. An IP-only bucket punishes shared
+    // addresses, and on Indian mobile networks CGNAT routinely puts hundreds of
+    // users behind one — at any real traffic level a 60/min IP bucket starts
+    // 429ing legitimate readers of the busiest screen in the app. The per-IP
+    // limit stays as the anonymous-abuse brake, set well above the per-user one.
+    const perAccount = me
+      ? await rateLimit(`posts-feed:${me.id}`, 120, 60_000)
+      : true;
+    const perIp = await rateLimit(`posts-feed-ip:${clientIp(request)}`, 600, 60_000);
+    if (!perAccount || !perIp) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        { status: 429, headers: { "Retry-After": "30" } },
+      );
+    }
+
     const connectionIds = me ? await getConnectionUserIds(me.id) : [];
 
     const result = await getPostsFeed({

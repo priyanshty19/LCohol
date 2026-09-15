@@ -6,6 +6,7 @@ import { ResponsibleDrinkingBanner } from "@/components/shared/responsible-drink
 import { GeoDisclaimer } from "@/components/shared/geo-disclaimer";
 import { JamesWidget } from "@/components/james/james-widget";
 import { DailyVibe } from "@/components/theme/daily-vibe";
+import { GoogleMapsPreload } from "@/components/bars/google-maps-preload";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,9 @@ export default async function MainLayout({
       <div className="pointer-events-none fixed inset-0 -z-10 bg-aurora" />
       <div className="pointer-events-none fixed inset-0 -z-10 bg-grain opacity-50" />
       <Header />
+      <GoogleMapsPreload
+        apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? ""}
+      />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 md:pb-6">
         {children}
       </main>

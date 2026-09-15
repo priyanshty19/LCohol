@@ -8,18 +8,19 @@ import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { OtpInput } from "@/components/auth/otp-input";
+import {
+  satisfyAutoRequirements,
+  verificationError,
+  type ClerkSignUpLike,
+} from "@/lib/clerk-signup-requirements";
 import { bustAuthCache } from "@/hooks/use-auth";
 import { safeReturnTo } from "@/lib/safe-return-to";
 import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
+import { clerkErrorMessage as clerkError } from "@/lib/clerk-errors";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const LI_OTP_KEY = "ss_login_otp";
-
-function clerkError(e: unknown, fallback: string): string {
-  const er = e as { errors?: { longMessage?: string; message?: string }[] };
-  return er?.errors?.[0]?.longMessage ?? er?.errors?.[0]?.message ?? fallback;
-}
 
 export function LoginForm({
   returnTo = "/",
@@ -170,17 +171,27 @@ export function LoginForm({
           code: code.trim(),
         });
         if (res.status !== "complete" || !res.createdSessionId) {
-          setError("That code didn't verify. Try again.");
+          setError(verificationError(res, "signin"));
           setLoading(false);
           return;
         }
         await setActive({ session: res.createdSessionId });
       } else {
-        const res = await signUp!.attemptEmailAddressVerification({
+        let res = await signUp!.attemptEmailAddressVerification({
           code: code.trim(),
         });
+        // The email is verified at this point. If Clerk is still holding the
+        // sign-up open for fields this app never collects (password by
+        // default), fill them in rather than telling the person their correct
+        // code was wrong. See lib/clerk-signup-requirements.ts.
+        if (res.status === "missing_requirements") {
+          res = (await satisfyAutoRequirements(
+            res as unknown as ClerkSignUpLike,
+            email,
+          )) as unknown as typeof res;
+        }
         if (res.status !== "complete" || !res.createdSessionId) {
-          setError("That code didn't verify. Try again.");
+          setError(verificationError(res, "signup"));
           setLoading(false);
           return;
         }
@@ -253,135 +264,151 @@ export function LoginForm({
 
   if (step === "otp") {
     return (
-      <Card variant="glass">
-        <form onSubmit={handleOtp}>
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-1">
-              <h2 className="font-display text-lg font-semibold">Check your email</h2>
-              <p className="text-sm text-muted-foreground">
-                We sent a 6-digit code to{" "}
-                <span className="text-foreground">{email}</span>.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="code">Verification code</Label>
-              <Input
-                id="code"
-                name="code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                required
-                autoFocus
-                className="text-center text-lg tracking-[0.4em]"
-              />
-            </div>
-
-            {error && (
-              <div role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-          </CardContent>
-
-          <CardFooter className="flex flex-col gap-3">
-            <Button
-              type="submit"
-              variant="gold"
-              size="lg"
-              className="w-full"
-              disabled={loading || code.length < 6}
-            >
-              {loading ? "Verifying…" : "Log in"}
-            </Button>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <button
-                type="button"
-                onClick={resend}
-                disabled={resending}
-                className="hover:text-primary disabled:opacity-50"
-              >
-                Resend code
-              </button>
-              <span>·</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setStep("email");
-                  setCode("");
-                  setError(null);
-                  try {
-                    sessionStorage.removeItem(LI_OTP_KEY);
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-                className="hover:text-primary"
-              >
-                Wrong email?
-              </button>
-            </div>
-            <p aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground">
-              {resent ? "A new code is on its way" : ""}
+      // Deliberately NOT Card/CardContent/CardFooter here.
+      //
+      // Those three compose into: a `flex flex-col` Card with
+      // `overflow-hidden` and a `:has()` rule that zeroes its bottom padding,
+      // wrapping a <form>, wrapping two block children, one of which carries
+      // `flex items-center` from the footer base. That stack was painting the
+      // submit button on top of the code row on this screen, and the button is
+      // `bg-transparent` underneath so it read as the two elements merged.
+      //
+      // A single static flex column cannot do that: every row is in normal
+      // flow, nothing is absolutely positioned, nothing can shrink below its
+      // content, and the gap is uniform. Boring on purpose.
+      <div className="glass-panel overflow-hidden rounded-xl ring-1 ring-foreground/10">
+        <form onSubmit={handleOtp} className="flex w-full flex-col gap-5 p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="font-display text-lg font-semibold">Check your email</h2>
+            <p className="text-sm text-muted-foreground">
+              We sent a 6-digit code to{" "}
+              <span className="break-all text-foreground">{email}</span>.
             </p>
-          </CardFooter>
-        </form>
-      </Card>
-    );
-  }
+          </div>
 
-  return (
-    <Card variant="glass">
-      <form onSubmit={handleEmail}>
-        <CardContent className="space-y-4 pt-6">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="code">Verification code</Label>
+            <OtpInput
+              id="code"
+              value={code}
+              onChange={setCode}
+              disabled={loading}
               autoFocus
-              autoComplete="email"
+              invalid={Boolean(error)}
+              describedBy={error ? "login-otp-error" : undefined}
             />
           </div>
 
-          {/* Clerk mounts its bot-protection CAPTCHA here for the signUp
-              fallback used when Clerk doesn't yet know this email. */}
-          <div id="clerk-captcha" className="flex justify-center empty:hidden" />
-
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div
+              id="login-otp-error"
+              role="alert"
+              className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
               {error}
             </div>
           )}
-        </CardContent>
 
-        <CardFooter className="flex flex-col gap-4">
+          <div className="h-px w-full bg-border/60" aria-hidden="true" />
+
           <Button
             type="submit"
             variant="gold"
             size="lg"
             className="w-full"
-            disabled={loading || !isLoaded}
+            disabled={loading || code.length < 6}
           >
-            {loading ? "Sending code…" : "Email me a code"}
+            {loading ? "Verifying…" : "Log in"}
           </Button>
 
-          <p className="text-center text-xs text-muted-foreground">
-            New here?{" "}
-            <Link href={signupHref} className="text-primary hover:underline">
-              Request an invite
-            </Link>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={resending}
+              className="hover:text-primary disabled:opacity-50"
+            >
+              Resend code
+            </button>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("email");
+                setCode("");
+                setError(null);
+                try {
+                  sessionStorage.removeItem(LI_OTP_KEY);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="hover:text-primary"
+            >
+              Wrong email?
+            </button>
+          </div>
+
+          <p aria-live="polite" className="min-h-[1rem] text-center text-xs text-muted-foreground">
+            {resent ? "A new code is on its way" : ""}
           </p>
-        </CardFooter>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    // Same flat structure as the OTP step above — see the note there.
+    <div className="glass-panel overflow-hidden rounded-xl ring-1 ring-foreground/10">
+      <form onSubmit={handleEmail} className="flex w-full flex-col gap-5 p-5">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoFocus
+            autoComplete="email"
+            className="h-11"
+          />
+        </div>
+
+        {/* Clerk mounts its bot-protection CAPTCHA here for the signUp
+            fallback used when Clerk doesn't yet know this email. */}
+        <div id="clerk-captcha" className="flex justify-center empty:hidden" />
+
+        {error && (
+          <div
+            role="alert"
+            className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        )}
+
+        <div className="h-px w-full bg-border/60" aria-hidden="true" />
+
+        <Button
+          type="submit"
+          variant="gold"
+          size="lg"
+          className="w-full"
+          disabled={loading || !isLoaded}
+        >
+          {loading ? "Sending code…" : "Email me a code"}
+        </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          New here?{" "}
+          <Link href={signupHref} className="text-primary hover:underline">
+            Request an invite
+          </Link>
+        </p>
       </form>
-    </Card>
+    </div>
   );
 }

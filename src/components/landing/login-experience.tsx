@@ -151,9 +151,9 @@ function AuthModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-10 flex max-h-[92dvh] w-full max-w-md flex-col animate-in fade-in zoom-in-95 duration-200"
+        className="relative z-10 flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex shrink-0 items-center justify-between">
           {/* Mode switch — keeps signin/signup in one place, no page nav */}
           <div className="inline-flex rounded-full border border-border/60 bg-card/60 p-1 text-sm">
             <button
@@ -186,8 +186,11 @@ function AuthModal({
           </button>
         </div>
 
-        {/* Single form instance — scrolls inside the dialog if tall */}
-        <div className="overflow-y-auto">
+        {/* Single form instance — scrolls inside the dialog if tall.
+            `min-h-0` is load-bearing: without it a flex column child refuses to
+            shrink below its content, so on a short viewport the card is
+            squeezed instead of scrolled and its rows paint over each other. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {isSignin ? (
             <LoginForm returnTo={returnTo} referralCode={referralCode} />
           ) : (

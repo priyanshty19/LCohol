@@ -31,16 +31,20 @@ function NavBtn({ it, active }: { it: (typeof ITEMS)[number]; active: boolean })
       aria-current={active ? "page" : undefined}
       className={cn(
         // min-h 44px = comfortable touch target; equal flex columns keep the bar balanced.
-        "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium transition-colors",
+        "relative flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
+      {/* Stitch bottom nav marks the active tab with a lit pip on the top edge
+          as well as the colour change — the colour alone was easy to miss on the
+          darker vibe themes. */}
+      {active && <span className="nav-pip" aria-hidden />}
       <Icon
         className={cn(
-          "h-5 w-5",
+          "h-5 w-5 transition-transform",
           // Glow tracks the active vibe's --primary (was hardcoded gold, which
           // clashed with the themed text label on every non-gold vibe).
-          active && "drop-shadow-[0_0_6px_var(--primary)]"
+          active && "scale-110 drop-shadow-[0_0_8px_var(--primary)]"
         )}
       />
       {it.label}

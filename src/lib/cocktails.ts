@@ -30,6 +30,7 @@ export const cocktailSelect = {
   imageUrl: true,
   sourceLabel: true,
   isCurated: true,
+  _count: { select: { cheers: true } },
   sourceBar: { select: { id: true, name: true, slug: true, city: true } },
   ingredients: {
     orderBy: { sortOrder: "asc" as const },
@@ -53,6 +54,31 @@ export async function getMyCocktails(userId: string, take = 50) {
   });
 
   return rows.filter((cocktail) => !containsProfanity(cocktail.name));
+}
+
+/** Latest unique mixes that received a cheer, newest activity first. */
+export async function getRecentCheersForCreator(userId: string, take = 8) {
+  const events = await prisma.cocktailCheer.findMany({
+    where: { cocktail: { authorId: userId, isCurated: false } },
+    orderBy: { createdAt: "desc" },
+    take: Math.max(take * 4, take),
+    select: {
+      createdAt: true,
+      user: {
+        select: {
+          profile: { select: { displayName: true, username: true, avatarUrl: true } },
+        },
+      },
+      cocktail: { select: cocktailSelect },
+    },
+  });
+
+  const unique = new Map<string, (typeof events)[number]>();
+  for (const event of events) {
+    if (!unique.has(event.cocktail.id)) unique.set(event.cocktail.id, event);
+    if (unique.size === take) break;
+  }
+  return Array.from(unique.values());
 }
 
 export async function getCocktails(opts: CocktailsQuery = {}) {

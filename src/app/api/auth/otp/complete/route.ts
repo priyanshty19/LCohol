@@ -7,7 +7,7 @@ import {
 } from "@/lib/referrals";
 import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
-import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { rateLimitStrict, clientIp } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
 import { verifiedEmailFromClerkToken, clerkBackend } from "@/lib/clerk";
 import { canonicalizeEmail } from "@/lib/email-normalize";
@@ -40,7 +40,7 @@ class ReferralUnavailableError extends Error {}
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!(await rateLimit(`otp-complete:${clientIp(request)}`, 10, 60_000))) {
+    if (!(await rateLimitStrict(`otp-complete:${clientIp(request)}`, 10, 60_000))) {
       return NextResponse.json(
         { error: "Too many attempts. Please wait a minute." },
         { status: 429 },
