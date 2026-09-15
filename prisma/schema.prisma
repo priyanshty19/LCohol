@@ -34,7 +34,6 @@ model User {
   votes                   Vote[]
   drinkReviews            DrinkReview[]
   cocktailCreations       CocktailCreation[]
-  cocktailCheers          CocktailCheer[]
   partyPlans              PartyPlan[]
   hangoverLogs            HangoverLog[]
   reports                 Report[]                 @relation("Reporter")
@@ -579,7 +578,6 @@ model CocktailCreation {
   author                User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   sourceBar             Bar?                   @relation(fields: [sourceBarId], references: [id])
   ingredients           CocktailIngredient[]
-  cheers                CocktailCheer[]
   partyDrinkSuggestions PartyDrinkSuggestion[]
 
   @@unique([authorId, name, sourceLabel])
@@ -592,23 +590,6 @@ model CocktailCreation {
   @@index([isCurated, name])
   @@index([categorySlug])
   @@map("cocktail_creations")
-}
-
-// One cheer per person per cocktail. The event timestamp powers the owner's
-// Recent Cheers rail; the unique pair makes toggling idempotent.
-model CocktailCheer {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
-  cocktailId String   @map("cocktail_id") @db.Uuid
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cocktail CocktailCreation   @relation(fields: [cocktailId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, cocktailId])
-  @@index([cocktailId, createdAt])
-  @@index([userId])
-  @@map("cocktail_cheers")
 }
 
 model CocktailIngredient {

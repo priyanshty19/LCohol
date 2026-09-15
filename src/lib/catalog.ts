@@ -22,7 +22,6 @@ export type CocktailSelectRow = {
   imageUrl: string | null;
   sourceLabel: string | null;
   isCurated: boolean;
-  _count: { cheers: number };
   sourceBar: { id: string; name: string; slug: string; city: string } | null;
   ingredients: {
     sortOrder: number;
@@ -65,7 +64,6 @@ export function toCatalogCocktail(c: CocktailSelectRow): CatalogCocktailEntry {
     garnish: c.garnish ?? null,
     instructions: c.instructions ?? null,
     isCurated: c.isCurated,
-    cheerCount: c._count.cheers,
     sourceBar: c.sourceBar,
     sourceLabel: c.sourceLabel ?? null,
     ingredients: c.ingredients.map((i) => ({

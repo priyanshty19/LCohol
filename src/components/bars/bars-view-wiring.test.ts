@@ -8,9 +8,9 @@ const pageSource = readFileSync(
   "utf8",
 );
 
-test("city tabs use the cached directory while near-me retains Google Places", () => {
-  assert.match(viewSource, /barsRequest/);
-  assert.match(viewSource, /const requestQuery = nearby \? "" : q/);
+test("city tabs use Google Places rather than the seeded bar directory", () => {
+  assert.match(viewSource, /googleBarsRequest/);
+  assert.doesNotMatch(viewSource, /fetch\(`\/api\/bars\?/);
   assert.doesNotMatch(pageSource, /getBars/);
   assert.doesNotMatch(pageSource, /initialBars/);
 });

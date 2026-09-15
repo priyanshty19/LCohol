@@ -122,11 +122,11 @@ export function CreatePostForm({
   }
 
   return (
-    <Card variant="glass" className={mode === "inline" ? "relative rounded-2xl" : undefined}>
+    <Card variant="glass" className={mode === "inline" ? "rounded-2xl" : undefined}>
       <CardContent className={mode === "inline" ? "pt-4" : "pt-6"}>
-        <form onSubmit={handleSubmit} className={mode === "inline" ? "space-y-3" : "space-y-4"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "inline" && onMinimize && (
-            <div className="absolute right-4 top-4 z-10">
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={onMinimize}
@@ -207,7 +207,7 @@ export function CreatePostForm({
               id="body"
               name="body"
               placeholder="Share the details..."
-              rows={mode === "inline" ? 4 : 6}
+              rows={6}
               maxLength={10000}
             />
           </div>
@@ -233,7 +233,7 @@ export function CreatePostForm({
                 </button>
               </div>
             ) : (
-              <label className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 bg-white/[0.02] px-4 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.04] ${mode === "inline" ? "py-5" : "py-8"}`}>
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/40 bg-white/[0.02] px-4 py-8 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.04]">
                 <ImagePlus className="h-6 w-6 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
                   Add a photo
@@ -260,7 +260,7 @@ export function CreatePostForm({
             </div>
           )}
 
-          <div className={mode === "inline" ? "flex" : "flex justify-end gap-3"}>
+          <div className="flex justify-end gap-3">
             {mode === "page" && (
               <Button
                 type="button"
@@ -271,7 +271,7 @@ export function CreatePostForm({
                 Cancel
               </Button>
             )}
-            <Button type="submit" variant="gold" size="lg" disabled={loading} className={mode === "inline" ? "w-full" : undefined}>
+            <Button type="submit" variant="gold" size="lg" disabled={loading}>
               <span aria-live="polite">{loading ? "Posting..." : "Post"}</span>
             </Button>
           </div>

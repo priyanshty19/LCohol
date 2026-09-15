@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ShareCocktailButton } from "@/components/cocktails/share-cocktail-button";
 import { CocktailImageEditor } from "@/components/cocktails/cocktail-image-editor";
-import { CheerButton } from "@/components/cocktails/cheer-button";
 import type { CatalogCocktailEntry } from "@/types/database";
 
 // Server-rendered cocktail detail (SSR, no client fetch) — the deep-linkable
@@ -11,13 +10,9 @@ import type { CatalogCocktailEntry } from "@/types/database";
 export function CocktailDetail({
   entry,
   canEditImage = false,
-  canCheer = false,
-  initialCheered = false,
 }: {
   entry: CatalogCocktailEntry;
   canEditImage?: boolean;
-  canCheer?: boolean;
-  initialCheered?: boolean;
 }) {
   const ingredientNames = entry.ingredients.flatMap((i) => {
     const name = i.ingredient?.name ?? i.drink?.name ?? "Unknown";
@@ -64,13 +59,7 @@ export function CocktailDetail({
             </div>
           </div>
         </div>
-        <div className="relative mt-4 flex flex-wrap gap-2">
-          <CheerButton
-            cocktailId={entry.id}
-            initialCount={entry.cheerCount}
-            initialCheered={initialCheered}
-            canCheer={canCheer}
-          />
+        <div className="relative mt-4">
           <ShareCocktailButton
             name={entry.name}
             slug={entry.slug}

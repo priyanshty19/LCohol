@@ -12,7 +12,6 @@ import { buildSystemPrompt } from "@/lib/james/persona";
 import { searchCatalog, type CatalogSearch } from "@/lib/james/search";
 import { NAV_TARGETS, type JamesAction } from "@/lib/james/actions";
 import { jamesKeywords } from "@/lib/james/keywords";
-import { stripReasoning } from "@/lib/james/reasoning";
 import { THEMES, isThemeId, type ThemeId } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
@@ -142,17 +141,14 @@ export async function POST(request: NextRequest) {
 
   const model = new ChatGroq({
     apiKey: process.env.GROQ_API_KEY,
-    model: "qwen/qwen3.6-27b",
+    model: "llama-3.3-70b-versatile",
     temperature: 0.7,
     maxTokens: 700,
-    // Without this, qwen emits its <think> block as part of the reply and the
-    // guest reads James thinking out loud.
-    reasoningEffort: "none",
   });
 
   try {
     const ai = await model.invoke(messages);
-    const { reply: parsedReply, directive } = parseReply(stripReasoning(asText(ai.content)));
+    const { reply: parsedReply, directive } = parseReply(asText(ai.content));
 
     const actions: JamesAction[] = [];
     let cards: CatalogSearch | null = null;
