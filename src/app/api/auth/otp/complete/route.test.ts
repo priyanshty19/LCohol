@@ -7,17 +7,23 @@ import { ModuleKind, transpileModule } from "typescript";
 import { canonicalizeEmail } from "../../../../../lib/email-normalize";
 
 // Execute the real handler with isolated Clerk/DB dependencies; no live accounts.
-function handler(existing: boolean) {
+function handler(existing: boolean, options: { failLookupOnce?: boolean; unavailable?: boolean } = {}) {
   let minted = 0;
   let created = 0;
+  let revoked = 0;
+  let lookups = 0;
+  class ClerkVerificationUnavailableError extends Error {}
   const modules: Record<string, unknown> = {
     "next/server": { NextResponse },
     "@/lib/prisma": {
       prisma: {
         user: {
-          findFirst: async () => existing
-            ? { id: "member", role: "USER", tokenEpoch: 3, profile: { username: "Member" } }
-            : null,
+          findFirst: async () => {
+            if (options.failLookupOnce && ++lookups === 1) throw new Error("Temporary DB outage");
+            return existing
+              ? { id: "member", role: "USER", tokenEpoch: 3, profile: { username: "Member" } }
+              : null;
+          },
         },
         profile: { findFirst: async () => null },
         $transaction: async (callback: (tx: unknown) => Promise<void>) => callback({
@@ -32,8 +38,15 @@ function handler(existing: boolean) {
     "@/lib/rate-limit": { rateLimitStrict: async () => true, clientIp: () => "test" },
     "@/lib/db-errors": { isPoolExhausted: () => false },
     "@/lib/clerk": {
-      verifiedEmailFromClerkToken: async () => ({ email: "m.em.ber+test@gmail.com", sessionId: "verified" }),
-      clerkBackend: { sessions: { revokeSession: async () => {} } },
+      verifiedEmailFromClerkToken: async () => {
+        if (options.unavailable) throw new ClerkVerificationUnavailableError();
+        return { email: "m.em.ber+test@gmail.com", sessionId: "verified" };
+      },
+      ClerkVerificationUnavailableError,
+      clerkBackend: { sessions: { revokeSession: async () => {
+        assert.ok(minted > 0, "The app session must be minted before revoking Clerk");
+        revoked++;
+      } } },
     },
     "@/lib/email-normalize": { canonicalizeEmail },
     "@/lib/session": {
@@ -52,7 +65,7 @@ function handler(existing: boolean) {
       assert.ok(name in modules, `Unexpected dependency: ${name}`);
       return modules[name];
     },
-    console,
+    console: { error: () => {} },
   });
   return {
     post: (mode: string) => exports.POST!(new NextRequest("https://sipstories.test/api/auth/otp/complete", {
@@ -63,6 +76,7 @@ function handler(existing: boolean) {
       }),
     })),
     counts: () => ({ minted, created }),
+    revoked: () => revoked,
   };
 }
 
@@ -73,6 +87,7 @@ test("signup for an existing member rejects completion without a login cookie", 
   assert.equal((await response.json()).code, "ACCOUNT_EXISTS");
   assert.equal(response.headers.get("set-cookie"), null);
   assert.deepEqual(route.counts(), { minted: 0, created: 0 });
+  assert.equal(route.revoked(), 0);
 });
 
 test("existing members can still sign in with a verified email", async () => {
@@ -82,6 +97,7 @@ test("existing members can still sign in with a verified email", async () => {
   assert.equal((await response.json()).user.email, "member@gmail.com");
   assert.match(response.headers.get("set-cookie") ?? "", /^ss_auth=test-session;/);
   assert.deepEqual(route.counts(), { minted: 1, created: 0 });
+  assert.equal(route.revoked(), 1);
 });
 
 test("a verified Clerk identity without a member can finish signup", async () => {
@@ -90,4 +106,23 @@ test("a verified Clerk identity without a member can finish signup", async () =>
   assert.equal(response.status, 201);
   assert.match(response.headers.get("set-cookie") ?? "", /^ss_auth=test-session;/);
   assert.deepEqual(route.counts(), { minted: 1, created: 1 });
+});
+
+test("a failed app exchange keeps Clerk verification available for a successful retry", async () => {
+  const route = handler(true, { failLookupOnce: true });
+  const failed = await route.post("signin");
+  assert.equal(failed.status, 500);
+  assert.equal(failed.headers.get("set-cookie"), null);
+  assert.equal(route.revoked(), 0);
+  assert.equal((await route.post("signin")).status, 200);
+  assert.equal(route.revoked(), 1);
+});
+
+test("Clerk outages return a retryable 503 without issuing or revoking sessions", async () => {
+  const route = handler(true, { unavailable: true });
+  const response = await route.post("signin");
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, "VERIFICATION_UNAVAILABLE");
+  assert.deepEqual(route.counts(), { minted: 0, created: 0 });
+  assert.equal(route.revoked(), 0);
 });

@@ -9,7 +9,7 @@ import { createConnectionTx } from "@/lib/connections";
 import { isAdminEmail } from "@/lib/rbac";
 import { rateLimitStrict, clientIp } from "@/lib/rate-limit";
 import { isPoolExhausted, poolBusyResponse } from "@/lib/db-errors";
-import { verifiedEmailFromClerkToken, clerkBackend } from "@/lib/clerk";
+import { verifiedEmailFromClerkToken, clerkBackend, ClerkVerificationUnavailableError } from "@/lib/clerk";
 import { canonicalizeEmail } from "@/lib/email-normalize";
 import {
   createSessionToken,
@@ -33,10 +33,9 @@ class ReferralUnavailableError extends Error {}
  * Final step of the email-OTP flow. The client has already verified the email
  * with Clerk and passes the resulting Clerk session token. We:
  *   1. verify that token server-side (proves the email was OTP-verified),
- *   2. revoke the Clerk session (we only use our own cookie),
- *   3. signup → create the Prisma member (referral + 21+ enforced here),
+ *   2. signup → create the Prisma member (referral + 21+ enforced here),
  *      signin → look up the existing member,
- *   4. mint our `ss_auth` cookie.
+ *   3. mint our `ss_auth` cookie, then revoke the temporary Clerk session.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -69,17 +68,14 @@ export async function POST(request: NextRequest) {
     // account (the prod "no account / already exists" bug).
     const email = canonicalizeEmail(verified.email);
 
-    // We don't keep Clerk sessions around — fire-and-forget revoke.
-    if (verified.sessionId) {
-      clerkBackend.sessions
-        .revokeSession(verified.sessionId)
-        .catch(() => {});
-    }
-
     const mintFor = (username: string | null, epoch = 0, status = 200) =>
       createSessionToken(email, epoch).then((token) => {
         const res = NextResponse.json({ ok: true, user: { email, username } }, { status });
         res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+        // Leave verification usable until the cookie exchange succeeds.
+        if (verified.sessionId) {
+          clerkBackend.sessions.revokeSession(verified.sessionId).catch(() => {});
+        }
         return res;
       });
 
@@ -276,6 +272,12 @@ export async function POST(request: NextRequest) {
 
     return mintFor(username, 0, 201);
   } catch (err) {
+    if (err instanceof ClerkVerificationUnavailableError) {
+      return NextResponse.json(
+        { error: "The verification service is temporarily unavailable. Please try again.", code: "VERIFICATION_UNAVAILABLE" },
+        { status: 503 },
+      );
+    }
     if (isPoolExhausted(err)) return poolBusyResponse();
     // Lost a uniqueness race (concurrent completion) → friendly 409, not a 500.
     const e = err as { code?: string; meta?: { target?: string[] | string } };
