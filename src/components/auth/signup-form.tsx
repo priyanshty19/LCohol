@@ -185,6 +185,29 @@ export function SignupForm({
       return;
     }
 
+    try {
+      const response = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.exists !== "boolean") {
+        setError(result.error ?? "Couldn't check that email. Please try again.");
+        setLoading(false);
+        return;
+      }
+      if (result.exists) {
+        setError("An account with this email already exists. Please sign in.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Couldn't check that email. Please try again.");
+      setLoading(false);
+      return;
+    }
+
     const favoriteDrinkId = await resolveDrinkId(favoriteDrink);
 
     // Referral pre-check (re-validated server-side at completion).
@@ -231,8 +254,8 @@ export function SignupForm({
       // "Identifier taken" means Clerk already has this email (an abandoned OTP
       // shadow record) even though our DB may have no member. Don't dead-end —
       // verify through the existing Clerk identity via signIn and still complete
-      // signup so the DB member is created. If our DB *does* already have them,
-      // otp/complete just logs them in.
+      // signup so the DB member is created. The membership pre-check and
+      // otp/complete both reject emails that already have a member account.
       const code = (e as { errors?: { code?: string }[] })?.errors?.[0]?.code;
       const identifierTaken =
         code === "form_identifier_exists" ||
@@ -377,8 +400,7 @@ export function SignupForm({
       let postOnboardingDestination = destination;
 
       // A party code doubles as the signup referral. New members were already
-      // RSVP'd in otp/complete; existing members who entered through signup are
-      // accepted here. In both cases this also resolves the private party URL.
+      // RSVP'd in otp/complete; this also resolves the private party URL.
       if (details.referralCode) {
         try {
           const partyResponse = await fetch(

@@ -83,12 +83,21 @@ export async function POST(request: NextRequest) {
         return res;
       });
 
-    // Already a member? Log them in regardless of mode (the email is verified).
+    // Existing members must use Sign In, even if they verified a signup OTP.
     const existing = await prisma.user.findFirst({
       where: { email },
       include: { profile: true },
     });
     if (existing) {
+      if (mode === "signup") {
+        return NextResponse.json(
+          {
+            error: "An account with this email already exists. Please sign in.",
+            code: "ACCOUNT_EXISTS",
+          },
+          { status: 409 },
+        );
+      }
       if (existing.isBanned) {
         return NextResponse.json(
           { error: "This account has been suspended." },
