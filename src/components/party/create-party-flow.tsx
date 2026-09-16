@@ -54,7 +54,11 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>(0);
   const [title, setTitle] = useState("");
   const [occasion, setOccasion] = useState<string | null>("HOUSE_PARTY");
-  const [startsAt, setStartsAt] = useState("");
+  // WHEN is captured as two separate controls (a date and a time) because a
+  // single datetime-local is fiddly on mobile. They're recombined into the
+  // exact `YYYY-MM-DDTHH:mm` shape the API already parses as local time.
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [venueMode, setVenueMode] = useState<"bar" | "house">("house");
   const [locationText, setLocationText] = useState("");
   const [barQuery, setBarQuery] = useState("");
@@ -95,6 +99,10 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
       ? `${selectedBar.name}, ${selectedBar.city}`
       : "Venue to be confirmed"
     : locationText.trim() || "Venue to be confirmed";
+
+  // Blank date ⇒ no schedule at all (the API stores null). A date without a
+  // time defaults to 20:00 rather than failing.
+  const startsAt = startDate ? `${startDate}T${startTime || "20:00"}` : "";
 
   const whenLine = startsAt
     ? new Date(startsAt).toLocaleString(undefined, {
@@ -252,14 +260,45 @@ export function CreatePartyFlow({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
 
-                <Field label="When" hint="Leave it blank if you're still deciding.">
-                  <Input
-                    type="datetime-local"
-                    value={startsAt}
-                    onChange={(e) => setStartsAt(e.target.value)}
-                    className="h-11"
-                  />
-                </Field>
+                <div className="space-y-1.5">
+                  <span className="eyebrow block">When</span>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="party-date"
+                        className="block text-[11px] font-medium text-muted-foreground"
+                      >
+                        Date
+                      </label>
+                      <Input
+                        id="party-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="party-time"
+                        className="block text-[11px] font-medium text-muted-foreground"
+                      >
+                        Time
+                      </label>
+                      <Input
+                        id="party-time"
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Leave it blank if you&apos;re still deciding.
+                    {startDate && !startTime ? " We'll assume 8:00 PM." : ""}
+                  </p>
+                </div>
               </div>
             )}
 

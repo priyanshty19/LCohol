@@ -31,6 +31,7 @@ type Msg = {
   content: string;
   cards?: Cards | null;
   actions?: JamesAction[];
+  isError?: boolean;
 };
 type AgentResponse = { reply: string; actions: JamesAction[]; cards: Cards | null; error?: string };
 
@@ -50,6 +51,17 @@ const MD = {
   li: (p: object) => <li {...p} />,
   a: (p: object) => <a className="text-primary underline underline-offset-2" {...p} />,
 };
+
+// A refusal from the route (no session, no API key, rate limited) must reach the
+// guest in words they can act on, not as a generic "he stepped away".
+function errorFor(status: number, message?: string): string {
+  if (message) return message;
+  if (status === 401) return "You'll need to be signed in for James to pour. Sign in and ask again.";
+  if (status === 403) return "This account can't use the bar right now.";
+  if (status === 429) return "James needs a breather, give him a minute.";
+  if (status === 503) return "James is off duty right now — the bar's AI service isn't available.";
+  return `James couldn't get that out (error ${status}). Give it another go.`;
+}
 
 // crypto.randomUUID is missing on older mobile browsers (Safari < 15.4, older
 // Android) — common in our audience — so fall back to a cheap random id.
@@ -164,16 +176,33 @@ export function AskJames() {
           messages: history.slice(-12).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-      if (!r.ok) throw new Error("agent failed");
-      const data = (await r.json()) as AgentResponse;
+      // A 500 answers with an HTML error page, so json() can throw — parse
+      // defensively and still say something honest.
+      const data = (await r.json().catch(() => ({}))) as Partial<AgentResponse>;
+      if (!r.ok) {
+        setMessages((m) => [
+          ...m,
+          {
+            id: uid(),
+            role: "assistant",
+            content: errorFor(r.status, data.error),
+            isError: true,
+          },
+        ]);
+        return;
+      }
       runActions(data.actions ?? []);
+      const cards = data.cards ?? null;
+      const hasCards = Boolean(cards && (cards.results.length || cards.similar.length));
+      const reply = data.reply?.trim();
       setMessages((m) => [
         ...m,
         {
           id: uid(),
           role: "assistant",
-          content: data.reply || "…",
-          cards: data.cards,
+          content:
+            reply || (hasCards ? "Here's what I'd pour. Take a look. 🥃" : "I didn't catch that. Ask me again?"),
+          cards,
           actions: data.actions,
         },
       ]);
@@ -184,6 +213,7 @@ export function AskJames() {
           id: uid(),
           role: "assistant",
           content: "James stepped away from the bar. Give it another go.",
+          isError: true,
         },
       ]);
     } finally {
@@ -198,8 +228,10 @@ export function AskJames() {
 
   const hasChat = messages.length > 0;
   // The expanded greeting/chat shows only near the top; scrolling collapses it to
-  // the hero bar. The manual chevron still works independently.
-  const showExtra = !collapsed && !scrolled;
+  // the hero bar. The manual chevron still works independently. An incidental
+  // scroll must NOT pull the panel away while James is mid-answer, or the guest
+  // asks a question and watches the reply vanish before it lands.
+  const showExtra = !collapsed && (!scrolled || sending);
 
   // No background band on the wrapper — it rendered as a faint rectangle around
   // the curved pill. The pill itself is opaque, so it masks scrolled content.
@@ -277,6 +309,9 @@ export function AskJames() {
               {messages.map((m) => (
                 <MessageBubble key={m.id} msg={m} />
               ))}
+              <div aria-live="polite" className="sr-only">
+                {sending ? "James is pouring an answer…" : ""}
+              </div>
               {sending && <TypingRow />}
             </div>
           </motion.div>
@@ -356,7 +391,14 @@ function MessageBubble({ msg }: { msg: Msg }) {
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2.5">
       <JamesAvatar className="h-7 w-7 shrink-0" />
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="rounded-2xl rounded-tl-sm bg-muted/40 px-3 py-2 text-sm leading-relaxed text-foreground">
+        <div
+          role={msg.isError ? "alert" : undefined}
+          className={
+            msg.isError
+              ? "rounded-2xl rounded-tl-sm border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm leading-relaxed text-foreground"
+              : "rounded-2xl rounded-tl-sm bg-muted/40 px-3 py-2 text-sm leading-relaxed text-foreground"
+          }
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD}>
             {msg.content}
           </ReactMarkdown>

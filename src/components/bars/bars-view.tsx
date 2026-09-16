@@ -204,7 +204,7 @@ export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
         setSelected(null);
         if (!places.length) {
           setStatusMsg(
-            nearby ? "No matching places found within about 3 km." : "No matching curated places found.",
+            nearby ? "No matching places found within about 3 km." : "No matching places found for this city.",
           );
         }
       } catch (error) {
@@ -321,7 +321,7 @@ export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
           {statusMsg ??
             (nearby
               ? "Showing operational places near you from Google Maps."
-              : "Showing curated Sip Stories places for this city.")}
+              : "Showing Sip Stories picks for this city, plus live matches from Google Maps.")}
         </span>
         {nearby && (
           <button onClick={exitNearby} className="shrink-0 text-primary underline-offset-2 hover:underline">

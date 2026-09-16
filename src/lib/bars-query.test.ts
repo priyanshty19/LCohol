@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { barsRequest } from "./bars-query";
 
-test("city tabs use the cached local directory", () => {
+test("city tabs use the merged city directory endpoint", () => {
   const request = barsRequest({
     city: "Delhi NCR",
     type: "PUB",
@@ -10,7 +10,7 @@ test("city tabs use the cached local directory", () => {
     nearbyLocation: null,
   });
 
-  assert.equal(request.endpoint, "/api/bars");
+  assert.equal(request.endpoint, "/api/bars/city");
   assert.equal(request.params.get("city"), "Delhi NCR");
   assert.equal(request.params.get("type"), "PUB");
   assert.equal(request.params.get("q"), "rooftop");

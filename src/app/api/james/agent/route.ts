@@ -74,6 +74,17 @@ function parseReply(raw: string): { reply: string; directive: ParsedDirective | 
   return { reply: kept.join("\n").trim(), directive };
 }
 
+// The card lookup is a bonus on top of the answer. If it fails, the guest still
+// gets James's reply — it must never take the whole response down with it.
+async function safeSearch(query: string): Promise<CatalogSearch | null> {
+  try {
+    return await searchCatalog(query);
+  } catch (err) {
+    console.error("[james/agent] catalog search failed", err);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -85,8 +96,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "James is off duty right now." }, { status: 503 });
   }
 
-  const body = await request.json();
-  const incoming: ChatMsg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+  const body = await request.json().catch(() => ({}) as { messages?: unknown });
+  const incoming: ChatMsg[] = Array.isArray(body.messages)
+    ? body.messages.slice(-12).map((m: ChatMsg) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content.slice(0, 2000) : "",
+      }))
+    : [];
   const lastUser = [...incoming].reverse().find((m) => m.role === "user")?.content ?? "";
   if (!lastUser.trim()) {
     return NextResponse.json({ error: "Ask James something first." }, { status: 400 });
@@ -99,21 +115,39 @@ export async function POST(request: NextRequest) {
     context: { q: lastUser.slice(0, 200), keywords: jamesKeywords(lastUser) },
   });
 
+  // These DB reads used to sit outside any try/catch: a saturated pool or any
+  // other Prisma error escaped as a 500 HTML error page, which the client can't
+  // parse into JSON — so James silently rendered nothing. Same handling as
+  // /api/james/chat: a JSON body the UI can always show.
   let favoriteDrink: string | null = null;
-  if (user.profile?.favoriteDrinkId) {
-    const fav = await prisma.drink.findUnique({
-      where: { id: user.profile.favoriteDrinkId },
-      select: { name: true },
-    });
-    favoriteDrink = fav?.name ?? null;
-  }
+  let groundingDrinks: Awaited<ReturnType<typeof retrieveDrinks>>;
+  let taste: Awaited<ReturnType<typeof getTasteProfile>>;
+  try {
+    if (user.profile?.favoriteDrinkId) {
+      const fav = await prisma.drink.findUnique({
+        where: { id: user.profile.favoriteDrinkId },
+        select: { name: true },
+      });
+      favoriteDrink = fav?.name ?? null;
+    }
 
-  // Fetch the grounding catalog + the user's demonstrated taste in parallel so the
-  // behavioral signal adds no latency over the existing retrieval step.
-  const [groundingDrinks, taste] = await Promise.all([
-    retrieveDrinks(lastUser),
-    getTasteProfile(user.id),
-  ]);
+    // Fetch the grounding catalog + the user's demonstrated taste in parallel so the
+    // behavioral signal adds no latency over the existing retrieval step.
+    [groundingDrinks, taste] = await Promise.all([
+      retrieveDrinks(lastUser),
+      getTasteProfile(user.id),
+    ]);
+  } catch (err) {
+    if (isPoolExhausted(err)) {
+      console.warn("[james/agent] pool exhausted — 503 backoff");
+      return poolBusyResponse();
+    }
+    console.error("[james/agent] grounding failed", err);
+    return NextResponse.json(
+      { error: "James can't reach the bar's shelves right now. Try me again in a moment." },
+      { status: 503 },
+    );
+  }
   const system =
     buildSystemPrompt(
       {
@@ -163,7 +197,7 @@ export async function POST(request: NextRequest) {
       const target = NAV_TARGETS[directive.page];
       if (target) actions.push({ type: "navigate", path: target.path, label: target.label });
     } else if (directive?.type === "find_drinks") {
-      cards = await searchCatalog(String(directive.query ?? lastUser));
+      cards = await safeSearch(String(directive.query ?? lastUser));
     }
 
     // Observability: a directive that resolved to nothing (bad theme, unknown
@@ -181,8 +215,8 @@ export async function POST(request: NextRequest) {
       );
     const negated = /\b(don'?t|do not|not|no|never|stop|without|isn'?t|aren'?t)\b/i.test(lastUser);
     if (!cards && actions.length === 0 && wantsCards && !negated) {
-      const fallback = await searchCatalog(lastUser);
-      if (fallback.results.length) cards = fallback;
+      const fallback = await safeSearch(lastUser);
+      if (fallback?.results.length) cards = fallback;
     }
 
     let reply = parsedReply;
@@ -197,9 +231,11 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (isPoolExhausted(err)) return poolBusyResponse();
     console.error("[james/agent]", err);
+    // Honest failure instead of a 200 that reads like James chose to say this:
+    // the client renders it as an error the guest can act on (retry).
     return NextResponse.json(
-      { reply: "James got pulled away for a second. Try me again.", actions: [], cards: null },
-      { status: 200 }
+      { error: "James couldn't get through to the bar's AI just now. Try me again." },
+      { status: 502 }
     );
   }
 }

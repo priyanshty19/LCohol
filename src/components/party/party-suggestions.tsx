@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,68 @@ function suggesterName(s: Suggester): string {
   return s?.profile?.displayName ?? s?.profile?.username ?? "someone";
 }
 
+// ── Autosave feedback ────────────────────────────────────────────────────────
+// Every change here is persisted the moment it's made (there is no separate
+// save step), so the card needs to *say* so — otherwise it looks like nothing
+// was saved and people go hunting for a Save button.
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function useSaveState() {
+  const [state, setState] = useState<SaveState>("idle");
+  const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  const start = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setMessage(null);
+    setState("saving");
+  }, []);
+
+  const saved = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    setMessage(null);
+    setState("saved");
+    timer.current = setTimeout(() => setState("idle"), 2000);
+  }, []);
+
+  const failed = useCallback((msg: string) => {
+    if (timer.current) clearTimeout(timer.current);
+    setMessage(msg);
+    setState("error");
+  }, []);
+
+  return { state, message, start, saved, failed };
+}
+
+function SaveIndicator({ state, message }: { state: SaveState; message: string | null }) {
+  return (
+    <>
+      <p
+        role="status"
+        aria-live="polite"
+        className={
+          "shrink-0 text-xs empty:hidden " +
+          (state === "saved" ? "text-primary" : "text-muted-foreground")
+        }
+      >
+        {state === "saving" ? "Saving…" : state === "saved" ? "Saved ✓" : ""}
+      </p>
+      {state === "error" && message && (
+        <p role="alert" className="shrink-0 text-xs text-destructive">
+          {message}
+        </p>
+      )}
+    </>
+  );
+}
+
 // ── Suggest a cocktail / drink ───────────────────────────────────────────────
 export function PartyDrinks({
   partyId,
@@ -48,6 +110,7 @@ export function PartyDrinks({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<CatalogResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const save = useSaveState();
 
   useEffect(() => {
     const term = query.trim();
@@ -97,20 +160,24 @@ export function PartyDrinks({
       cocktail: item.kind === "cocktail" ? { id: item.id, name: item.name, slug: item.slug ?? "", category: null } : null,
     };
     setList((prev) => [optimistic, ...prev]);
+    save.start();
     try {
       const r = await fetch(`/api/parties/${partyId}/drinks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ kind: item.kind, id: item.id }),
       });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (r.ok && j.data?.id) {
         setList((prev) => prev.map((s) => (s.id === tmpId ? { ...s, id: j.data.id } : s)));
+        save.saved();
       } else {
         setList((prev) => prev.filter((s) => s.id !== tmpId));
+        save.failed(j.error ?? "Couldn't save that drink. Try again.");
       }
     } catch {
       setList((prev) => prev.filter((s) => s.id !== tmpId));
+      save.failed("Couldn't save that drink. Check your connection.");
     }
   }
 
@@ -118,25 +185,38 @@ export function PartyDrinks({
     const prev = list;
     setList((l) => l.filter((s) => s.id !== id));
     if (id.startsWith("tmp-")) return;
+    save.start();
     const r = await fetch(`/api/parties/${partyId}/drinks`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ suggestionId: id }),
     }).catch(() => null);
-    if (!r || !r.ok) setList(prev);
+    if (!r || !r.ok) {
+      setList(prev);
+      save.failed("Couldn't remove that drink. Try again.");
+    } else {
+      save.saved();
+    }
   }
 
   return (
     <Card>
       <CardContent className="space-y-3 pt-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          🍸 What we&apos;re drinking
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            🍸 What we&apos;re drinking
+          </p>
+          <SaveIndicator state={save.state} message={save.message} />
+        </div>
+        <p className="text-[11px] text-muted-foreground/70">
+          Everything here saves as you add it — no save button needed.
         </p>
 
         <div className="relative">
           <Input
             value={query}
             onChange={(e) => updateQuery(e.target.value)}
+            aria-label="Add a drink or cocktail"
             placeholder="Add a drink or cocktail…"
             className="sm:max-w-md"
           />
@@ -225,6 +305,7 @@ export function PartyGames({
   const [list, setList] = useState<GameSuggestion[]>(initial);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const save = useSaveState();
 
   const sorted = useMemo(
     () => [...list].sort((a, b) => b.votes.length - a.votes.length),
@@ -245,20 +326,24 @@ export function PartyGames({
     };
     setList((prev) => [...prev, optimistic]);
     setText("");
+    save.start();
     try {
       const r = await fetch(`/api/parties/${partyId}/games`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: t }),
       });
-      const j = await r.json();
+      const j = await r.json().catch(() => ({}));
       if (r.ok && j.data?.id) {
         setList((prev) => prev.map((g) => (g.id === tmpId ? { ...g, id: j.data.id } : g)));
+        save.saved();
       } else {
         setList((prev) => prev.filter((g) => g.id !== tmpId));
+        save.failed(j.error ?? "Couldn't save that game. Try again.");
       }
     } catch {
       setList((prev) => prev.filter((g) => g.id !== tmpId));
+      save.failed("Couldn't save that game. Check your connection.");
     } finally {
       setBusy(false);
     }
@@ -277,29 +362,44 @@ export function PartyGames({
         };
       }),
     );
-    await fetch(`/api/parties/${partyId}/games/vote`, {
+    save.start();
+    const r = await fetch(`/api/parties/${partyId}/games/vote`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gameId }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (!r || !r.ok) save.failed("Couldn't save your vote. Try again.");
+    else save.saved();
   }
 
   async function remove(gameId: string) {
     const prev = list;
     setList((l) => l.filter((g) => g.id !== gameId));
     if (gameId.startsWith("tmp-")) return;
+    save.start();
     const r = await fetch(`/api/parties/${partyId}/games`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ gameId }),
     }).catch(() => null);
-    if (!r || !r.ok) setList(prev);
+    if (!r || !r.ok) {
+      setList(prev);
+      save.failed("Couldn't remove that game. Try again.");
+    } else {
+      save.saved();
+    }
   }
 
   return (
     <Card>
       <CardContent className="space-y-3 pt-5">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">🎲 Games</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">🎲 Games</p>
+          <SaveIndicator state={save.state} message={save.message} />
+        </div>
+        <p className="text-[11px] text-muted-foreground/70">
+          Games and votes save as you go — no save button needed.
+        </p>
 
         <div className="flex gap-2">
           <Input
@@ -308,6 +408,7 @@ export function PartyGames({
             onKeyDown={(e) => {
               if (e.key === "Enter") suggest();
             }}
+            aria-label="Suggest a game"
             placeholder="Suggest a game — Most Likely To, Charades…"
             maxLength={200}
           />

@@ -5,6 +5,8 @@ type BarsRequest = {
   nearbyLocation: [number, number] | null;
 };
 
+// City browsing goes to /api/bars/city: our curated directory merged with a
+// live Google Places pass, so uncurated venues still turn up in search.
 export function barsRequest({ city, type, query, nearbyLocation }: BarsRequest) {
   const nearby = nearbyLocation !== null;
   const params = nearby
@@ -19,7 +21,7 @@ export function barsRequest({ city, type, query, nearbyLocation }: BarsRequest) 
   if (!nearby && query.trim()) params.set("q", query.trim());
 
   return {
-    endpoint: nearby ? "/api/bars/nearby" : "/api/bars",
+    endpoint: nearby ? "/api/bars/nearby" : "/api/bars/city",
     params,
   };
 }

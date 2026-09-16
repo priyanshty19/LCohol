@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
@@ -50,6 +50,11 @@ export function LoginForm({
   const [loading, setLoading] = useState(false);
   const [resent, setResent] = useState(false);
   const [resending, setResending] = useState(false);
+  // Latch: once Clerk has accepted the code and the session is active, a retry
+  // must NOT re-attempt the (now consumed) first factor — it would fail with
+  // client_state_invalid and strand a half-signed-in user. Mirrors signup-form.
+  const [verified, setVerified] = useState(false);
+  const resendTimer = useRef<number | null>(null);
 
   // Restore an in-flight OTP step across a refresh (Clerk rehydrates its own
   // verification attempt; we just bring the step + email back).
@@ -71,6 +76,14 @@ export function LoginForm({
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // The resend cooldown timer must not fire into an unmounted form.
+  useEffect(
+    () => () => {
+      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     trackVirtualPageView(
@@ -99,8 +112,21 @@ export function LoginForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: addr }),
       });
-      const { exists } = await checkRes.json();
-      if (!exists) {
+      const check = await checkRes.json().catch(() => ({}));
+      // A 429/500 from this route also carries `exists: false`. Reading only
+      // `exists` told a rate-limited (or DB-stalled) MEMBER that they have no
+      // account and sent them to signup, where the email is already taken —
+      // a dead end. Trust `exists` only on a 2xx.
+      if (!checkRes.ok) {
+        setError(
+          typeof check.error === "string"
+            ? check.error
+            : "Couldn't check that email right now. Please try again.",
+        );
+        setLoading(false);
+        return;
+      }
+      if (!check.exists) {
         setError("No account for this email yet — please sign up.");
         setLoading(false);
         return;
@@ -133,11 +159,28 @@ export function LoginForm({
       } catch {
         /* ignore */
       }
-    } catch {
+    } catch (e1) {
       // We already confirmed above that this email IS a member in our DB, so
-      // signIn.create() failing means Clerk simply hasn't seen this address yet
-      // (a legacy/password member). Verify via the signUp shadow-user flow; the
-      // backend still treats them as an existing member on completion.
+      // signIn.create() failing USUALLY means Clerk simply hasn't seen this
+      // address yet (a legacy/password member). Verify via the signUp
+      // shadow-user flow; the backend still treats them as an existing member.
+      //
+      // But not every failure means "unknown identifier". A throttled or
+      // CAPTCHA-blocked signIn.create() used to fall through here too, and the
+      // signUp fallback then minted exactly the stranded Clerk shadow record
+      // that /api/auth/check-email exists to prevent. Surface those instead.
+      const code1 = (e1 as { errors?: { code?: string }[] })?.errors?.[0]?.code;
+      const NO_FALLBACK = new Set([
+        "too_many_requests",
+        "rate_limit_exceeded",
+        "captcha_invalid",
+        "captcha_unavailable",
+        "form_param_format_invalid",
+      ]);
+      if (code1 && NO_FALLBACK.has(code1)) {
+        setError(clerkError(e1, "Couldn't send a code to that email."));
+        return; // `finally` clears loading
+      }
       try {
         await signUp!.create({ emailAddress: addr });
         await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -160,56 +203,94 @@ export function LoginForm({
   // Step 2 — verify the OTP, then mint our session via the backend.
   async function handleOtp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!isLoaded) return;
+    // The button is disabled until Clerk loads, but the OTP step can also be
+    // restored from sessionStorage before that. Returning silently here left
+    // the person tapping a live button that did nothing at all — say so.
+    if (!isLoaded || !signIn) {
+      setError("Still connecting to the verification service — try again in a moment.");
+      return;
+    }
+    const entered = code.replace(/\D/g, "");
+    if (entered.length !== 6) {
+      setError("Enter all 6 digits of the code.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
-      if (flow === "signin") {
-        const res = await signIn.attemptFirstFactor({
-          strategy: "email_code",
-          code: code.trim(),
-        });
-        if (res.status !== "complete" || !res.createdSessionId) {
-          setError(verificationError(res, "signin"));
-          setLoading(false);
-          return;
+      // Only verify if we haven't already. Everything after this block can fail
+      // for reasons that have nothing to do with the code (backend 500, 429,
+      // network), and re-attempting a consumed first factor throws
+      // client_state_invalid — which used to strand the person signed in to
+      // Clerk but not to SIPSTORIES, with no way to retry.
+      if (!verified) {
+        if (flow === "signin") {
+          const res = await signIn.attemptFirstFactor({
+            strategy: "email_code",
+            code: entered,
+          });
+          if (res.status !== "complete" || !res.createdSessionId) {
+            setError(verificationError(res, "signin"));
+            setLoading(false);
+            return;
+          }
+          await setActive({ session: res.createdSessionId });
+        } else {
+          if (!signUp || !setActiveSignUp) {
+            setError("Your sign-in timed out. Tap Resend code to get a new one.");
+            setLoading(false);
+            return;
+          }
+          let res = await signUp.attemptEmailAddressVerification({
+            code: entered,
+          });
+          // The email is verified at this point. If Clerk is still holding the
+          // sign-up open for fields this app never collects (password by
+          // default), fill them in rather than telling the person their correct
+          // code was wrong. See lib/clerk-signup-requirements.ts.
+          if (res.status === "missing_requirements") {
+            res = (await satisfyAutoRequirements(
+              res as unknown as ClerkSignUpLike,
+              email,
+            )) as unknown as typeof res;
+          }
+          if (res.status !== "complete" || !res.createdSessionId) {
+            setError(verificationError(res, "signup"));
+            setLoading(false);
+            return;
+          }
+          await setActiveSignUp({ session: res.createdSessionId });
         }
-        await setActive({ session: res.createdSessionId });
-      } else {
-        let res = await signUp!.attemptEmailAddressVerification({
-          code: code.trim(),
-        });
-        // The email is verified at this point. If Clerk is still holding the
-        // sign-up open for fields this app never collects (password by
-        // default), fill them in rather than telling the person their correct
-        // code was wrong. See lib/clerk-signup-requirements.ts.
-        if (res.status === "missing_requirements") {
-          res = (await satisfyAutoRequirements(
-            res as unknown as ClerkSignUpLike,
-            email,
-          )) as unknown as typeof res;
-        }
-        if (res.status !== "complete" || !res.createdSessionId) {
-          setError(verificationError(res, "signup"));
-          setLoading(false);
-          return;
-        }
-        await setActiveSignUp!({ session: res.createdSessionId });
+        setVerified(true);
       }
 
       const token = await getToken();
+      if (!token) {
+        // Email is verified but Clerk hasn't handed us a session token. Don't
+        // post `null` and let the backend answer "Missing verification token."
+        setError(
+          "Your email is verified, but we couldn't read the session back. Tap Log in again.",
+        );
+        setLoading(false);
+        return;
+      }
       const r = await fetch("/api/auth/otp/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "signin", clerkToken: token }),
       });
-      const d = await r.json();
+      // A gateway/proxy error body isn't JSON; parsing it used to throw into the
+      // outer catch and blame the code ("Verification failed. Request a new
+      // code.") for a server problem.
+      const d = await r.json().catch(() => ({} as { error?: string }));
       if (!r.ok) {
         if (r.status === 404) {
           setError("No account for this email yet — please sign up.");
         } else {
-          setError(d.error ?? "Login failed.");
+          setError(
+            d.error ?? `Login failed (${r.status}). Your email is verified — tap Log in to retry.`,
+          );
         }
         setLoading(false);
         return;
@@ -230,11 +311,15 @@ export function LoginForm({
   }
 
   async function resend() {
-    if (!isLoaded || !signIn || resending) return;
+    // The old gate required `signIn` even on the signup-shadow flow, where the
+    // in-flight attempt lives on `signUp` — so that branch silently did nothing.
+    if (!isLoaded || resending) return;
     setError(null);
+    setResent(false);
     setResending(true);
     try {
       if (flow === "signin") {
+        if (!signIn) throw new Error("Sign-in session lost. Please go back and try again.");
         // Re-create the SignIn attempt so supportedFirstFactors is freshly populated.
         const si = await signIn.create({ identifier: email });
         const factor = si.supportedFirstFactors?.find(
@@ -249,10 +334,16 @@ export function LoginForm({
         if (!signUp) throw new Error("Sign-up session lost. Please go back and try again.");
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
+      // A fresh code invalidates the old one AND the attempt it belonged to, so
+      // the next submit must verify again rather than reuse the latch.
+      setVerified(false);
+      setCode("");
       setResent(true);
       trackAnalyticsEvent("auth_code_resent", { mode: "sign_in" });
       // Brief cooldown so the success message lands and the button isn't spammed.
-      setTimeout(() => {
+      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+      resendTimer.current = window.setTimeout(() => {
+        resendTimer.current = null;
         setResent(false);
         setResending(false);
       }, 4000);
@@ -316,7 +407,7 @@ export function LoginForm({
             variant="gold"
             size="lg"
             className="w-full"
-            disabled={loading || code.length < 6}
+            disabled={loading || !isLoaded || code.length < 6}
           >
             {loading ? "Verifying…" : "Log in"}
           </Button>
@@ -337,6 +428,9 @@ export function LoginForm({
                 setStep("email");
                 setCode("");
                 setError(null);
+                // A different address means a different verification — never
+                // carry the "already verified" latch back to step 1.
+                setVerified(false);
                 try {
                   sessionStorage.removeItem(LI_OTP_KEY);
                 } catch {
@@ -349,8 +443,12 @@ export function LoginForm({
             </button>
           </div>
 
-          <p aria-live="polite" className="min-h-[1rem] text-center text-xs text-muted-foreground">
-            {resent ? "A new code is on its way" : ""}
+          <p
+            role="status"
+            aria-live="polite"
+            className="min-h-[1rem] text-center text-xs text-muted-foreground"
+          >
+            {resending && !resent ? "Sending a new code…" : resent ? "A new code is on its way" : ""}
           </p>
         </form>
       </div>

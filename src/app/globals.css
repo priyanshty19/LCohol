@@ -604,6 +604,43 @@
   transition: all 0.3s ease;
 }
 
+/* ---------- CTAs that stay legible on ANY backdrop ----------
+   The landing hero paints a vibe gradient, an aurora and a shader behind these
+   buttons, and the vibe changes per theme, so a translucent control is a
+   coin-flip: `variant="outline"` resolves to `dark:bg-input/30`, and --input is
+   rgba(255,255,255,0.12) — a 3.6% white fill that vanishes over the dark wine
+   gradient.
+
+   Both CTAs are therefore anchored to OPAQUE theme tokens rather than to
+   whatever is behind them. Every vibe defines --card/--card-foreground
+   (measured 10.9:1 to 17.7:1) and --primary/--primary-foreground (4.8:1 to
+   8.5:1), so contrast is guaranteed by the token pair, not by the backdrop,
+   and it re-derives automatically for any vibe added later.
+
+   The ring + shadow are what separate the button EDGE from a busy backdrop;
+   the opaque fill is what keeps the LABEL readable. Both are needed. */
+@utility cta-solid {
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid color-mix(in oklch, var(--card-foreground) 38%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklch, var(--card-foreground) 8%, transparent) inset,
+    0 2px 10px rgb(0 0 0 / 0.28);
+}
+
+.cta-solid:hover {
+  background: color-mix(in oklch, var(--card), var(--card-foreground) 8%);
+  border-color: color-mix(in oklch, var(--card-foreground) 55%, transparent);
+}
+
+/* Separates the filled primary CTA from a light or busy backdrop without
+   touching its fill, which already carries its own guaranteed contrast. */
+@utility cta-raised {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--primary-foreground) 45%, transparent),
+    0 2px 10px rgb(0 0 0 / 0.28);
+}
+
 @utility btn-ghost-gold {
   border: 1px solid #B5720A;
   color: #B5720A;

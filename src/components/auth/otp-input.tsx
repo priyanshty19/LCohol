@@ -150,7 +150,20 @@ export function OtpInput({
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={(e) => handlePaste(i, e)}
-          onFocus={(e) => e.currentTarget.select()}
+          onFocus={(e) => {
+            // The value is a plain digit string, so a gap can't be
+            // represented: clicking slot 4 with only slot 1 filled wrote the
+            // digit into slot 2 and looked broken. Snap to the first empty
+            // slot instead, which is how every OTP field behaves. Once all
+            // six are filled there is no empty slot and any of them is
+            // directly editable.
+            const firstEmpty = digits.findIndex((x) => !x);
+            if (firstEmpty !== -1 && i > firstEmpty) {
+              focusAt(firstEmpty);
+              return;
+            }
+            e.currentTarget.select();
+          }}
           className={cn(
             "h-12 w-full min-w-0 rounded-lg border border-input bg-transparent",
             "text-center font-mono text-lg tabular-nums text-foreground",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Dices } from "lucide-react";
@@ -81,6 +81,9 @@ export function SignupForm({
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
   const [verified, setVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+  const resendTimer = useRef<number | null>(null);
   // DOB as separate parts so year is a single dropdown (no calendar paging).
   const [dobDay, setDobDay] = useState("");
   const [dobMonth, setDobMonth] = useState("");
@@ -132,6 +135,14 @@ export function SignupForm({
       step === "otp" ? "Account verification" : "Create account",
     );
   }, [step]);
+
+  // The resend cooldown timer must not fire into an unmounted form.
+  useEffect(
+    () => () => {
+      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+    },
+    [],
+  );
 
   // Step 1 — validate referral, then ask Clerk to email a code.
   async function handleDetails(e: React.FormEvent<HTMLFormElement>) {
@@ -256,26 +267,41 @@ export function SignupForm({
   // Step 2 — verify the OTP with Clerk, then create the member via our backend.
   async function handleOtp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!isLoaded) return;
+    // The OTP step can be restored from sessionStorage before Clerk finishes
+    // loading. Returning silently left a live button that did nothing at all.
+    if (!isLoaded) {
+      setError("Still connecting to the verification service — try again in a moment.");
+      return;
+    }
+    const entered = code.replace(/\D/g, "");
+    if (entered.length !== 6) {
+      setError("Enter all 6 digits of the code.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
       if (!verified) {
         if (verifyVia === "signin") {
-          const res = await signIn!.attemptFirstFactor({
+          if (!signIn || !setActiveSignIn) {
+            setError("Your sign-up timed out. Tap Resend code to get a new one.");
+            setLoading(false);
+            return;
+          }
+          const res = await signIn.attemptFirstFactor({
             strategy: "email_code",
-            code: code.trim(),
+            code: entered,
           });
           if (res.status !== "complete" || !res.createdSessionId) {
             setError(verificationError(res, "signin"));
             setLoading(false);
             return;
           }
-          await setActiveSignIn!({ session: res.createdSessionId });
+          await setActiveSignIn({ session: res.createdSessionId });
         } else {
           let res = await signUp.attemptEmailAddressVerification({
-            code: code.trim(),
+            code: entered,
           });
           // Email is verified here. Don't blame the code for fields the Clerk
           // instance requires but this app never collects — fill them in.
@@ -297,6 +323,15 @@ export function SignupForm({
       }
 
       const token = await getToken();
+      if (!token) {
+        // Email is verified but Clerk hasn't handed us a session token. Don't
+        // post `null` and let the backend answer "Missing verification token."
+        setError(
+          "Your email is verified, but we couldn't read the session back. Tap Verify & join again.",
+        );
+        setLoading(false);
+        return;
+      }
       const r = await fetch("/api/auth/otp/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -311,13 +346,18 @@ export function SignupForm({
           consent: details.consent,
         }),
       });
-      const d = await r.json();
+      // A gateway/proxy error body isn't JSON; parsing it used to throw into the
+      // outer catch and blame the code for a server problem.
+      const d = await r.json().catch(() => ({} as { error?: string }));
       if (!r.ok) {
         if (r.status === 409 && /username/i.test(d.error ?? "")) {
           setUsername(generateFunkyName());
           setError("That name got snapped up — here's a fresh one. Tap verify again.");
         } else {
-          setError(d.error ?? "Could not finish signup.");
+          setError(
+            d.error ??
+              `Could not finish signup (${r.status}). Your email is verified — tap Verify & join to retry.`,
+          );
         }
         setLoading(false);
         return;
@@ -365,25 +405,43 @@ export function SignupForm({
   }
 
   async function resend() {
-    if (!isLoaded) return;
+    // Previously this had no pending/confirmation state at all: tapping "Resend
+    // code" produced no visible change whatsoever, success or failure.
+    if (!isLoaded || resending) return;
     setError(null);
+    setResent(false);
+    setResending(true);
     try {
       if (verifyVia === "signin") {
-        const si = await signIn!.create({ identifier: details.email });
+        if (!signIn) throw new Error("Sign-up session lost. Please go back and try again.");
+        const si = await signIn.create({ identifier: details.email });
         const factor = si.supportedFirstFactors?.find(
           (f) => f.strategy === "email_code",
         ) as { emailAddressId: string } | undefined;
         if (!factor) throw new Error("no email_code factor");
-        await signIn!.prepareFirstFactor({
+        await signIn.prepareFirstFactor({
           strategy: "email_code",
           emailAddressId: factor.emailAddressId,
         });
       } else {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       }
+      // A fresh code belongs to a fresh attempt, so drop the "already verified"
+      // latch — otherwise the next submit skips verification entirely and
+      // re-posts a token from the attempt the resend just replaced.
+      setVerified(false);
+      setCode("");
+      setResent(true);
       trackAnalyticsEvent("auth_code_resent", { mode: "sign_up" });
+      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+      resendTimer.current = window.setTimeout(() => {
+        resendTimer.current = null;
+        setResent(false);
+        setResending(false);
+      }, 4000);
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
+      setResending(false);
     }
   }
 
@@ -432,13 +490,18 @@ export function SignupForm({
             variant="gold"
             size="lg"
             className="w-full"
-            disabled={loading || code.length < 6}
+            disabled={loading || !isLoaded || code.length < 6}
           >
             {loading ? "Verifying…" : "Verify & join"}
           </Button>
 
           <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <button type="button" onClick={resend} className="hover:text-primary">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={resending}
+              className="hover:text-primary disabled:opacity-50"
+            >
               Resend code
             </button>
             <span aria-hidden="true">·</span>
@@ -448,6 +511,10 @@ export function SignupForm({
                 setStep("details");
                 setCode("");
                 setError(null);
+                // A different address means a different verification — never
+                // carry the "already verified" latch back to step 1, or the
+                // next submit would skip Clerk and post a stale token.
+                setVerified(false);
                 try {
                   sessionStorage.removeItem(SU_OTP_KEY);
                 } catch {
@@ -459,6 +526,14 @@ export function SignupForm({
               Wrong email?
             </button>
           </div>
+
+          <p
+            role="status"
+            aria-live="polite"
+            className="min-h-[1rem] text-center text-xs text-muted-foreground"
+          >
+            {resending && !resent ? "Sending a new code…" : resent ? "A new code is on its way" : ""}
+          </p>
         </form>
       </div>
     );
@@ -646,7 +721,10 @@ export function SignupForm({
           <div id="clerk-captcha" className="flex justify-center empty:hidden" />
 
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div
+              role="alert"
+              className="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            >
               {error}
             </div>
           )}

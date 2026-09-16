@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -198,6 +198,35 @@ export function PartyDetail({ party, isHost, myRsvp, meId }: { party: Party; isH
   );
 }
 
+// Clipboard writes reject on insecure origins (and in browsers that gate the
+// async API), so fall back to a hidden textarea + execCommand before giving up.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 function HostControls({
   partyId,
   onInvited,
@@ -212,12 +241,21 @@ function HostControls({
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Split feedback: a success line (role="status") and an error line (role="alert")
+  // so an invite/copy never fails silently.
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/connections")
       .then((r) => r.json())
       .then((d) => setMembers(Array.isArray(d) ? d : d.data ?? []))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => () => {
+    if (copyTimer.current) clearTimeout(copyTimer.current);
   }, []);
 
   function toggle(id: string) {
@@ -227,46 +265,99 @@ function HostControls({
       else n.add(id);
       return n;
     });
+    setError(null);
+  }
+
+  function flashCopied() {
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 2000);
   }
 
   async function sendInvites() {
     if (!selected.size || busy) return;
     setBusy(true);
+    setNote(null);
+    setError(null);
     try {
       const r = await fetch(`/api/parties/${partyId}/invites`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userIds: [...selected] }),
       });
-      if (r.ok) {
-        const picked = members.filter((m) => selected.has(m.userId));
-        onInvited(
-          picked.map((m) => ({
-            id: `tmp-${m.userId}`,
-            rsvp: "INVITED",
-            invitedUserId: m.userId,
-            invitedUser: { profile: { username: m.username, displayName: m.displayName } },
-          }))
-        );
-        setSelected(new Set());
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setError(j.error ?? "Couldn't send the invites. Try again.");
+        return;
       }
+      const invited: number = typeof j.data?.invited === "number" ? j.data.invited : 0;
+      if (invited === 0) {
+        setNote("Everyone you picked was already invited.");
+        setSelected(new Set());
+        return;
+      }
+      const picked = members.filter((m) => selected.has(m.userId));
+      onInvited(
+        picked.map((m) => ({
+          id: `tmp-${m.userId}`,
+          rsvp: "INVITED",
+          invitedUserId: m.userId,
+          invitedUser: { profile: { username: m.username, displayName: m.displayName } },
+        }))
+      );
+      setSelected(new Set());
+      setNote(invited === 1 ? "Invite sent." : `${invited} invites sent.`);
+    } catch {
+      setError("Couldn't send the invites. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function makeLink() {
+  // "Copy invite link" mints a link the first time, then copies it. Reuse the
+  // already-minted link on repeat clicks so we don't burn through the link quota.
+  async function copyInviteLink() {
+    if (busy) return;
     setBusy(true);
+    setNote(null);
+    setError(null);
     try {
-      const r = await fetch(`/api/parties/${partyId}/invites`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ generateLink: true }),
-      });
-      const j = await r.json();
-      if (r.ok && j.data?.code) setLink(`${window.location.origin}/party/${j.data.code}`);
+      let url = link;
+      if (!url) {
+        const r = await fetch(`/api/parties/${partyId}/invites`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generateLink: true }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.data?.code) {
+          setError(j.error ?? "Couldn't create an invite link.");
+          return;
+        }
+        url = `${window.location.origin}/party/${j.data.code}`;
+        setLink(url);
+      }
+      if (await copyToClipboard(url)) {
+        flashCopied();
+        setNote("Invite link copied.");
+      } else {
+        setError("Couldn't copy automatically — select the link below and copy it.");
+      }
+    } catch {
+      setError("Couldn't create an invite link. Check your connection and try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyExistingLink() {
+    if (!link) return;
+    setError(null);
+    if (await copyToClipboard(link)) {
+      flashCopied();
+      setNote("Invite link copied.");
+    } else {
+      setError("Couldn't copy automatically — select the link above and copy it.");
     }
   }
 
@@ -280,13 +371,20 @@ function HostControls({
     onCancel();
   }
 
+  const nothingSelected = selected.size === 0;
+  // Why the Invite button is disabled, said out loud (and wired up via
+  // aria-describedby) instead of leaving a dead-looking button.
+  const inviteHint = members.length === 0
+    ? "Your circle is empty — use a link below for anyone."
+    : nothingSelected
+      ? "Pick at least one person to enable Invite."
+      : null;
+
   return (
     <Card>
       <CardContent className="space-y-3 pt-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Invite your circle</p>
-        {members.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Your circle is empty — use a link below for anyone.</p>
-        ) : (
+        {members.length > 0 && (
           <div className="max-h-40 space-y-1 overflow-y-auto">
             {members.map((m) => {
               const name = m.displayName ?? m.username ?? "Member";
@@ -308,26 +406,50 @@ function HostControls({
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button variant="gold" size="sm" disabled={busy || selected.size === 0} onClick={sendInvites}>
+          <Button
+            variant="gold"
+            size="sm"
+            disabled={busy || nothingSelected}
+            aria-describedby={inviteHint ? "invite-hint" : undefined}
+            onClick={sendInvites}
+          >
             {selected.size > 0 ? `Invite ${selected.size}` : "Invite"}
           </Button>
-          <Button variant="outline" size="sm" disabled={busy} onClick={makeLink}>
-            Copy invite link
+          <Button variant="outline" size="sm" disabled={busy} onClick={copyInviteLink}>
+            {copied ? "Copied!" : "Copy invite link"}
           </Button>
           <Button variant="ghost" size="sm" className="ml-auto text-destructive" onClick={cancelParty}>
             Cancel party
           </Button>
         </div>
+        {inviteHint && (
+          <p id="invite-hint" className="text-xs text-muted-foreground">
+            {inviteHint}
+          </p>
+        )}
+        <p role="status" aria-live="polite" className="text-xs text-primary empty:hidden">
+          {note}
+        </p>
+        {error && (
+          <p role="alert" className="text-xs text-destructive">
+            {error}
+          </p>
+        )}
         {link && (
           <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
-            <input readOnly value={link} className="min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none" />
+            <label htmlFor="party-invite-link" className="sr-only">
+              Invite link
+            </label>
+            <input
+              id="party-invite-link"
+              readOnly
+              value={link}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 bg-transparent text-xs text-muted-foreground outline-none"
+            />
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(link).then(() => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                });
-              }}
+              type="button"
+              onClick={copyExistingLink}
               className="shrink-0 text-xs font-medium text-primary"
             >
               {copied ? "Copied ✓" : "Copy"}
