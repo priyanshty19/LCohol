@@ -1,36 +1,49 @@
 "use client";
 
 import * as React from "react";
+import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const LENGTH = 6;
 
+/** Orbit geometry, in px. Six beads on a ring around the row's centre. */
+const ORBIT_RADIUS = 34;
+const ORBIT_SCALE = 0.46;
+/** Row height at rest vs. while the ring is up (ring diameter + a bead). */
+const ROW_H = 48;
+const RING_H = 104;
+
+export type OtpStatus = "idle" | "verifying" | "success" | "error";
+
 /**
  * Six discrete digit slots instead of one stretched text input.
  *
- * The previous control was a single `<Input>` with
- * `className="text-center text-lg tracking-[0.4em]"`. Two things went wrong
- * with that:
+ * Why slots rather than one input with `tracking-[0.4em]`: letter-spacing is
+ * applied after the last character too, so a centred code rendered visibly
+ * left of centre, and a single stretched input has no height floor.
  *
- *  1. `letter-spacing` is applied AFTER every character, including the last
- *     one. So a centred 6-digit string carries 0.4em of invisible trailing
- *     space that is included in the centring calculation, and the digits
- *     render visibly left of centre. That is the "distorted" look — it gets
- *     worse as the field narrows, which is why it read worst on a laptop with
- *     the dialog at its `max-w-md` and on small phones.
+ * Typing. Each keystroke writes its slot and moves focus to the next one. The
+ * `onFocus` "snap to the first empty slot" guard used to read `digits` from the
+ * render closure, i.e. BEFORE the keystroke that caused the focus move, so the
+ * next slot looked out of turn and focus was bounced back. The following digit
+ * then overwrote the previous one, and every slot took two key presses. The
+ * guard now reads `latest`, a ref updated synchronously on every edit.
  *
- *  2. A single stretched input has no intrinsic height floor. Six slots in a
- *     grid do (`h-12` each, and the wrapper is `shrink-0`), so the row cannot
- *     be compressed by an ancestor and cannot be painted over by whatever
- *     follows it.
+ * Verification ("orbit"). When the last digit lands the parent submits. While
+ * `status` is "verifying" the row curls onto a ring around its centre and spins
+ * (transform-origin at the hub, rotate() draws the circle); on "success" the
+ * beads screw down into the hub and a single verified tile turns in; on
+ * "error" the ring unwinds back into a row and shakes. Colour is reserved for
+ * verdicts: focus is light only, green only on success, red only on error.
  *
- * Behaviour kept deliberately boring: value is still a plain string of digits
- * owned by the parent, so the submit path is unchanged.
+ * Value is still a plain digit string owned by the parent.
  */
 export function OtpInput({
   value,
   onChange,
+  onComplete,
+  status = "idle",
   id,
   disabled = false,
   autoFocus = false,
@@ -39,6 +52,9 @@ export function OtpInput({
 }: {
   value: string;
   onChange: (next: string) => void;
+  /** Called once each time the user (not a restore) fills the last slot. */
+  onComplete?: (code: string) => void;
+  status?: OtpStatus;
   id?: string;
   disabled?: boolean;
   autoFocus?: boolean;
@@ -52,11 +68,41 @@ export function OtpInput({
     return Array.from({ length: LENGTH }, (_, i) => clean[i] ?? "");
   }, [value]);
 
-  // autoFocus as an effect rather than the DOM attribute: the attribute fires
-  // before hydration settles and loses the focus on a re-render.
+  // Always-current digits for handlers that run before React re-renders
+  // (focus events fired synchronously from inside onChange).
+  const latest = React.useRef(digits);
+  React.useLayoutEffect(() => {
+    latest.current = digits;
+  }, [digits]);
+
+  // Set when the user edits; consumed by the completion effect so a code
+  // restored from sessionStorage never auto-submits.
+  const userEdited = React.useRef(false);
+
+  const reducedMotion = useReducedMotion();
+
   React.useEffect(() => {
     if (autoFocus) refs.current[0]?.focus();
   }, [autoFocus]);
+
+  const complete = digits.every(Boolean);
+
+  // Fire after commit so the parent's submit handler sees the new code.
+  React.useEffect(() => {
+    if (!userEdited.current) return;
+    userEdited.current = false;
+    if (complete) onComplete?.(digits.join(""));
+  }, [complete, digits, onComplete]);
+
+  // After a failed attempt, put the caret back on the last slot so the person
+  // can fix the code without reaching for the mouse.
+  const prevStatus = React.useRef(status);
+  React.useEffect(() => {
+    if (prevStatus.current === "verifying" && status === "error") {
+      refs.current[LENGTH - 1]?.focus();
+    }
+    prevStatus.current = status;
+  }, [status]);
 
   const focusAt = (i: number) => {
     const el = refs.current[Math.max(0, Math.min(LENGTH - 1, i))];
@@ -64,40 +110,53 @@ export function OtpInput({
     el?.select();
   };
 
-  const setDigits = (next: string[]) => onChange(next.join("").slice(0, LENGTH));
+  const commit = (next: string[]) => {
+    latest.current = next.map((d) => d ?? "");
+    userEdited.current = true;
+    onChange(next.join("").slice(0, LENGTH));
+  };
+
+  const fillFrom = (i: number, chars: string) => {
+    const next = [...latest.current];
+    let k = 0;
+    for (; k < chars.length && i + k < LENGTH; k++) next[i + k] = chars[k]!;
+    commit(next);
+    focusAt(i + k);
+  };
 
   const handleChange = (i: number, raw: string) => {
     const typed = raw.replace(/\D/g, "");
+    const current = latest.current[i] ?? "";
+
     if (!typed) {
-      const next = [...digits];
+      const next = [...latest.current];
       next[i] = "";
-      setDigits(next);
+      commit(next);
       return;
     }
 
-    // One field can receive the whole code: SMS/email autofill on iOS and
-    // Android delivers all six characters to whichever input has focus.
-    if (typed.length > 1) {
-      const next = [...digits];
-      for (let k = 0; k < typed.length && i + k < LENGTH; k++) next[i + k] = typed[k]!;
-      setDigits(next);
-      focusAt(i + typed.length);
+    // Typing into a filled slot whose text wasn't selected (caret before or
+    // after the old digit) yields two characters. That is one new digit, not a
+    // paste: keep whichever character isn't the old one.
+    if (typed.length === 2 && current && typed.includes(current)) {
+      const fresh = typed[0] === current ? typed[1]! : typed[0]!;
+      fillFrom(i, fresh);
       return;
     }
 
-    const next = [...digits];
-    next[i] = typed;
-    setDigits(next);
-    focusAt(i + 1);
+    // Otherwise several characters means autofill (iOS/Android deliver the
+    // whole code to the focused slot) — spread them forward.
+    fillFrom(i, typed);
   };
 
   const handleKeyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Backspace") {
-      if (digits[i]) return; // let the field clear itself first
+      if (latest.current[i]) return; // let the field clear itself first
       e.preventDefault();
-      const next = [...digits];
+      if (i === 0) return;
+      const next = [...latest.current];
       next[i - 1] = "";
-      setDigits(next);
+      commit(next);
       focusAt(i - 1);
       return;
     }
@@ -109,6 +168,12 @@ export function OtpInput({
     if (e.key === "ArrowRight") {
       e.preventDefault();
       focusAt(i + 1);
+      return;
+    }
+    // Retyping the same digit produces no change event; still advance.
+    if (/^\d$/.test(e.key) && latest.current[i] === e.key) {
+      e.preventDefault();
+      focusAt(i + 1);
     }
   };
 
@@ -116,65 +181,161 @@ export function OtpInput({
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "");
     if (!pasted) return;
     e.preventDefault();
-    const next = [...digits];
-    for (let k = 0; k < pasted.length && i + k < LENGTH; k++) next[i + k] = pasted[k]!;
-    setDigits(next);
-    focusAt(i + pasted.length);
+    fillFrom(i, pasted);
+  };
+
+  // ── Orbit state ──────────────────────────────────────────────────────────
+  const orbiting = !reducedMotion && complete && (status === "verifying" || status === "success");
+  const screwed = complete && status === "success";
+
+  // Measure slot pitch so each bead knows how far it sits from the hub.
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const [pitch, setPitch] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const measure = () => {
+      const a = refs.current[0]?.parentElement;
+      const b = refs.current[1]?.parentElement;
+      if (a && b) setPitch(b.offsetLeft - a.offsetLeft);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, []);
+
+  const beadTransform = (i: number) => {
+    if (screwed) return "translate(0px, 0px) scale(0)";
+    if (!orbiting) return "translate(0px, 0px) scale(1)";
+    const fromHub = (i - (LENGTH - 1) / 2) * pitch; // bead's resting x vs hub
+    const angle = (-90 + (360 / LENGTH) * i) * (Math.PI / 180);
+    const x = Math.cos(angle) * ORBIT_RADIUS - fromHub;
+    const y = Math.sin(angle) * ORBIT_RADIUS;
+    return `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${ORBIT_SCALE})`;
   };
 
   return (
     <div
-      role="group"
-      aria-label="Verification code"
-      aria-describedby={describedBy}
-      // grid + min-w-0 keeps six slots on one row at any width the dialog can
-      // reach, down to a 320px phone, without horizontal overflow.
-      className="grid shrink-0 grid-cols-6 gap-1.5 sm:gap-2"
+      className={cn(
+        "relative flex shrink-0 items-center justify-center",
+        "transition-[height] duration-500 ease-[var(--ease-lounge)]",
+        status === "error" && "animate-[otp-shake_0.42s_var(--ease-pour)]",
+      )}
+      style={{ height: orbiting && !screwed ? RING_H : ROW_H }}
     >
-      {digits.map((d, i) => (
-        <input
-          key={i}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          id={i === 0 ? id : undefined}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={LENGTH}
-          autoComplete={i === 0 ? "one-time-code" : "off"}
-          aria-label={`Digit ${i + 1} of ${LENGTH}`}
-          aria-invalid={invalid || undefined}
-          disabled={disabled}
-          value={d}
-          onChange={(e) => handleChange(i, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          onPaste={(e) => handlePaste(i, e)}
-          onFocus={(e) => {
-            // The value is a plain digit string, so a gap can't be
-            // represented: clicking slot 4 with only slot 1 filled wrote the
-            // digit into slot 2 and looked broken. Snap to the first empty
-            // slot instead, which is how every OTP field behaves. Once all
-            // six are filled there is no empty slot and any of them is
-            // directly editable.
-            const firstEmpty = digits.findIndex((x) => !x);
-            if (firstEmpty !== -1 && i > firstEmpty) {
-              focusAt(firstEmpty);
-              return;
-            }
-            e.currentTarget.select();
-          }}
-          className={cn(
-            "h-12 w-full min-w-0 rounded-lg border border-input bg-transparent",
-            "text-center font-mono text-lg tabular-nums text-foreground",
-            "outline-none transition-colors",
-            "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-            "disabled:pointer-events-none disabled:opacity-50",
-            "dark:bg-input/30",
-            invalid && "border-destructive ring-3 ring-destructive/20",
-          )}
-        />
-      ))}
+      <div
+        ref={rowRef}
+        role="group"
+        aria-label="Verification code"
+        aria-describedby={describedBy}
+        aria-busy={status === "verifying" || undefined}
+        // grid + min-w-0 keeps six slots on one row down to a 320px phone.
+        // When orbiting, this grid is the ring: its centre is the hub.
+        className="grid w-full grid-cols-6 gap-1.5 sm:gap-2"
+        style={
+          orbiting
+            ? {
+                animation:
+                  "otp-orbit-in 0.9s var(--ease-lounge) both, otp-orbit-spin 1.6s linear 0.9s infinite",
+              }
+            : undefined
+        }
+      >
+        {digits.map((d, i) => (
+          <div
+            key={i}
+            className="min-w-0 transition-[transform,opacity] ease-[var(--ease-lounge)]"
+            style={{
+              transform: beadTransform(i),
+              opacity: screwed ? 0 : 1,
+              // Stagger so the row curls up one bead after another.
+              transitionDuration: screwed ? "420ms" : "620ms",
+              transitionDelay: orbiting && !screwed ? `${i * 35}ms` : "0ms",
+            }}
+          >
+            <input
+              ref={(el) => {
+                refs.current[i] = el;
+              }}
+              id={i === 0 ? id : undefined}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={LENGTH}
+              autoComplete={i === 0 ? "one-time-code" : "off"}
+              aria-label={`Digit ${i + 1} of ${LENGTH}`}
+              aria-invalid={invalid || undefined}
+              disabled={disabled}
+              value={d}
+              onChange={(e) => handleChange(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
+              onPaste={(e) => handlePaste(i, e)}
+              onFocus={(e) => {
+                // A gap can't be represented in a plain digit string, so snap
+                // to the first empty slot. Reads `latest`, not the render
+                // closure — see the note at the top of the file.
+                const firstEmpty = latest.current.findIndex((x) => !x);
+                if (firstEmpty !== -1 && i > firstEmpty) {
+                  focusAt(firstEmpty);
+                  return;
+                }
+                e.currentTarget.select();
+              }}
+              // Counter-rotate so digits stay upright while the ring spins.
+              style={
+                orbiting
+                  ? {
+                      animation:
+                        "otp-counter-in 0.9s var(--ease-lounge) both, otp-counter-spin 1.6s linear 0.9s infinite",
+                    }
+                  : undefined
+              }
+              className={cn(
+                "block h-12 w-full min-w-0 rounded-lg border bg-transparent",
+                "text-center font-mono text-lg tabular-nums text-foreground caret-foreground/70",
+                "outline-none transition-[border-color,background-color,box-shadow] duration-200",
+                d ? "border-foreground/25" : "border-input",
+                // Attention is light, not colour.
+                "focus-visible:border-foreground/60 focus-visible:bg-foreground/[0.06]",
+                "focus-visible:shadow-[0_0_0_3px_rgb(255_255_255/0.07),0_0_18px_rgb(255_255_255/0.08)]",
+                "disabled:pointer-events-none disabled:opacity-100",
+                "dark:bg-input/30",
+                invalid && "border-destructive ring-3 ring-destructive/20",
+              )}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* The single verified tile the ring screws down into. */}
+      <div
+        aria-hidden={!screwed}
+        className={cn(
+          "pointer-events-none absolute inset-0 m-auto flex h-12 w-12 items-center justify-center",
+          "rounded-xl border border-sober/70 bg-sober/15 text-sober",
+          "shadow-[0_0_24px_color-mix(in_oklab,var(--color-sober)_35%,transparent)]",
+          "transition-[transform,opacity] duration-500 ease-[var(--ease-lounge)]",
+          screwed ? "scale-100 rotate-0 opacity-100 delay-200" : "scale-50 -rotate-90 opacity-0",
+        )}
+      >
+        <Check className="size-6" strokeWidth={2.5} />
+      </div>
+      <span className="sr-only" aria-live="polite">
+        {status === "verifying" ? "Verifying code" : status === "success" ? "Code verified" : ""}
+      </span>
     </div>
   );
+}
+
+function useReducedMotion() {
+  const [reduced, setReduced] = React.useState(false);
+  React.useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return reduced;
 }
