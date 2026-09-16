@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import { bustAuthCache } from "@/hooks/use-auth";
 import { safeReturnTo } from "@/lib/safe-return-to";
 import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 import { clerkErrorMessage as clerkError } from "@/lib/clerk-errors";
+import { activeEmailOtpSession, requestEmailOtp } from "@/lib/clerk-email-otp";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const LI_OTP_KEY = "ss_login_otp";
@@ -40,6 +41,7 @@ export function LoginForm({
   // backend decides if they're a real member.
   const { signUp, setActive: setActiveSignUp } = useSignUp();
   const { getToken } = useAuth();
+  const clerk = useClerk();
 
   const [step, setStep] = useState<"email" | "otp">("email");
   // Which Clerk object holds the in-flight verification.
@@ -59,6 +61,15 @@ export function LoginForm({
   const [otpDone, setOtpDone] = useState(false);
   const otpFormRef = useRef<HTMLFormElement>(null);
   const resendTimer = useRef<number | null>(null);
+
+  function codeRequested() {
+    setResent(true);
+    if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+    resendTimer.current = window.setTimeout(() => {
+      resendTimer.current = null;
+      setResent(false);
+    }, 30_000);
+  }
 
   // Restore an in-flight OTP step across a refresh (Clerk rehydrates its own
   // verification attempt; we just bring the step + email back).
@@ -142,63 +153,20 @@ export function LoginForm({
     }
 
     try {
-      const si = await signIn.create({ identifier: addr });
-      const factor = si.supportedFirstFactors?.find(
-        (f) => f.strategy === "email_code",
-      ) as { emailAddressId: string } | undefined;
-      if (!factor) {
-        setError("Email codes aren't enabled for this account.");
-        setLoading(false);
-        return;
-      }
-      await signIn.prepareFirstFactor({
-        strategy: "email_code",
-        emailAddressId: factor.emailAddressId,
-      });
+      const nextFlow = await requestEmailOtp(clerk, addr, "signin");
       trackAnalyticsEvent("auth_code_requested", { mode: "sign_in" });
-      setFlow("signin");
+      setFlow(nextFlow);
+      setEmail(addr);
+      setVerified(false);
+      codeRequested();
       setStep("otp");
       try {
-        sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email: addr, flow: "signin" }));
+        sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email: addr, flow: nextFlow }));
       } catch {
         /* ignore */
       }
-    } catch (e1) {
-      // We already confirmed above that this email IS a member in our DB, so
-      // signIn.create() failing USUALLY means Clerk simply hasn't seen this
-      // address yet (a legacy/password member). Verify via the signUp
-      // shadow-user flow; the backend still treats them as an existing member.
-      //
-      // But not every failure means "unknown identifier". A throttled or
-      // CAPTCHA-blocked signIn.create() used to fall through here too, and the
-      // signUp fallback then minted exactly the stranded Clerk shadow record
-      // that /api/auth/check-email exists to prevent. Surface those instead.
-      const code1 = (e1 as { errors?: { code?: string }[] })?.errors?.[0]?.code;
-      const NO_FALLBACK = new Set([
-        "too_many_requests",
-        "rate_limit_exceeded",
-        "captcha_invalid",
-        "captcha_unavailable",
-        "form_param_format_invalid",
-      ]);
-      if (code1 && NO_FALLBACK.has(code1)) {
-        setError(clerkError(e1, "Couldn't send a code to that email."));
-        return; // `finally` clears loading
-      }
-      try {
-        await signUp!.create({ emailAddress: addr });
-        await signUp!.prepareEmailAddressVerification({ strategy: "email_code" });
-        trackAnalyticsEvent("auth_code_requested", { mode: "sign_in" });
-        setFlow("signup");
-        setStep("otp");
-        try {
-          sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email: addr, flow: "signup" }));
-        } catch {
-          /* ignore */
-        }
-      } catch (e2) {
-        setError(clerkError(e2, "Couldn't send a code to that email."));
-      }
+    } catch (error) {
+      setError(clerkError(error, "Couldn't send a code to that email."));
     } finally {
       setLoading(false);
     }
@@ -207,6 +175,7 @@ export function LoginForm({
   // Step 2 — verify the OTP, then mint our session via the backend.
   async function handleOtp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading || resending) return;
     // The button is disabled until Clerk loads, but the OTP step can also be
     // restored from sessionStorage before that. Returning silently here left
     // the person tapping a live button that did nothing at all — say so.
@@ -215,7 +184,8 @@ export function LoginForm({
       return;
     }
     const entered = code.replace(/\D/g, "");
-    if (entered.length !== 6) {
+    const activeSession = activeEmailOtpSession(clerk, email);
+    if (!verified && !activeSession && entered.length !== 6) {
       setError("Enter all 6 digits of the code.");
       return;
     }
@@ -228,9 +198,9 @@ export function LoginForm({
       // network), and re-attempting a consumed first factor throws
       // client_state_invalid — which used to strand the person signed in to
       // Clerk but not to SIPSTORIES, with no way to retry.
-      if (!verified) {
+      if (!verified && !activeSession) {
         if (flow === "signin") {
-          const res = await signIn.attemptFirstFactor({
+          const res = signIn.status === "complete" ? signIn : await signIn.attemptFirstFactor({
             strategy: "email_code",
             code: entered,
           });
@@ -246,7 +216,7 @@ export function LoginForm({
             setLoading(false);
             return;
           }
-          let res = await signUp.attemptEmailAddressVerification({
+          let res = signUp.status === "complete" ? signUp : await signUp.attemptEmailAddressVerification({
             code: entered,
           });
           // The email is verified at this point. If Clerk is still holding the
@@ -269,7 +239,7 @@ export function LoginForm({
         setVerified(true);
       }
 
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       if (!token) {
         // Email is verified but Clerk hasn't handed us a session token. Don't
         // post `null` and let the backend answer "Missing verification token."
@@ -319,42 +289,23 @@ export function LoginForm({
   async function resend() {
     // The old gate required `signIn` even on the signup-shadow flow, where the
     // in-flight attempt lives on `signUp` — so that branch silently did nothing.
-    if (!isLoaded || resending) return;
+    if (!isLoaded || loading || resending || resent) return;
     setError(null);
     setResent(false);
     setResending(true);
+    setVerified(false);
     try {
-      if (flow === "signin") {
-        if (!signIn) throw new Error("Sign-in session lost. Please go back and try again.");
-        // Re-create the SignIn attempt so supportedFirstFactors is freshly populated.
-        const si = await signIn.create({ identifier: email });
-        const factor = si.supportedFirstFactors?.find(
-          (f) => f.strategy === "email_code",
-        ) as { emailAddressId: string } | undefined;
-        if (!factor) throw new Error("Email code factor not available. Please restart sign-in.");
-        await signIn.prepareFirstFactor({
-          strategy: "email_code",
-          emailAddressId: factor.emailAddressId,
-        });
-      } else {
-        if (!signUp) throw new Error("Sign-up session lost. Please go back and try again.");
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      }
-      // A fresh code invalidates the old one AND the attempt it belonged to, so
-      // the next submit must verify again rather than reuse the latch.
-      setVerified(false);
+      const nextFlow = await requestEmailOtp(clerk, email, flow);
+      setFlow(nextFlow);
+      try {
+        sessionStorage.setItem(LI_OTP_KEY, JSON.stringify({ step: "otp", email, flow: nextFlow }));
+      } catch { /* ignore */ }
       setCode("");
-      setResent(true);
+      codeRequested();
       trackAnalyticsEvent("auth_code_resent", { mode: "sign_in" });
-      // Brief cooldown so the success message lands and the button isn't spammed.
-      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
-      resendTimer.current = window.setTimeout(() => {
-        resendTimer.current = null;
-        setResent(false);
-        setResending(false);
-      }, 4000);
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
+    } finally {
       setResending(false);
     }
   }
@@ -390,10 +341,10 @@ export function LoginForm({
               value={code}
               onChange={setCode}
               onComplete={() => {
-                if (!loading) otpFormRef.current?.requestSubmit();
+                if (!loading && !resending) otpFormRef.current?.requestSubmit();
               }}
               status={otpDone ? "success" : loading ? "verifying" : error ? "error" : "idle"}
-              disabled={loading || otpDone}
+              disabled={loading || resending || otpDone}
               autoFocus
               invalid={Boolean(error)}
               describedBy={error ? "login-otp-error" : undefined}
@@ -417,7 +368,7 @@ export function LoginForm({
             variant="gold"
             size="lg"
             className="w-full"
-            disabled={loading || !isLoaded || code.length < 6}
+            disabled={loading || resending || !isLoaded || (!verified && !activeEmailOtpSession(clerk, email) && code.length < 6)}
           >
             {loading ? "Verifying…" : "Log in"}
           </Button>
@@ -426,7 +377,7 @@ export function LoginForm({
             <button
               type="button"
               onClick={resend}
-              disabled={resending}
+              disabled={!isLoaded || loading || resending || resent}
               className="hover:text-primary disabled:opacity-50"
             >
               Resend code
@@ -434,6 +385,7 @@ export function LoginForm({
             <span aria-hidden="true">·</span>
             <button
               type="button"
+              disabled={loading || resending}
               onClick={() => {
                 setStep("email");
                 setCode("");
@@ -458,7 +410,7 @@ export function LoginForm({
             aria-live="polite"
             className="min-h-[1rem] text-center text-xs text-muted-foreground"
           >
-            {resending && !resent ? "Sending a new code…" : resent ? "A new code is on its way" : ""}
+            {resending ? "Sending a new code..." : resent ? "Code requested. Check your inbox or spam folder. Resend is available after 30 seconds." : ""}
           </p>
         </form>
       </div>

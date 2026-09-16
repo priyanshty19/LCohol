@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Dices } from "lucide-react";
 import { useSignIn, useSignUp } from "@clerk/nextjs/legacy";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import { bustAuthCache } from "@/hooks/use-auth";
 import { safeReturnTo } from "@/lib/safe-return-to";
 import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
 import { clerkErrorMessage as clerkError } from "@/lib/clerk-errors";
+import { activeEmailOtpSession, requestEmailOtp } from "@/lib/clerk-email-otp";
 
 // Survives a refresh during the OTP wait — see the restore effect below.
 const SU_OTP_KEY = "ss_signup_otp";
@@ -71,6 +72,7 @@ export function SignupForm({
   // gets created. Without this, a stranded Clerk record permanently blocks signup.
   const { signIn, setActive: setActiveSignIn } = useSignIn();
   const { getToken } = useAuth();
+  const clerk = useClerk();
 
   const [step, setStep] = useState<"details" | "otp">("details");
   // Which Clerk object holds the in-flight verification for this signup.
@@ -88,6 +90,15 @@ export function SignupForm({
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const resendTimer = useRef<number | null>(null);
+
+  function codeRequested() {
+    setResent(true);
+    if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
+    resendTimer.current = window.setTimeout(() => {
+      resendTimer.current = null;
+      setResent(false);
+    }, 30_000);
+  }
   // DOB as separate parts so year is a single dropdown (no calendar paging).
   const [dobDay, setDobDay] = useState("");
   const [dobMonth, setDobMonth] = useState("");
@@ -151,7 +162,7 @@ export function SignupForm({
   // Step 1 — validate referral, then ask Clerk to email a code.
   async function handleDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!isLoaded || loading || resending) return;
     setLoading(true);
     setError(null);
 
@@ -247,39 +258,11 @@ export function SignupForm({
     };
 
     try {
-      await signUp.create({ emailAddress: email });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      goToOtp("signup");
+      const nextFlow = await requestEmailOtp(clerk, email, "signup");
+      setVerified(false);
+      codeRequested();
+      goToOtp(nextFlow);
     } catch (e) {
-      // "Identifier taken" means Clerk already has this email (an abandoned OTP
-      // shadow record) even though our DB may have no member. Don't dead-end —
-      // verify through the existing Clerk identity via signIn and still complete
-      // signup so the DB member is created. The membership pre-check and
-      // otp/complete both reject emails that already have a member account.
-      const code = (e as { errors?: { code?: string }[] })?.errors?.[0]?.code;
-      const identifierTaken =
-        code === "form_identifier_exists" ||
-        /taken|already.*(registered|exists)/i.test(clerkError(e, ""));
-      if (identifierTaken && signIn) {
-        try {
-          const si = await signIn.create({ identifier: email });
-          const factor = si.supportedFirstFactors?.find(
-            (f) => f.strategy === "email_code",
-          ) as { emailAddressId: string } | undefined;
-          if (!factor) throw new Error("no email_code factor");
-          await signIn.prepareFirstFactor({
-            strategy: "email_code",
-            emailAddressId: factor.emailAddressId,
-          });
-          goToOtp("signin");
-          setLoading(false);
-          return;
-        } catch (e2) {
-          setError(clerkError(e2, "Couldn't send a code to that email. Please try again."));
-          setLoading(false);
-          return;
-        }
-      }
       setError(
         clerkError(
           e,
@@ -294,6 +277,7 @@ export function SignupForm({
   // Step 2 — verify the OTP with Clerk, then create the member via our backend.
   async function handleOtp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading || resending) return;
     // The OTP step can be restored from sessionStorage before Clerk finishes
     // loading. Returning silently left a live button that did nothing at all.
     if (!isLoaded) {
@@ -301,7 +285,8 @@ export function SignupForm({
       return;
     }
     const entered = code.replace(/\D/g, "");
-    if (entered.length !== 6) {
+    const activeSession = activeEmailOtpSession(clerk, details.email);
+    if (!verified && !activeSession && entered.length !== 6) {
       setError("Enter all 6 digits of the code.");
       return;
     }
@@ -309,14 +294,14 @@ export function SignupForm({
     setError(null);
 
     try {
-      if (!verified) {
+      if (!verified && !activeSession) {
         if (verifyVia === "signin") {
           if (!signIn || !setActiveSignIn) {
             setError("Your sign-up timed out. Tap Resend code to get a new one.");
             setLoading(false);
             return;
           }
-          const res = await signIn.attemptFirstFactor({
+          const res = signIn.status === "complete" ? signIn : await signIn.attemptFirstFactor({
             strategy: "email_code",
             code: entered,
           });
@@ -327,7 +312,7 @@ export function SignupForm({
           }
           await setActiveSignIn({ session: res.createdSessionId });
         } else {
-          let res = await signUp.attemptEmailAddressVerification({
+          let res = signUp.status === "complete" ? signUp : await signUp.attemptEmailAddressVerification({
             code: entered,
           });
           // Email is verified here. Don't blame the code for fields the Clerk
@@ -349,7 +334,7 @@ export function SignupForm({
         setVerified(true);
       }
 
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       if (!token) {
         // Email is verified but Clerk hasn't handed us a session token. Don't
         // post `null` and let the backend answer "Missing verification token."
@@ -435,40 +420,23 @@ export function SignupForm({
   async function resend() {
     // Previously this had no pending/confirmation state at all: tapping "Resend
     // code" produced no visible change whatsoever, success or failure.
-    if (!isLoaded || resending) return;
+    if (!isLoaded || loading || resending || resent) return;
     setError(null);
     setResent(false);
     setResending(true);
+    setVerified(false);
     try {
-      if (verifyVia === "signin") {
-        if (!signIn) throw new Error("Sign-up session lost. Please go back and try again.");
-        const si = await signIn.create({ identifier: details.email });
-        const factor = si.supportedFirstFactors?.find(
-          (f) => f.strategy === "email_code",
-        ) as { emailAddressId: string } | undefined;
-        if (!factor) throw new Error("no email_code factor");
-        await signIn.prepareFirstFactor({
-          strategy: "email_code",
-          emailAddressId: factor.emailAddressId,
-        });
-      } else {
-        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      }
-      // A fresh code belongs to a fresh attempt, so drop the "already verified"
-      // latch — otherwise the next submit skips verification entirely and
-      // re-posts a token from the attempt the resend just replaced.
-      setVerified(false);
+      const nextFlow = await requestEmailOtp(clerk, details.email, verifyVia);
+      setVerifyVia(nextFlow);
+      try {
+        sessionStorage.setItem(SU_OTP_KEY, JSON.stringify({ step: "otp", details, username, verifyVia: nextFlow }));
+      } catch { /* ignore */ }
       setCode("");
-      setResent(true);
+      codeRequested();
       trackAnalyticsEvent("auth_code_resent", { mode: "sign_up" });
-      if (resendTimer.current !== null) window.clearTimeout(resendTimer.current);
-      resendTimer.current = window.setTimeout(() => {
-        resendTimer.current = null;
-        setResent(false);
-        setResending(false);
-      }, 4000);
     } catch (e) {
       setError(clerkError(e, "Couldn't resend the code."));
+    } finally {
       setResending(false);
     }
   }
@@ -495,10 +463,10 @@ export function SignupForm({
               value={code}
               onChange={setCode}
               onComplete={() => {
-                if (!loading) otpFormRef.current?.requestSubmit();
+                if (!loading && !resending) otpFormRef.current?.requestSubmit();
               }}
               status={otpDone ? "success" : loading ? "verifying" : error ? "error" : "idle"}
-              disabled={loading || otpDone}
+              disabled={loading || resending || otpDone}
               autoFocus
               invalid={Boolean(error)}
               describedBy={error ? "signup-otp-error" : undefined}
@@ -522,7 +490,7 @@ export function SignupForm({
             variant="gold"
             size="lg"
             className="w-full"
-            disabled={loading || !isLoaded || code.length < 6}
+            disabled={loading || resending || !isLoaded || (!verified && !activeEmailOtpSession(clerk, details.email) && code.length < 6)}
           >
             {loading ? "Verifying…" : "Verify & join"}
           </Button>
@@ -531,7 +499,7 @@ export function SignupForm({
             <button
               type="button"
               onClick={resend}
-              disabled={resending}
+              disabled={!isLoaded || loading || resending || resent}
               className="hover:text-primary disabled:opacity-50"
             >
               Resend code
@@ -539,6 +507,7 @@ export function SignupForm({
             <span aria-hidden="true">·</span>
             <button
               type="button"
+              disabled={loading || resending}
               onClick={() => {
                 setStep("details");
                 setCode("");
@@ -564,7 +533,7 @@ export function SignupForm({
             aria-live="polite"
             className="min-h-[1rem] text-center text-xs text-muted-foreground"
           >
-            {resending && !resent ? "Sending a new code…" : resent ? "A new code is on its way" : ""}
+            {resending ? "Sending a new code..." : resent ? "Code requested. Check your inbox or spam folder. Resend is available after 30 seconds." : ""}
           </p>
         </form>
       </div>
