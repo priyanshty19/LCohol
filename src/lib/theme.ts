@@ -52,6 +52,10 @@ export function applyTheme(theme: ThemeId, opts: { persist?: boolean } = {}) {
   window.dispatchEvent(new CustomEvent("themechange", { detail: theme }));
 
   if (opts.persist) {
+    // A deliberate pick IS today's answer — otherwise choosing "Chill Session"
+    // from the home rail at 9:00 still got you asked "What's the vibe today?"
+    // at 9:05.
+    markVibeChosenToday();
     // Fire-and-forget; the cookie already covers the unauthenticated case.
     fetch("/api/profile", {
       method: "PATCH",
@@ -59,6 +63,31 @@ export function applyTheme(theme: ThemeId, opts: { persist?: boolean } = {}) {
       body: JSON.stringify({ theme }),
     }).catch(() => {});
   }
+}
+
+// ---------------------------------------------------------------------------
+// "Vibe chosen today" record.
+//
+// The daily vibe prompt asks once per CALENDAR DAY, keyed on the user's LOCAL
+// date so the rollover is right per-user with no server cron or UTC math. It
+// lives here (rather than inside daily-vibe.tsx) because onboarding also needs
+// to stamp it: a vibe picked while creating the account IS that day's choice,
+// and re-asking "What's the vibe today?" moments later is the bug this shares
+// a fix with.
+export const VIBE_DAY_COOKIE = "sip_vibe_day";
+
+/** Local (NOT UTC) YYYY-MM-DD for the given instant. */
+export function vibeDayKey(d: Date = new Date()): string {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+/** Record that a vibe choice has been made (or offered) for today, so the daily
+ *  prompt does not ask again until the local date rolls over. */
+export function markVibeChosenToday() {
+  if (typeof document === "undefined") return;
+  document.cookie = `${VIBE_DAY_COOKIE}=${vibeDayKey()}; path=/; max-age=31536000; samesite=lax`;
 }
 
 export function getActiveTheme(): ThemeId {

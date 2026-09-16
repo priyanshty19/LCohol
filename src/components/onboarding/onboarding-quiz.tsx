@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { THEMES, applyTheme, vibeToTheme } from "@/lib/theme";
+import { THEMES, applyTheme, markVibeChosenToday, vibeToTheme } from "@/lib/theme";
 import { safeReturnTo } from "@/lib/safe-return-to";
 import { persistOnboardingProfile } from "@/lib/onboarding-profile";
 import { trackAnalyticsEvent, trackVirtualPageView } from "@/lib/analytics";
@@ -118,6 +118,13 @@ export function OnboardingQuiz({
   }
 
   function finish() {
+    // A vibe picked here IS today's vibe choice. Without this stamp the daily
+    // prompt ("What's the vibe today?") fired on the very next screen, asking
+    // again for something the user had just answered while creating the
+    // account. Stamping the same per-day record the prompt reads keeps the
+    // once-a-calendar-day behaviour intact — it simply starts counting from
+    // today instead of re-asking today.
+    if (vibe) markVibeChosenToday();
     persist(
       {
         preferredSpirits: drinks,
@@ -261,6 +268,8 @@ export function OnboardingQuiz({
                       active={vibe === o.id}
                       onClick={() => {
                         setVibe(o.id);
+                        // Preview only — `finish()` is what commits it (theme is
+                        // sent with the profile PATCH there).
                         applyTheme(vibeToTheme(o.id));
                       }}
                     />

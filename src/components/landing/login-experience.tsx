@@ -83,12 +83,16 @@ function Wordmark({ className }: { className?: string }) {
 // the two layouts.
 function AuthButtons({ setMode }: { setMode: (m: Mode) => void }) {
   return (
+    // Both CTAs sit on opaque theme-token surfaces (see cta-solid / cta-raised
+    // in globals.css). The secondary one used to be variant="outline", whose
+    // dark-mode fill is --input at 30% — ~3.6% white — which disappeared into
+    // the hero gradient.
     <div className="flex justify-center gap-3">
       <Button
         onClick={() => setMode("signin")}
         variant="default"
         size="lg"
-        className="flex-1"
+        className="cta-raised h-11 flex-1 text-base font-semibold"
       >
         Sign In
       </Button>
@@ -96,7 +100,7 @@ function AuthButtons({ setMode }: { setMode: (m: Mode) => void }) {
         onClick={() => setMode("signup")}
         variant="outline"
         size="lg"
-        className="flex-1"
+        className="cta-solid h-11 flex-1 text-base font-semibold"
       >
         Create Account
       </Button>
@@ -155,13 +159,16 @@ function AuthModal({
       >
         <div className="mb-3 flex shrink-0 items-center justify-between">
           {/* Mode switch — keeps signin/signup in one place, no page nav */}
-          <div className="inline-flex rounded-full border border-border/60 bg-card/60 p-1 text-sm">
+          {/* bg-card/60 let the backdrop-blurred hero show through and washed
+              out the inactive pill; the container is now opaque for the same
+              reason the CTAs are. */}
+          <div className="inline-flex rounded-full border border-border/60 bg-card p-1 text-sm shadow-[0_2px_10px_rgb(0_0_0_/_0.28)]">
             <button
               onClick={() => setMode("signin")}
               className={`rounded-full px-4 py-1.5 transition-colors ${
                 isSignin
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-card-foreground/75 hover:text-card-foreground"
               }`}
             >
               Sign In
@@ -171,7 +178,7 @@ function AuthModal({
               className={`rounded-full px-4 py-1.5 transition-colors ${
                 !isSignin
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-card-foreground/75 hover:text-card-foreground"
               }`}
             >
               Create Account
@@ -180,7 +187,7 @@ function AuthModal({
           <button
             onClick={close}
             aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card/60 text-muted-foreground transition-colors hover:text-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card text-card-foreground/75 shadow-[0_2px_10px_rgb(0_0_0_/_0.28)] transition-colors hover:text-card-foreground"
           >
             <X className="h-4 w-4" />
           </button>

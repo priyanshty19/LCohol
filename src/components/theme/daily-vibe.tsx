@@ -3,23 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
-import { THEMES, applyTheme, type ThemeId } from "@/lib/theme";
-import { getCookie, setCookie } from "@/lib/client-cookies";
+import {
+  THEMES,
+  applyTheme,
+  markVibeChosenToday,
+  vibeDayKey,
+  VIBE_DAY_COOKIE,
+  type ThemeId,
+} from "@/lib/theme";
+import { getCookie } from "@/lib/client-cookies";
 import { AGE_COOKIE } from "@/components/shared/age-gate-overlay";
 
 // One ask per calendar day. We store the local date we last prompted on; when
 // today's local date differs (i.e. midnight has rolled over in the user's own
-// timezone) we ask again. Using the LOCAL date string means the rollover is
-// correct per-user with no server cron or UTC math.
-const VIBE_DAY_COOKIE = "sip_vibe_day";
+// timezone) we ask again. The cookie name and the local-date key now live in
+// lib/theme.ts, because onboarding stamps the same record: a vibe picked while
+// creating the account counts as that day's choice, so this prompt must not
+// immediately ask for it again.
 const VIBES = THEMES.filter((t) => t.group === "vibe");
-
-function todayKey(): string {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
 
 /**
  * Daily, on-open prompt to set the app's vibe (which themes the whole app).
@@ -32,7 +33,7 @@ export function DailyVibe() {
   const firstVibeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const today = todayKey();
+    const today = vibeDayKey();
     if (getCookie(VIBE_DAY_COOKIE) === today) return; // already asked today
     let done = false;
     function attempt() {
@@ -49,7 +50,7 @@ export function DailyVibe() {
         done = true;
         // Stamp at SHOW time, not just on answer: makes "one ask per day" exact
         // and stops a second tab from double-prompting.
-        setCookie(VIBE_DAY_COOKIE, today);
+        markVibeChosenToday();
         setOpen(true);
       }
     }
@@ -68,7 +69,7 @@ export function DailyVibe() {
   // Belt-and-braces: the cookie is already stamped at show time, but stamp again
   // on interaction so the "asked today" record holds even on odd open paths.
   function markAsked() {
-    setCookie(VIBE_DAY_COOKIE, todayKey());
+    markVibeChosenToday();
   }
 
   const dismiss = useCallback(() => {
