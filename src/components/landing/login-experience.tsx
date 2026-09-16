@@ -124,17 +124,13 @@ function AuthModal({
 }) {
   const close = () => setMode(null);
 
-  // Esc to close + lock background scroll while open.
+  // Lock background scroll while open.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -148,7 +144,6 @@ function AuthModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-background/75 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={close}
       />
 
       {/* Dialog */}
