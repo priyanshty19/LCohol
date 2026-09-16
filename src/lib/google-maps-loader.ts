@@ -20,6 +20,7 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
 
     const fail = () => {
       delete mapsWindow.__sipStoriesMapsReady;
+      document.getElementById("gmaps-js")?.remove();
       reject(new Error("Google Maps failed to load"));
     };
     const existing = document.getElementById("gmaps-js");

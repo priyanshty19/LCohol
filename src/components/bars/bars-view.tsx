@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -268,15 +268,17 @@ export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
     );
   }
 
-  const visibleBars = nearby ? filterNearbyBars(bars, q) : bars;
+  const visibleBars = useMemo(() => nearby ? filterNearbyBars(bars, q) : bars, [nearby, bars, q]);
   const center: [number, number] = nearby && userLoc ? userLoc : CITY_CENTER[city] ?? [28.55, 77.15];
-  const mapBars = visibleBars.map((b) => ({
+  const mapBars = useMemo(() => visibleBars.map((b) => ({
     id: b.id,
     name: b.name,
     lat: b.lat,
     lng: b.lng,
     address: b.address,
-  }));
+    type: b.type,
+    rating: b.rating,
+  })), [visibleBars]);
 
   return (
     <div className="space-y-4">
@@ -385,10 +387,8 @@ export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
           ))}
         </div>
 
-        {/* isolate = own stacking context, so Leaflet's internal z-indexes (panes
-            up to ~700, controls ~1000) can't escape and render over fixed overlays
-            like the James panel (z-50). */}
-        <div className="isolate order-1 h-[42vh] overflow-hidden rounded-2xl border border-[var(--glass-border)] lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
+        {/* Keep map controls below fixed overlays such as the James panel. */}
+        <div className="isolate order-1 h-[52vh] min-h-[380px] overflow-hidden rounded-lg border border-[var(--glass-border)] lg:order-2 lg:sticky lg:top-20 lg:h-[70vh]">
           {mapReady ? (
             <BarsMap
               apiKey={mapsApiKey}
@@ -396,6 +396,11 @@ export function BarsView({ mapsApiKey }: { mapsApiKey: string }) {
               center={center}
               selectedId={selected}
               onSelect={setSelected}
+              locationLabel={nearby ? "Near you" : city}
+              onAskJames={(id) => {
+                const bar = visibleBars.find((item) => item.id === id);
+                if (bar) askJames(bar);
+              }}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-[#0c0d12] text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LocateFixed, Martini, Maximize, MessageCircle, Navigation, Plus, Minus } from "lucide-react";
 import { loadGoogleMaps } from "@/lib/google-maps-loader";
 
 export type MapBar = {
@@ -9,6 +10,8 @@ export type MapBar = {
   lat: number;
   lng: number;
   address: string | null;
+  type: string;
+  rating: number | string | null;
 };
 
 /* ------------------------------------------------------------------------
@@ -26,6 +29,10 @@ interface GMap {
   setZoom(z: number): void;
   getZoom(): number | undefined;
   setOptions(o: Record<string, unknown>): void;
+  fitBounds(bounds: GBounds, padding: number): void;
+}
+interface GBounds {
+  extend(p: LatLngLiteral): void;
 }
 interface GMarker {
   setMap(m: GMap | null): void;
@@ -34,11 +41,6 @@ interface GMarker {
   setZIndex(z: number): void;
   addListener(ev: string, cb: () => void): void;
 }
-interface GInfoWindow {
-  setContent(c: string): void;
-  open(o: { map: GMap; anchor: GMarker }): void;
-  close(): void;
-}
 interface GPoint {
   x: number;
   y: number;
@@ -46,7 +48,7 @@ interface GPoint {
 interface GMapsApi {
   Map: new (el: HTMLElement, opts: Record<string, unknown>) => GMap;
   Marker: new (opts: Record<string, unknown>) => GMarker;
-  InfoWindow: new () => GInfoWindow;
+  LatLngBounds: new () => GBounds;
   Point: new (x: number, y: number) => GPoint;
 }
 declare global {
@@ -82,6 +84,13 @@ const DARK_STYLE: MapStyle[] = [
 ];
 
 const LIGHT_STYLE: MapStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#eef1f0" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#49565c" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#cbd3d7" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#cce7ec" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#dce9e0" }] },
   { featureType: "poi", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
@@ -119,6 +128,12 @@ function useLightUi(): boolean {
  * glass the Bars tab uses in the nav, so a pin reads as "bar" at a glance
  * instead of as an anonymous dot. */
 const GLASS_PATH = "M3 2 H21 L13 12.5 V19 H17.5 V22 H6.5 V19 H11 V12.5 Z";
+const MAP_CONTROLS = [
+  { label: "Zoom in", Icon: Plus, action: "in" },
+  { label: "Zoom out", Icon: Minus, action: "out" },
+  { label: "Show all places", Icon: Maximize, action: "fit" },
+  { label: "Recenter map", Icon: LocateFixed, action: "center" },
+] as const;
 
 function pinIcon(active: boolean): Record<string, unknown> {
   return {
@@ -148,18 +163,23 @@ export default function BarsMap({
   center,
   selectedId,
   onSelect,
+  locationLabel,
+  onAskJames,
 }: {
   apiKey: string;
   bars: MapBar[];
   center: [number, number];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  locationLabel: string;
+  onAskJames: (id: string) => void;
 }) {
   const lightUi = useLightUi();
   const hostRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GMap | null>(null);
   const markersRef = useRef<Map<string, GMarker>>(new Map());
-  const infoRef = useRef<GInfoWindow | null>(null);
+  const [centerLat, centerLng] = center;
+  const selectedBar = bars.find((bar) => bar.id === selectedId);
   // onSelect lives in a ref so marker click handlers never need rebinding when
   // the parent re-renders with a new closure. Synced in an effect — writing a
   // ref during render is a React violation (react-hooks/refs).
@@ -170,6 +190,7 @@ export default function BarsMap({
 
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   // --- create the map once
   useEffect(() => {
     if (!apiKey) return;
@@ -182,11 +203,11 @@ export default function BarsMap({
           center: { lat: center[0], lng: center[1] },
           zoom: 12,
           disableDefaultUI: true,
-          zoomControl: true,
+          zoomControl: false,
+          gestureHandling: "cooperative",
           clickableIcons: false,
           styles: lightUi ? DARK_STYLE : LIGHT_STYLE,
         });
-        infoRef.current = new g.InfoWindow();
         setReady(true);
       })
       .catch(() => {
@@ -197,7 +218,7 @@ export default function BarsMap({
     };
     // Once on mount: later center/theme changes are handled by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [apiKey, attempt]);
 
   // --- theme swap
   useEffect(() => {
@@ -209,9 +230,9 @@ export default function BarsMap({
   useEffect(() => {
     if (!ready || !mapRef.current) return;
     const map = mapRef.current;
-    map.panTo({ lat: center[0], lng: center[1] });
+    map.panTo({ lat: centerLat, lng: centerLng });
     if ((map.getZoom() ?? 12) < 11) map.setZoom(12);
-  }, [ready, center]);
+  }, [ready, centerLat, centerLng]);
 
   // --- sync markers to the bars list
   useEffect(() => {
@@ -238,33 +259,55 @@ export default function BarsMap({
         });
         created.addListener("click", () => {
           onSelectRef.current(b.id);
-          const safe = (t: string) =>
-            t.replace(/[&<>"]/g, (c) =>
-              ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
-            );
-          infoRef.current?.setContent(
-            `<div style="color:#111"><strong>${safe(b.name)}</strong>${
-              b.address ? `<br/>${safe(b.address)}` : ""
-            }</div>`,
-          );
-          infoRef.current?.open({ map, anchor: created });
         });
         live.set(b.id, created);
         marker = created;
       } else {
         marker.setPosition({ lat: b.lat, lng: b.lng });
       }
-      marker.setIcon(pinIcon(b.id === selectedId));
-      marker.setZIndex(b.id === selectedId ? 999 : 1);
+      marker.setIcon(pinIcon(false));
     }
-  }, [ready, bars, selectedId]);
+  }, [ready, bars]);
+
+  useEffect(() => {
+    if (!ready) return;
+    for (const [id, marker] of markersRef.current) {
+      marker.setIcon(pinIcon(id === selectedId));
+      marker.setZIndex(id === selectedId ? 999 : 1);
+    }
+    if (selectedBar && mapRef.current) {
+      mapRef.current.panTo({ lat: selectedBar.lat, lng: selectedBar.lng });
+    }
+  }, [ready, bars, selectedId, selectedBar]);
+
+  function fitVenues() {
+    const map = mapRef.current;
+    if (!map || !bars.length) return;
+    if (bars.length === 1) {
+      map.panTo({ lat: bars[0].lat, lng: bars[0].lng });
+      map.setZoom(15);
+      return;
+    }
+    const bounds = new (gmaps().LatLngBounds)();
+    for (const bar of bars) bounds.extend({ lat: bar.lat, lng: bar.lng });
+    map.fitBounds(bounds, 48);
+  }
+
+  function handleControl(action: (typeof MAP_CONTROLS)[number]["action"]) {
+    const map = mapRef.current;
+    if (!map) return;
+    if (action === "fit") fitVenues();
+    else if (action === "center") {
+      map.panTo({ lat: centerLat, lng: centerLng });
+      map.setZoom(12);
+    } else map.setZoom(Math.max(3, Math.min(21, (map.getZoom() ?? 12) + (action === "in" ? 1 : -1))));
+  }
 
   // --- tear every marker down on unmount (the map node goes with the div)
   useEffect(
     () => () => {
       for (const m of markersRef.current.values()) m.setMap(null);
       markersRef.current.clear();
-      infoRef.current?.close();
     },
     [],
   );
@@ -276,13 +319,86 @@ export default function BarsMap({
       </Notice>
     );
   }
-  if (failed) return <Notice>Couldn&apos;t load Google Maps.</Notice>;
-
   return (
-    <div
-      ref={hostRef}
-      className="h-full w-full"
-      style={{ background: lightUi ? "#1d2026" : "#e7e9ec" }}
-    />
+    <section aria-label="SipStories Map" className="flex h-full min-h-0 flex-col bg-card text-card-foreground">
+      <header className="flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Martini aria-hidden="true" className="size-5 shrink-0 text-primary" />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">SipStories Map</h2>
+            <p className="truncate text-xs text-muted-foreground">{locationLabel}</p>
+          </div>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">{bars.length} places</span>
+      </header>
+      <div className="relative min-h-0 flex-1">
+        <div ref={hostRef} className="h-full w-full" style={{ background: lightUi ? "#1d2026" : "#eef1f0" }} />
+        {!ready && (
+          <div className="absolute inset-0">
+            <Notice>
+              <div role="status" className="space-y-2">
+                <p>{failed ? "Couldn't load the map." : "Loading map..."}</p>
+                {failed && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFailed(false);
+                      setAttempt((value) => value + 1);
+                    }}
+                    className="text-primary underline"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            </Notice>
+          </div>
+        )}
+        {ready && (
+          <div role="group" aria-label="Map controls" className="absolute right-3 top-3 flex flex-col gap-1 rounded-lg border border-border bg-card p-1 shadow-md">
+            {MAP_CONTROLS.map(({ label, Icon, action }) => (
+              <button
+                key={label}
+                type="button"
+                aria-label={label}
+                title={label}
+                disabled={action === "fit" && !bars.length}
+                onClick={() => handleControl(action)}
+                className="flex size-10 items-center justify-center rounded-md hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-40"
+              >
+                <Icon aria-hidden="true" className="size-4" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {selectedBar && (
+        <footer aria-live="polite" className="max-h-[40%] shrink-0 overflow-y-auto border-t border-border px-3 py-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="min-w-0 break-words text-sm font-semibold">{selectedBar.name}</h3>
+            {selectedBar.rating != null && <span className="shrink-0 text-xs text-primary">{Number(selectedBar.rating).toFixed(1)} / 5</span>}
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">{selectedBar.type}</p>
+          {selectedBar.address && <p className="mt-1 break-words text-xs text-muted-foreground">{selectedBar.address}</p>}
+          <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${selectedBar.lat},${selectedBar.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-9 items-center gap-1.5 text-primary hover:underline"
+            >
+              <Navigation aria-hidden="true" className="size-4" />Directions
+            </a>
+            <button
+              type="button"
+              onClick={() => onAskJames(selectedBar.id)}
+              className="inline-flex min-h-9 items-center gap-1.5 hover:text-primary"
+            >
+              <MessageCircle aria-hidden="true" className="size-4" />Ask James
+            </button>
+          </div>
+        </footer>
+      )}
+    </section>
   );
 }
