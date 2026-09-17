@@ -1160,32 +1160,3 @@
   font-size: 1.5rem;
   line-height: 1;
 }
-
-/* ============================================================
-   OTP orbit — the code row curls onto a ring while verifying.
-   One and a quarter turns in, then a steady spin. The digits
-   counter-rotate so they stay readable. See otp-input.tsx.
-   ============================================================ */
-@keyframes otp-orbit-in {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(450deg); }
-}
-@keyframes otp-orbit-spin {
-  from { transform: rotate(450deg); }
-  to { transform: rotate(810deg); }
-}
-@keyframes otp-counter-in {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-450deg); }
-}
-@keyframes otp-counter-spin {
-  from { transform: rotate(-450deg); }
-  to { transform: rotate(-810deg); }
-}
-@keyframes otp-shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-6px); }
-  40% { transform: translateX(5px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(2px); }
-}
