@@ -1163,7 +1163,7 @@
 
 /* ============================================================
    OTP orbit — the code row curls onto a ring while verifying.
-   One and a quarter turns in, then a steady spin. The digits
+   One and a quarter turns in, then a steady spin until verified. The digits
    counter-rotate so they stay readable. See otp-input.tsx.
    ============================================================ */
 @keyframes otp-orbit-in {

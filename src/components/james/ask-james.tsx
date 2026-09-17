@@ -173,7 +173,7 @@ export function AskJames() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: history.slice(-12).map((m) => ({ role: m.role, content: m.content })),
+          messages: history.filter((m) => !m.isError).slice(-12).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
       // A 500 answers with an HTML error page, so json() can throw — parse
@@ -212,7 +212,7 @@ export function AskJames() {
         {
           id: uid(),
           role: "assistant",
-          content: "James stepped away from the bar. Give it another go.",
+          content: "Couldn't connect. Check your connection and try again.",
           isError: true,
         },
       ]);

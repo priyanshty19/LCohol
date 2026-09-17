@@ -315,7 +315,7 @@ export function JamesWidget({ showLauncher = true }: { showLauncher?: boolean })
         signal: controller.signal,
         body: JSON.stringify({
           messages: next
-            .filter((m) => m !== greetingRef.current)
+            .filter((m) => m !== greetingRef.current && !m.isError)
             .slice(-12)
             .map((m) => ({ role: m.role, content: m.content })),
         }),

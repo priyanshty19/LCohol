@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
+import { createJamesModel, jamesProviderFailure } from "@/lib/james/model";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -79,32 +79,40 @@ export async function POST(request: NextRequest) {
     ),
   ];
 
-  const model = new ChatGroq({
-    apiKey: process.env.GROQ_API_KEY,
-    model: "qwen/qwen3.6-27b",
-    temperature: 0.7,
-    maxTokens: 700,
-    // Without this, qwen streams its <think> block straight into the bubble.
-    reasoningEffort: "none",
-  });
+  const model = createJamesModel();
+
+  // Confirm the provider accepted the request before committing a 200 stream.
+  let source: Awaited<ReturnType<typeof model.stream>>;
+  let first: Awaited<ReturnType<typeof source.next>>;
+  try {
+    source = await model.stream(lcMessages, { signal: request.signal });
+    first = await source.next();
+  } catch (err) {
+    const failure = jamesProviderFailure(err);
+    console.error("[james/chat] provider request failed", { status: (err as { status?: number })?.status ?? failure.status });
+    return NextResponse.json(
+      { error: failure.error },
+      { status: failure.status, headers: failure.headers },
+    );
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const s = await model.stream(lcMessages);
-        for await (const chunk of s) {
+        if (!first.done && typeof first.value.content === "string") {
+          controller.enqueue(encoder.encode(first.value.content));
+        }
+        for await (const chunk of source) {
           const t = typeof chunk.content === "string" ? chunk.content : "";
           if (t) controller.enqueue(encoder.encode(t));
         }
       } catch (err) {
-        console.error("[james/chat]", err);
-        controller.enqueue(
-          encoder.encode("\n\n(James got pulled away for a second — try me again.)")
-        );
-      } finally {
-        controller.close();
+        console.error("[james/chat] response stream interrupted");
+        controller.error(err);
+        return;
       }
+      controller.close();
     },
   });
 
