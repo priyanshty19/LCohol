@@ -56,10 +56,6 @@ export function LoginForm({
   // must NOT re-attempt the (now consumed) first factor — it would fail with
   // client_state_invalid and strand a half-signed-in user. Mirrors signup-form.
   const [verified, setVerified] = useState(false);
-  // True once the server has accepted the code and we're navigating away —
-  // the only moment the OTP row is allowed to turn green.
-  const [otpDone, setOtpDone] = useState(false);
-  const otpFormRef = useRef<HTMLFormElement>(null);
   const resendTimer = useRef<number | null>(null);
 
   function codeRequested() {
@@ -269,7 +265,6 @@ export function LoginForm({
         setLoading(false);
         return;
       }
-      setOtpDone(true);
       try {
         sessionStorage.removeItem(LI_OTP_KEY);
       } catch {
@@ -280,7 +275,6 @@ export function LoginForm({
       router.push(destination);
       router.refresh();
     } catch (e) {
-      setOtpDone(false);
       setError(clerkError(e, "Verification failed. Request a new code."));
       setLoading(false);
     }
@@ -325,7 +319,7 @@ export function LoginForm({
       // flow, nothing is absolutely positioned, nothing can shrink below its
       // content, and the gap is uniform. Boring on purpose.
       <div className="glass-panel overflow-hidden rounded-xl ring-1 ring-foreground/10">
-        <form ref={otpFormRef} onSubmit={handleOtp} className="flex w-full flex-col gap-5 p-5">
+        <form onSubmit={handleOtp} className="flex w-full flex-col gap-5 p-5">
           <div className="flex flex-col gap-1">
             <h2 className="font-display text-lg font-semibold">Check your email</h2>
             <p className="text-sm text-muted-foreground">
@@ -340,11 +334,7 @@ export function LoginForm({
               id="code"
               value={code}
               onChange={setCode}
-              onComplete={() => {
-                if (!loading && !resending) otpFormRef.current?.requestSubmit();
-              }}
-              status={otpDone ? "success" : loading ? "verifying" : error ? "error" : "idle"}
-              disabled={loading || resending || otpDone}
+              disabled={loading || resending}
               autoFocus
               invalid={Boolean(error)}
               describedBy={error ? "login-otp-error" : undefined}
