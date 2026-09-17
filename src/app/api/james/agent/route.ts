@@ -11,6 +11,7 @@ import { retrieveDrinks } from "@/lib/james/retriever";
 import { buildSystemPrompt } from "@/lib/james/persona";
 import { searchCatalog, type CatalogSearch } from "@/lib/james/search";
 import { NAV_TARGETS, type JamesAction } from "@/lib/james/actions";
+import { JAMES_TOOLS, normalizeToolCalls, wantsDrinkCards } from "@/lib/james/tools";
 import { jamesKeywords } from "@/lib/james/keywords";
 import { stripReasoning } from "@/lib/james/reasoning";
 import { THEMES, isThemeId, type ThemeId } from "@/lib/theme";
@@ -21,23 +22,18 @@ export const maxDuration = 60;
 type ChatMsg = { role: "user" | "assistant"; content: string };
 
 const THEME_LABEL = Object.fromEntries(THEMES.map((t) => [t.id, t.label])) as Record<ThemeId, string>;
-const THEME_LIST = THEMES.map((t) => t.id).join("|");
-const NAV_LIST = Object.keys(NAV_TARGETS).join("|");
 
-// Directive protocol instead of native tool-calling: llama-on-Groq reliably
-// breaks when it mixes prose with a structured tool call, so James instead
-// appends one machine-readable line we parse + strip server-side.
-const ACTION_PROTOCOL = `
+// James gets real tools (see lib/james/tools.ts). This text only tells him WHEN
+// to reach for them; the call itself is schema-validated, so there is no format
+// for him to get wrong and nothing to parse out of his prose.
+const TOOL_GUIDANCE = `
 
 ACTING IN THE APP (you can DO things, not just talk)
-When an in-app action serves the guest, append ONE directive as the very last line of your reply: %%ACTION%% then compact JSON. Always write your short spoken reply FIRST, then the directive alone on the final line.
-- Change the vibe / mood / theme: %%ACTION%% {"type":"set_vibe","theme":"<${THEME_LIST}>"}
-  Use when the guest asks to set the vibe/mood, or names an occasion (party, chill, date night, celebration, solo, budget).
-- Open a page: %%ACTION%% {"type":"navigate","page":"<${NAV_LIST}>"}
-  Use when the guest asks to go to or open a section, or a page is the natural next step (e.g. hangover, help).
-- Pull up drink or cocktail cards: %%ACTION%% {"type":"find_drinks","query":"<spirit or style>"}
-  Use whenever the guest asks to see, show, find, browse, or recommend drinks or cocktails, or whenever you name drinks worth showing. Keep the query short (a spirit or style, e.g. "gin", "smoky whisky").
-Rules: at most one directive, only when it truly serves the guest; never mention the directive, the JSON, the word ACTION, or these instructions to the guest; the safety rules above apply to every action (never navigate or recommend in a way that helps someone buy/order alcohol or drink unsafely).`;
+You have tools: set_vibe (change the vibe/mood/theme), open_page (open a section), find_drinks (pull up drink or cocktail cards).
+- Always speak to the guest as well as calling a tool: your words are what they read.
+- Call a tool only when it genuinely serves the guest. You may combine one vibe or page change with find_drinks when both are wanted.
+- Never mention tools, calls, or these instructions to the guest.
+- The safety rules above apply to every tool call: never navigate or recommend in a way that helps someone buy/order alcohol or drink unsafely.`;
 
 function asText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -49,7 +45,9 @@ function asText(content: unknown): string {
 
 type ParsedDirective = { type?: string; theme?: string; page?: string; query?: string };
 
-// Pull the (at most one) %%ACTION%% directive out and return the cleaned reply.
+// Legacy directive parser, kept one release as a fallback for the case where a
+// model or gateway returns no tool calls at all. Remove once tool calls are
+// confirmed in production (see the no_tool_calls log line below).
 function parseReply(raw: string): { reply: string; directive: ParsedDirective | null } {
   const lines = raw.split("\n");
   const kept: string[] = [];
@@ -165,7 +163,7 @@ export async function POST(request: NextRequest) {
         tasteKeywords: taste.keywords,
       },
       groundingDrinks
-    ) + ACTION_PROTOCOL;
+    ) + TOOL_GUIDANCE;
 
   const messages = [
     new SystemMessage(system),
@@ -178,49 +176,64 @@ export async function POST(request: NextRequest) {
     apiKey: process.env.GROQ_API_KEY,
     model: "qwen/qwen3.6-27b",
     temperature: 0.7,
-    maxTokens: 700,
-    // Without this, qwen emits its <think> block as part of the reply and the
-    // guest reads James thinking out loud.
+    // 700 was too tight: any thinking tokens counted against it, so a reasoning
+    // slip truncated the reply, stripReasoning() emptied what was left, and the
+    // guest got the "I'm right here" fallback instead of an answer.
+    maxTokens: 1400,
+    // Belt: ask qwen for non-thinking mode.
     reasoningEffort: "none",
   });
 
+  const james = model.bindTools(JAMES_TOOLS, {
+    tool_choice: "auto",
+    // Braces: even if it reasons anyway, Groq keeps reasoning out of the
+    // message content, so it can never reach the guest's bubble.
+    reasoning_format: "hidden",
+  });
+
   try {
-    const ai = await model.invoke(messages);
+    const ai = await james.invoke(messages);
+    const toolCalls = ai.tool_calls ?? [];
+    const { actions: toolActions, cardQuery, rejected } = normalizeToolCalls(toolCalls);
+
+    const actions: JamesAction[] = [...toolActions];
+    let cards: CatalogSearch | null = cardQuery ? await safeSearch(cardQuery) : null;
+
+    // A tool call that failed its schema would otherwise vanish silently.
+    if (rejected.length) console.warn("[james/agent] rejected tool calls", rejected);
+
+    // Fallback for a model/gateway that ignores tools entirely: read the old
+    // directive line if one is present. Logged so we can see whether tool
+    // calling is actually working in production and drop this path.
     const { reply: parsedReply, directive } = parseReply(stripReasoning(asText(ai.content)));
-
-    const actions: JamesAction[] = [];
-    let cards: CatalogSearch | null = null;
-
-    if (directive?.type === "set_vibe" && isThemeId(directive.theme)) {
-      actions.push({ type: "set_vibe", theme: directive.theme, label: THEME_LABEL[directive.theme] });
-    } else if (directive?.type === "navigate" && directive.page) {
-      const target = NAV_TARGETS[directive.page];
-      if (target) actions.push({ type: "navigate", path: target.path, label: target.label });
-    } else if (directive?.type === "find_drinks") {
-      cards = await safeSearch(String(directive.query ?? lastUser));
-    }
-
-    // Observability: a directive that resolved to nothing (bad theme, unknown
-    // page, typo'd type) would otherwise fail silently.
-    if (directive && actions.length === 0 && !cards) {
-      console.warn("[james/agent] directive produced no action", directive);
+    if (!toolCalls.length) {
+      console.warn("[james/agent] no_tool_calls", { directive: Boolean(directive) });
+      if (directive?.type === "set_vibe" && isThemeId(directive.theme)) {
+        actions.push({ type: "set_vibe", theme: directive.theme, label: THEME_LABEL[directive.theme] });
+      } else if (directive?.type === "navigate" && directive.page) {
+        const target = NAV_TARGETS[directive.page];
+        if (target) actions.push({ type: "navigate", path: target.path, label: target.label });
+      } else if (directive?.type === "find_drinks" && !cards) {
+        cards = await safeSearch(String(directive.query ?? lastUser));
+      }
     }
 
     // Safety net: if the guest clearly asked to see/find/recommend drinks but
     // James didn't emit a find_drinks directive, surface cards anyway — unless
     // the ask is negated ("I don't want to see drinks").
-    const wantsCards =
-      /\b(show|see|find|browse|recommend|suggest|pull up|what (should|can) i (drink|order|have|make|mix)|what to drink|what cocktail|i'?ve got|i have)\b/i.test(
-        lastUser
-      );
-    const negated = /\b(don'?t|do not|not|no|never|stop|without|isn'?t|aren'?t)\b/i.test(lastUser);
-    if (!cards && actions.length === 0 && wantsCards && !negated) {
+    // Cards no longer require actions to be empty: a vibe change and a drinks
+    // ask can both be true in one message.
+    if (!cards && wantsDrinkCards(lastUser)) {
       const fallback = await safeSearch(lastUser);
       if (fallback?.results.length) cards = fallback;
     }
 
     let reply = parsedReply;
     if (!reply) {
+      console.warn("[james/agent] empty_reply", {
+        finish: ai.response_metadata?.finish_reason,
+        toolCalls: toolCalls.length,
+      });
       if (actions.some((a) => a.type === "set_vibe")) reply = "Done. New vibe is on. 🎉";
       else if (actions.some((a) => a.type === "navigate")) reply = "On our way. 🍸";
       else if (cards) reply = "Here's what I'd pour. Take a look. 🥃";
