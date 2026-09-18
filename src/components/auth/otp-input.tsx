@@ -185,7 +185,7 @@ export function OtpInput({
   };
 
   // ── Orbit state ──────────────────────────────────────────────────────────
-  const orbiting = !reducedMotion && complete && (status === "verifying" || status === "success");
+  const orbiting = !reducedMotion && complete && status === "verifying";
   const screwed = complete && status === "success";
 
   // Measure slot pitch so each bead knows how far it sits from the hub.
@@ -237,7 +237,7 @@ export function OtpInput({
           orbiting
             ? {
                 animation:
-                  "otp-orbit-in 0.9s var(--ease-lounge) both, otp-orbit-spin 1.6s linear 0.9s infinite",
+                  "otp-orbit-in 0.9s var(--ease-lounge) both, otp-orbit-spin 2.1s linear 0.9s infinite",
               }
             : undefined
         }
@@ -287,7 +287,7 @@ export function OtpInput({
                 orbiting
                   ? {
                       animation:
-                        "otp-counter-in 0.9s var(--ease-lounge) both, otp-counter-spin 1.6s linear 0.9s infinite",
+                        "otp-counter-in 0.9s var(--ease-lounge) both, otp-counter-spin 2.1s linear 0.9s infinite",
                     }
                   : undefined
               }

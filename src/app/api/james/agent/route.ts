@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ChatGroq } from "@langchain/groq";
+import { createJamesModel, jamesProviderFailure } from "@/lib/james/model";
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages";
 import { getCurrentUser } from "@/lib/auth";
 import { logInteraction } from "@/lib/interactions";
@@ -174,18 +174,10 @@ export async function POST(request: NextRequest) {
     ),
   ];
 
-  const model = new ChatGroq({
-    apiKey: process.env.GROQ_API_KEY,
-    model: "qwen/qwen3.6-27b",
-    temperature: 0.7,
-    maxTokens: 700,
-    // Without this, qwen emits its <think> block as part of the reply and the
-    // guest reads James thinking out loud.
-    reasoningEffort: "none",
-  });
+  const model = createJamesModel();
 
   try {
-    const ai = await model.invoke(messages);
+    const ai = await model.invoke(messages, { signal: request.signal });
     const { reply: parsedReply, directive } = parseReply(stripReasoning(asText(ai.content)));
 
     const actions: JamesAction[] = [];
@@ -230,12 +222,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ reply, actions, cards });
   } catch (err) {
     if (isPoolExhausted(err)) return poolBusyResponse();
-    console.error("[james/agent]", err);
+    const failure = jamesProviderFailure(err);
+    console.error("[james/agent] provider request failed", { status: (err as { status?: number })?.status ?? failure.status });
     // Honest failure instead of a 200 that reads like James chose to say this:
     // the client renders it as an error the guest can act on (retry).
     return NextResponse.json(
-      { error: "James couldn't get through to the bar's AI just now. Try me again." },
-      { status: 502 }
+      { error: failure.error },
+      { status: failure.status, headers: failure.headers }
     );
   }
 }
